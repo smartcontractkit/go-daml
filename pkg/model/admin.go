@@ -63,3 +63,26 @@ type PackageDetails struct {
 	Name        string
 	Version     string
 }
+
+type CommandState int
+
+const (
+	CommandStateUnspecified CommandState = iota
+	CommandStatePending
+	CommandStateSucceeded
+	CommandStateFailed
+)
+
+type CommandStatus struct {
+	Started   *time.Time
+	Completed *time.Time
+	State     CommandState
+}
+
+type IdentityProviderConfig struct {
+	IdentityProviderID string
+	IsDeactivated      bool
+	Issuer             string
+	JwksURL            string
+	Audience           string
+}

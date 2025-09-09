@@ -71,13 +71,13 @@ func packageDetailsFromProto(pb *adminv2.PackageDetails) *model.PackageDetails {
 	if pb == nil {
 		return nil
 	}
-	
+
 	var knownSince *time.Time
 	if pb.KnownSince != nil {
 		t := pb.KnownSince.AsTime()
 		knownSince = &t
 	}
-	
+
 	return &model.PackageDetails{
 		PackageID:   pb.PackageId,
 		PackageSize: pb.PackageSize,

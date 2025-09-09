@@ -127,12 +127,12 @@ func partyDetailsFromProto(pb *adminv2.PartyDetails) *model.PartyDetails {
 	if pb == nil {
 		return nil
 	}
-	
+
 	localMetadata := make(map[string]string)
 	if pb.LocalMetadata != nil {
 		localMetadata = pb.LocalMetadata.Annotations
 	}
-	
+
 	return &model.PartyDetails{
 		Party:              pb.Party,
 		IsLocal:            pb.IsLocal,
@@ -145,14 +145,14 @@ func partyDetailsToProto(pd *model.PartyDetails) *adminv2.PartyDetails {
 	if pd == nil {
 		return nil
 	}
-	
+
 	var metadata *adminv2.ObjectMeta
 	if len(pd.LocalMetadata) > 0 {
 		metadata = &adminv2.ObjectMeta{
 			Annotations: pd.LocalMetadata,
 		}
 	}
-	
+
 	return &adminv2.PartyDetails{
 		Party:              pd.Party,
 		IsLocal:            pd.IsLocal,
