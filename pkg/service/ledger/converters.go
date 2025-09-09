@@ -1,0 +1,108 @@
+package ledger
+
+import (
+	"google.golang.org/protobuf/types/known/durationpb"
+	"google.golang.org/protobuf/types/known/timestamppb"
+
+	v2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
+	"github.com/noders-team/go-daml/pkg/model"
+)
+
+func commandsToProto(cmd *model.Commands) *v2.Commands {
+	if cmd == nil {
+		return nil
+	}
+
+	pbCmd := &v2.Commands{
+		WorkflowId:   cmd.WorkflowID,
+		UserId:       cmd.UserID,
+		CommandId:    cmd.CommandID,
+		Commands:     commandsArrayToProto(cmd.Commands),
+		ActAs:        cmd.ActAs,
+		ReadAs:       cmd.ReadAs,
+		SubmissionId: cmd.SubmissionID,
+	}
+
+	if cmd.MinLedgerTimeAbs != nil {
+		pbCmd.MinLedgerTimeAbs = timestamppb.New(*cmd.MinLedgerTimeAbs)
+	}
+
+	if cmd.MinLedgerTimeRel != nil {
+		pbCmd.MinLedgerTimeRel = durationpb.New(*cmd.MinLedgerTimeRel)
+	}
+
+	switch dp := cmd.DeduplicationPeriod.(type) {
+	case model.DeduplicationDuration:
+		pbCmd.DeduplicationPeriod = &v2.Commands_DeduplicationDuration{
+			DeduplicationDuration: durationpb.New(dp.Duration),
+		}
+	case model.DeduplicationOffset:
+		pbCmd.DeduplicationPeriod = &v2.Commands_DeduplicationOffset{
+			DeduplicationOffset: dp.Offset,
+		}
+	}
+
+	return pbCmd
+}
+
+func commandsArrayToProto(cmds []*model.Command) []*v2.Command {
+	if cmds == nil {
+		return nil
+	}
+
+	result := make([]*v2.Command, len(cmds))
+	for i, cmd := range cmds {
+		result[i] = commandToProto(cmd)
+	}
+	return result
+}
+
+func commandToProto(cmd *model.Command) *v2.Command {
+	if cmd == nil {
+		return nil
+	}
+
+	pbCmd := &v2.Command{}
+
+	switch c := cmd.Command.(type) {
+	case model.CreateCommand:
+		pbCmd.Command = &v2.Command_Create{
+			Create: &v2.CreateCommand{
+				TemplateId: &v2.Identifier{
+					PackageId:  "", // TODO: Parse template ID
+					ModuleName: "", // TODO: Parse template ID
+					EntityName: c.TemplateID,
+				},
+				CreateArguments: nil, // TODO: Convert arguments to proto Value
+			},
+		}
+	case model.ExerciseCommand:
+		pbCmd.Command = &v2.Command_Exercise{
+			Exercise: &v2.ExerciseCommand{
+				ContractId: c.ContractID,
+				TemplateId: &v2.Identifier{
+					PackageId:  "", // TODO: Parse template ID
+					ModuleName: "", // TODO: Parse template ID
+					EntityName: c.TemplateID,
+				},
+				Choice:            c.Choice,
+				ChoiceArgument:    nil, // TODO: Convert arguments to proto Value
+			},
+		}
+	case model.ExerciseByKeyCommand:
+		pbCmd.Command = &v2.Command_ExerciseByKey{
+			ExerciseByKey: &v2.ExerciseByKeyCommand{
+				TemplateId: &v2.Identifier{
+					PackageId:  "", // TODO: Parse template ID
+					ModuleName: "", // TODO: Parse template ID
+					EntityName: c.TemplateID,
+				},
+				ContractKey:       nil, // TODO: Convert key to proto Value
+				Choice:            c.Choice,
+				ChoiceArgument:    nil, // TODO: Convert arguments to proto Value
+			},
+		}
+	}
+
+	return pbCmd
+}

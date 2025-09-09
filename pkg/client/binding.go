@@ -2,6 +2,7 @@ package client
 
 import (
 	"github.com/noders-team/go-daml/pkg/service/admin"
+	"github.com/noders-team/go-daml/pkg/service/ledger"
 	"google.golang.org/grpc"
 )
 
@@ -14,6 +15,9 @@ type damlBindingClient struct {
 	PackageMng           admin.PackageManagement
 	CommandInspectionMng admin.CommandInspection
 	IdentityProviderMng  admin.IdentityProviderConfig
+	CommandCompletion    ledger.CommandCompletion
+	CommandService       ledger.CommandService
+	CommandSubmission    ledger.CommandSubmission
 }
 
 func NewDamlBindingClient(client *DamlClient, grpc *grpc.ClientConn) *damlBindingClient {
@@ -26,6 +30,9 @@ func NewDamlBindingClient(client *DamlClient, grpc *grpc.ClientConn) *damlBindin
 		PackageMng:           admin.NewPackageManagementClient(grpc),
 		CommandInspectionMng: admin.NewCommandInspectionClient(grpc),
 		IdentityProviderMng:  admin.NewIdentityProviderConfigClient(grpc),
+		CommandCompletion:    ledger.NewCommandCompletionClient(grpc),
+		CommandService:       ledger.NewCommandServiceClient(grpc),
+		CommandSubmission:    ledger.NewCommandSubmissionClient(grpc),
 	}
 }
 

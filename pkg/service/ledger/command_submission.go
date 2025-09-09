@@ -1,0 +1,39 @@
+package ledger
+
+import (
+	"context"
+	"fmt"
+
+	"google.golang.org/grpc"
+
+	v2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
+	"github.com/noders-team/go-daml/pkg/model"
+)
+
+type CommandSubmission interface {
+	Submit(ctx context.Context, req *model.SubmitRequest) (*model.SubmitResponse, error)
+}
+
+type commandSubmission struct {
+	client v2.CommandSubmissionServiceClient
+}
+
+func NewCommandSubmissionClient(conn *grpc.ClientConn) *commandSubmission {
+	client := v2.NewCommandSubmissionServiceClient(conn)
+	return &commandSubmission{
+		client: client,
+	}
+}
+
+func (c *commandSubmission) Submit(ctx context.Context, req *model.SubmitRequest) (*model.SubmitResponse, error) {
+	protoReq := &v2.SubmitRequest{
+		Commands: commandsToProto(req.Commands),
+	}
+
+	_, err := c.client.Submit(ctx, protoReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to submit command: %w", err)
+	}
+
+	return &model.SubmitResponse{}, nil
+}
