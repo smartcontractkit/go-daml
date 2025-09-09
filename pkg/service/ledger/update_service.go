@@ -1,0 +1,206 @@
+package ledger
+
+import (
+	"context"
+	"fmt"
+	"io"
+
+	"google.golang.org/grpc"
+
+	v2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
+	"github.com/noders-team/go-daml/pkg/model"
+)
+
+type UpdateService interface {
+	GetUpdates(ctx context.Context, req *model.GetUpdatesRequest) (<-chan *model.GetUpdatesResponse, <-chan error)
+	GetTransactionByID(ctx context.Context, req *model.GetTransactionByIDRequest) (*model.GetTransactionResponse, error)
+	GetTransactionByOffset(ctx context.Context, req *model.GetTransactionByOffsetRequest) (*model.GetTransactionResponse, error)
+}
+
+type updateService struct {
+	client v2.UpdateServiceClient
+}
+
+func NewUpdateServiceClient(conn *grpc.ClientConn) *updateService {
+	client := v2.NewUpdateServiceClient(conn)
+	return &updateService{
+		client: client,
+	}
+}
+
+func (c *updateService) GetUpdates(ctx context.Context, req *model.GetUpdatesRequest) (<-chan *model.GetUpdatesResponse, <-chan error) {
+	protoReq := &v2.GetUpdatesRequest{
+		BeginExclusive: req.BeginExclusive,
+		Filter:         transactionFilterToProto(req.Filter),
+		Verbose:        req.Verbose,
+	}
+
+	if req.EndInclusive != nil {
+		protoReq.EndInclusive = req.EndInclusive
+	}
+
+	stream, err := c.client.GetUpdates(ctx, protoReq)
+	if err != nil {
+		errCh := make(chan error, 1)
+		errCh <- fmt.Errorf("failed to get updates stream: %w", err)
+		close(errCh)
+		return nil, errCh
+	}
+
+	responseCh := make(chan *model.GetUpdatesResponse)
+	errCh := make(chan error, 1)
+
+	go func() {
+		defer close(responseCh)
+		defer close(errCh)
+
+		for {
+			resp, err := stream.Recv()
+			if err == io.EOF {
+				return
+			}
+			if err != nil {
+				errCh <- fmt.Errorf("stream error: %w", err)
+				return
+			}
+
+			modelResp := getUpdatesResponseFromProto(resp)
+			if modelResp != nil {
+				select {
+				case responseCh <- modelResp:
+				case <-ctx.Done():
+					return
+				}
+			}
+		}
+	}()
+
+	return responseCh, errCh
+}
+
+func (c *updateService) GetTransactionByID(ctx context.Context, req *model.GetTransactionByIDRequest) (*model.GetTransactionResponse, error) {
+	protoReq := &v2.GetTransactionByIdRequest{
+		UpdateId:          req.UpdateID,
+		RequestingParties: req.RequestingParties,
+	}
+
+	resp, err := c.client.GetTransactionById(ctx, protoReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get transaction by ID: %w", err)
+	}
+
+	return getTransactionResponseFromProto(resp), nil
+}
+
+func (c *updateService) GetTransactionByOffset(ctx context.Context, req *model.GetTransactionByOffsetRequest) (*model.GetTransactionResponse, error) {
+	protoReq := &v2.GetTransactionByOffsetRequest{
+		Offset:            req.Offset,
+		RequestingParties: req.RequestingParties,
+	}
+
+	resp, err := c.client.GetTransactionByOffset(ctx, protoReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get transaction by offset: %w", err)
+	}
+
+	return getTransactionResponseFromProto(resp), nil
+}
+
+func getUpdatesResponseFromProto(pb *v2.GetUpdatesResponse) *model.GetUpdatesResponse {
+	if pb == nil {
+		return nil
+	}
+
+	resp := &model.GetUpdatesResponse{
+		Update: &model.Update{},
+	}
+
+	switch update := pb.Update.(type) {
+	case *v2.GetUpdatesResponse_Transaction:
+		if update.Transaction != nil {
+			resp.Update.Transaction = transactionFromProto(update.Transaction)
+		}
+	case *v2.GetUpdatesResponse_Reassignment:
+		if update.Reassignment != nil {
+			resp.Update.Reassignment = reassignmentFromProto(update.Reassignment)
+		}
+	case *v2.GetUpdatesResponse_OffsetCheckpoint:
+		resp.Update.OffsetCheckpoint = &model.OffsetCheckpoint{
+			Offset: update.OffsetCheckpoint.Offset,
+		}
+	}
+
+	return resp
+}
+
+func getTransactionResponseFromProto(pb *v2.GetTransactionResponse) *model.GetTransactionResponse {
+	if pb == nil {
+		return nil
+	}
+
+	return &model.GetTransactionResponse{
+		Transaction: transactionFromProto(pb.Transaction),
+	}
+}
+
+func transactionFromProto(pb *v2.Transaction) *model.Transaction {
+	if pb == nil {
+		return nil
+	}
+
+	tx := &model.Transaction{
+		UpdateID:   pb.UpdateId,
+		CommandID:  pb.CommandId,
+		WorkflowID: pb.WorkflowId,
+		Offset:     pb.Offset,
+	}
+
+	if pb.EffectiveAt != nil {
+		t := pb.EffectiveAt.AsTime()
+		tx.EffectiveAt = &t
+	}
+
+	for _, event := range pb.Events {
+		tx.Events = append(tx.Events, eventFromProto(event))
+	}
+
+	return tx
+}
+
+func eventFromProto(pb *v2.Event) *model.Event {
+	if pb == nil {
+		return nil
+	}
+
+	event := &model.Event{}
+
+	switch e := pb.Event.(type) {
+	case *v2.Event_Created:
+		event.Created = createdEventFromProto(e.Created)
+	case *v2.Event_Archived:
+		event.Archived = archivedEventFromProto(e.Archived)
+	}
+
+	return event
+}
+
+func reassignmentFromProto(pb *v2.Reassignment) *model.Reassignment {
+	if pb == nil {
+		return nil
+	}
+
+	r := &model.Reassignment{
+		UpdateID: pb.UpdateId,
+		Offset:   pb.Offset,
+	}
+
+	// Note: The proto Reassignment doesn't contain all the fields in the model
+	// The additional fields may need to be extracted from ReassignmentEvents
+
+	if pb.RecordTime != nil {
+		t := pb.RecordTime.AsTime()
+		r.SubmittedAt = &t
+	}
+
+	return r
+}

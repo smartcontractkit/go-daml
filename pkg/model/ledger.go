@@ -81,13 +81,13 @@ type CompletionResponse interface {
 }
 
 type Completion struct {
-	CommandID    string
-	Status       Status
-	UpdateID     string
+	CommandID     string
+	Status        Status
+	UpdateID      string
 	TransactionID string
-	SubmissionID string
-	CompletedAt  *time.Time
-	Offset       int64
+	SubmissionID  string
+	CompletedAt   *time.Time
+	Offset        int64
 }
 
 func (Completion) isCompletionResponse() {}
@@ -126,4 +126,208 @@ type SubmitAndWaitRequest struct {
 type SubmitAndWaitResponse struct {
 	UpdateID         string
 	CompletionOffset int64
+}
+
+// Event Query Service types
+type GetEventsByContractIDRequest struct {
+	ContractID        string
+	RequestingParties []string
+}
+
+type GetEventsByContractIDResponse struct {
+	CreateEvent  *CreatedEvent
+	ArchiveEvent *ArchivedEvent
+}
+
+type CreatedEvent struct {
+	ContractID      string
+	TemplateID      string
+	CreateArguments map[string]interface{}
+	ContractKey     map[string]interface{}
+	CreatedAt       *time.Time
+	Signatories     []string
+	Observers       []string
+}
+
+type ArchivedEvent struct {
+	ContractID string
+	TemplateID string
+	ArchivedAt *time.Time
+}
+
+// Package Service types
+type ListPackagesRequest struct{}
+
+type ListPackagesResponse struct {
+	PackageIDs []string
+}
+
+type GetPackageRequest struct {
+	PackageID string
+}
+
+type GetPackageResponse struct {
+	ArchivePayload []byte
+	HashFunction   HashFunction
+	Hash           string
+}
+
+type HashFunction int32
+
+const (
+	HashFunctionSHA256 HashFunction = 0
+)
+
+type GetPackageStatusRequest struct {
+	PackageID string
+}
+
+type GetPackageStatusResponse struct {
+	PackageStatus PackageStatus
+}
+
+type PackageStatus int32
+
+const (
+	PackageStatusUnknown    PackageStatus = 0
+	PackageStatusRegistered PackageStatus = 1
+)
+
+// State Service types
+type GetActiveContractsRequest struct {
+	Filter  *TransactionFilter
+	Verbose bool
+}
+
+type GetActiveContractsResponse struct {
+	Offset          int64
+	WorkflowID      string
+	ActiveContracts []*CreatedEvent
+}
+
+type TransactionFilter struct {
+	FiltersByParty map[string]*Filters
+}
+
+type Filters struct {
+	Inclusive *InclusiveFilters
+}
+
+type InclusiveFilters struct {
+	TemplateFilters []*TemplateFilter
+}
+
+type TemplateFilter struct {
+	TemplateID              string
+	InterfaceFilter         *InterfaceFilter
+	IncludeCreatedEventBlob bool
+}
+
+type InterfaceFilter struct {
+	InterfaceID          string
+	IncludeInterfaceView bool
+}
+
+type GetConnectedSynchronizersRequest struct{}
+
+type GetConnectedSynchronizersResponse struct {
+	ConnectedSynchronizers []*ConnectedSynchronizer
+}
+
+type ConnectedSynchronizer struct {
+	SynchronizerID        string
+	ParticipantPermission ParticipantPermission
+}
+
+type ParticipantPermission int32
+
+const (
+	ParticipantPermissionSubmission   ParticipantPermission = 0
+	ParticipantPermissionConfirmation ParticipantPermission = 1
+	ParticipantPermissionObservation  ParticipantPermission = 2
+)
+
+type GetLedgerEndRequest struct{}
+
+type GetLedgerEndResponse struct {
+	Offset int64
+}
+
+type GetLatestPrunedOffsetsRequest struct{}
+
+type GetLatestPrunedOffsetsResponse struct {
+	ParticipantPrunedUpToInclusive          int64
+	AllDivulgedContractsPrunedUpToInclusive int64
+}
+
+// Update Service types
+type GetUpdatesRequest struct {
+	BeginExclusive int64
+	EndInclusive   *int64
+	Filter         *TransactionFilter
+	Verbose        bool
+}
+
+type GetUpdatesResponse struct {
+	Update *Update
+}
+
+type Update struct {
+	Transaction      *Transaction
+	Reassignment     *Reassignment
+	OffsetCheckpoint *OffsetCheckpoint
+}
+
+type Transaction struct {
+	UpdateID    string
+	CommandID   string
+	WorkflowID  string
+	EffectiveAt *time.Time
+	Events      []*Event
+	Offset      int64
+}
+
+type Event struct {
+	Created  *CreatedEvent
+	Archived *ArchivedEvent
+}
+
+type Reassignment struct {
+	UpdateID    string
+	Offset      int64
+	UnassignID  string
+	Source      string
+	Target      string
+	Counter     int64
+	SubmittedAt *time.Time
+	Unassigned  *time.Time
+	Reassigned  *time.Time
+}
+
+type GetTransactionByIDRequest struct {
+	UpdateID          string
+	RequestingParties []string
+}
+
+type GetTransactionResponse struct {
+	Transaction *Transaction
+}
+
+type GetTransactionByOffsetRequest struct {
+	Offset            int64
+	RequestingParties []string
+}
+
+// Version Service types
+type GetLedgerAPIVersionRequest struct{}
+
+type GetLedgerAPIVersionResponse struct {
+	Version  string
+	Features *FeaturesDescriptor
+}
+
+type FeaturesDescriptor struct {
+	UserManagement   bool
+	PartyManagement  bool
+	OffsetCheckpoint bool
 }

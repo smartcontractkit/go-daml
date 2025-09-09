@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"io"
 
+	rpcstatus "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	rpcstatus "google.golang.org/genproto/googleapis/rpc/status"
 
 	v2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/noders-team/go-daml/pkg/model"

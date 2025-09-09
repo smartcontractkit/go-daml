@@ -85,8 +85,8 @@ func commandToProto(cmd *model.Command) *v2.Command {
 					ModuleName: "", // TODO: Parse template ID
 					EntityName: c.TemplateID,
 				},
-				Choice:            c.Choice,
-				ChoiceArgument:    nil, // TODO: Convert arguments to proto Value
+				Choice:         c.Choice,
+				ChoiceArgument: nil, // TODO: Convert arguments to proto Value
 			},
 		}
 	case model.ExerciseByKeyCommand:
@@ -97,12 +97,93 @@ func commandToProto(cmd *model.Command) *v2.Command {
 					ModuleName: "", // TODO: Parse template ID
 					EntityName: c.TemplateID,
 				},
-				ContractKey:       nil, // TODO: Convert key to proto Value
-				Choice:            c.Choice,
-				ChoiceArgument:    nil, // TODO: Convert arguments to proto Value
+				ContractKey:    nil, // TODO: Convert key to proto Value
+				Choice:         c.Choice,
+				ChoiceArgument: nil, // TODO: Convert arguments to proto Value
 			},
 		}
 	}
 
 	return pbCmd
+}
+
+func transactionFilterToProto(filter *model.TransactionFilter) *v2.TransactionFilter {
+	if filter == nil {
+		return nil
+	}
+
+	pbFilter := &v2.TransactionFilter{
+		FiltersByParty: make(map[string]*v2.Filters),
+	}
+
+	for party, filters := range filter.FiltersByParty {
+		pbFilter.FiltersByParty[party] = filtersToProto(filters)
+	}
+
+	return pbFilter
+}
+
+func filtersToProto(filters *model.Filters) *v2.Filters {
+	if filters == nil {
+		return nil
+	}
+
+	pbFilters := &v2.Filters{}
+
+	// Convert template filters to cumulative filters
+	if filters.Inclusive != nil {
+		for _, tf := range filters.Inclusive.TemplateFilters {
+			pbFilters.Cumulative = append(pbFilters.Cumulative, &v2.CumulativeFilter{
+				IdentifierFilter: &v2.CumulativeFilter_TemplateFilter{
+					TemplateFilter: templateFilterToProto(tf),
+				},
+			})
+		}
+	}
+
+	return pbFilters
+}
+
+func templateFilterToProto(tf *model.TemplateFilter) *v2.TemplateFilter {
+	if tf == nil {
+		return nil
+	}
+
+	return &v2.TemplateFilter{
+		TemplateId: &v2.Identifier{
+			// TODO: Parse template ID
+			EntityName: tf.TemplateID,
+		},
+		IncludeCreatedEventBlob: tf.IncludeCreatedEventBlob,
+	}
+}
+
+func createdEventFromProto(pb *v2.CreatedEvent) *model.CreatedEvent {
+	if pb == nil {
+		return nil
+	}
+
+	event := &model.CreatedEvent{
+		ContractID:  pb.ContractId,
+		TemplateID:  pb.TemplateId.String(),
+		Signatories: pb.Signatories,
+		Observers:   pb.Observers,
+	}
+
+	// TODO: Convert proto Value to map[string]interface{}
+	// event.CreateArguments = valueToMap(pb.CreateArguments)
+	// event.ContractKey = valueToMap(pb.ContractKey)
+
+	return event
+}
+
+func archivedEventFromProto(pb *v2.ArchivedEvent) *model.ArchivedEvent {
+	if pb == nil {
+		return nil
+	}
+
+	return &model.ArchivedEvent{
+		ContractID: pb.ContractId,
+		TemplateID: pb.TemplateId.String(),
+	}
 }
