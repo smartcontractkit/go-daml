@@ -6,18 +6,22 @@ import (
 )
 
 type damlBindingClient struct {
-	client  *DamlClient
-	grpcCl  *grpc.ClientConn
-	UserMng admin.UserManagement
-	PartyMng admin.PartyManagement
+	client     *DamlClient
+	grpcCl     *grpc.ClientConn
+	UserMng    admin.UserManagement
+	PartyMng   admin.PartyManagement
+	PruningMng admin.ParticipantPruning
+	PackageMng admin.PackageManagement
 }
 
 func NewDamlBindingClient(client *DamlClient, grpc *grpc.ClientConn) *damlBindingClient {
 	return &damlBindingClient{
-		client:   client,
-		grpcCl:   grpc,
-		UserMng:  admin.NewUserManagementClient(grpc),
-		PartyMng: admin.NewPartyManagementClient(grpc),
+		client:     client,
+		grpcCl:     grpc,
+		UserMng:    admin.NewUserManagementClient(grpc),
+		PartyMng:   admin.NewPartyManagementClient(grpc),
+		PruningMng: admin.NewParticipantPruningClient(grpc),
+		PackageMng: admin.NewPackageManagementClient(grpc),
 	}
 }
 

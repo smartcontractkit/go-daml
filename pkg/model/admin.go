@@ -1,5 +1,7 @@
 package model
 
+import "time"
+
 type User struct {
 	ID                 string
 	PrimaryParty       string
@@ -46,4 +48,18 @@ type PartyDetails struct {
 type ListKnownPartiesResponse struct {
 	PartyDetails  []*PartyDetails
 	NextPageToken string
+}
+
+type PruneRequest struct {
+	PruneUpTo                 int64
+	SubmissionID              string
+	PruneAllDivulgedContracts bool
+}
+
+type PackageDetails struct {
+	PackageID   string
+	PackageSize uint64
+	KnownSince  *time.Time
+	Name        string
+	Version     string
 }
