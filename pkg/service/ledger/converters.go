@@ -1,12 +1,29 @@
 package ledger
 
 import (
+	"strings"
+
 	"google.golang.org/protobuf/types/known/durationpb"
+	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/noders-team/go-daml/pkg/model"
 )
+
+// parseTemplateID parses a template ID string into its components
+// Format: packageId:ModuleName:EntityName
+func parseTemplateID(templateID string) (packageID, moduleName, entityName string) {
+	parts := strings.Split(templateID, ":")
+	if len(parts) == 3 {
+		return parts[0], parts[1], parts[2]
+	} else if len(parts) == 2 {
+		// Handle case where packageId might be missing
+		return "", parts[0], parts[1]
+	}
+	// Return the whole string as entity name if parsing fails
+	return "", "", templateID
+}
 
 func commandsToProto(cmd *model.Commands) *v2.Commands {
 	if cmd == nil {
@@ -66,40 +83,43 @@ func commandToProto(cmd *model.Command) *v2.Command {
 
 	switch c := cmd.Command.(type) {
 	case model.CreateCommand:
+		packageID, moduleName, entityName := parseTemplateID(c.TemplateID)
 		pbCmd.Command = &v2.Command_Create{
 			Create: &v2.CreateCommand{
 				TemplateId: &v2.Identifier{
-					PackageId:  "", // TODO: Parse template ID
-					ModuleName: "", // TODO: Parse template ID
-					EntityName: c.TemplateID,
+					PackageId:  packageID,
+					ModuleName: moduleName,
+					EntityName: entityName,
 				},
-				CreateArguments: nil, // TODO: Convert arguments to proto Value
+				CreateArguments: convertToRecord(c.Arguments),
 			},
 		}
 	case model.ExerciseCommand:
+		packageID, moduleName, entityName := parseTemplateID(c.TemplateID)
 		pbCmd.Command = &v2.Command_Exercise{
 			Exercise: &v2.ExerciseCommand{
 				ContractId: c.ContractID,
 				TemplateId: &v2.Identifier{
-					PackageId:  "", // TODO: Parse template ID
-					ModuleName: "", // TODO: Parse template ID
-					EntityName: c.TemplateID,
+					PackageId:  packageID,
+					ModuleName: moduleName,
+					EntityName: entityName,
 				},
 				Choice:         c.Choice,
-				ChoiceArgument: nil, // TODO: Convert arguments to proto Value
+				ChoiceArgument: mapToValue(c.Arguments),
 			},
 		}
 	case model.ExerciseByKeyCommand:
+		packageID, moduleName, entityName := parseTemplateID(c.TemplateID)
 		pbCmd.Command = &v2.Command_ExerciseByKey{
 			ExerciseByKey: &v2.ExerciseByKeyCommand{
 				TemplateId: &v2.Identifier{
-					PackageId:  "", // TODO: Parse template ID
-					ModuleName: "", // TODO: Parse template ID
-					EntityName: c.TemplateID,
+					PackageId:  packageID,
+					ModuleName: moduleName,
+					EntityName: entityName,
 				},
-				ContractKey:    nil, // TODO: Convert key to proto Value
+				ContractKey:    mapToValue(c.Key),
 				Choice:         c.Choice,
-				ChoiceArgument: nil, // TODO: Convert arguments to proto Value
+				ChoiceArgument: mapToValue(c.Arguments),
 			},
 		}
 	}
@@ -149,10 +169,12 @@ func templateFilterToProto(tf *model.TemplateFilter) *v2.TemplateFilter {
 		return nil
 	}
 
+	packageID, moduleName, entityName := parseTemplateID(tf.TemplateID)
 	return &v2.TemplateFilter{
 		TemplateId: &v2.Identifier{
-			// TODO: Parse template ID
-			EntityName: tf.TemplateID,
+			PackageId:  packageID,
+			ModuleName: moduleName,
+			EntityName: entityName,
 		},
 		IncludeCreatedEventBlob: tf.IncludeCreatedEventBlob,
 	}
@@ -170,9 +192,17 @@ func createdEventFromProto(pb *v2.CreatedEvent) *model.CreatedEvent {
 		Observers:   pb.Observers,
 	}
 
-	// TODO: Convert proto Value to map[string]interface{}
-	// event.CreateArguments = valueToMap(pb.CreateArguments)
-	// event.ContractKey = valueToMap(pb.ContractKey)
+	// Convert proto Values to map[string]interface{}
+	if pb.CreateArguments != nil {
+		event.CreateArguments = valueFromRecord(pb.CreateArguments)
+	}
+	if pb.ContractKey != nil {
+		if key := valueFromProto(pb.ContractKey); key != nil {
+			if m, ok := key.(map[string]interface{}); ok {
+				event.ContractKey = m
+			}
+		}
+	}
 
 	return event
 }
@@ -186,4 +216,146 @@ func archivedEventFromProto(pb *v2.ArchivedEvent) *model.ArchivedEvent {
 		ContractID: pb.ContractId,
 		TemplateID: pb.TemplateId.String(),
 	}
+}
+
+// valueFromProto converts a proto Value to a map[string]interface{}
+func valueFromProto(pb *v2.Value) interface{} {
+	if pb == nil {
+		return nil
+	}
+
+	switch v := pb.Sum.(type) {
+	case *v2.Value_Unit:
+		return map[string]interface{}{"_type": "unit"}
+	case *v2.Value_Bool:
+		return v.Bool
+	case *v2.Value_Int64:
+		return v.Int64
+	case *v2.Value_Text:
+		return v.Text
+	case *v2.Value_Numeric:
+		return v.Numeric
+	case *v2.Value_Party:
+		return v.Party
+	case *v2.Value_ContractId:
+		return v.ContractId
+	case *v2.Value_Date:
+		return v.Date
+	case *v2.Value_Timestamp:
+		return v.Timestamp
+	case *v2.Value_Optional:
+		if v.Optional.Value != nil {
+			return valueFromProto(v.Optional.Value)
+		}
+		return nil
+	case *v2.Value_List:
+		result := make([]interface{}, len(v.List.Elements))
+		for i, elem := range v.List.Elements {
+			result[i] = valueFromProto(elem)
+		}
+		return result
+	case *v2.Value_Record:
+		if v.Record == nil {
+			return nil
+		}
+		record := make(map[string]interface{})
+		for _, field := range v.Record.Fields {
+			record[field.Label] = valueFromProto(field.Value)
+		}
+		return record
+	case *v2.Value_TextMap:
+		if v.TextMap == nil {
+			return nil
+		}
+		result := make(map[string]interface{})
+		for _, entry := range v.TextMap.Entries {
+			result[entry.Key] = valueFromProto(entry.Value)
+		}
+		return result
+	default:
+		return nil
+	}
+}
+
+// mapToValue converts a map[string]interface{} to a proto Value
+// This is a basic implementation that can be extended
+func mapToValue(data interface{}) *v2.Value {
+	if data == nil {
+		return nil
+	}
+
+	switch v := data.(type) {
+	case bool:
+		return &v2.Value{Sum: &v2.Value_Bool{Bool: v}}
+	case int64:
+		return &v2.Value{Sum: &v2.Value_Int64{Int64: v}}
+	case int:
+		return &v2.Value{Sum: &v2.Value_Int64{Int64: int64(v)}}
+	case string:
+		return &v2.Value{Sum: &v2.Value_Text{Text: v}}
+	case []interface{}:
+		elements := make([]*v2.Value, len(v))
+		for i, elem := range v {
+			elements[i] = mapToValue(elem)
+		}
+		return &v2.Value{
+			Sum: &v2.Value_List{
+				List: &v2.List{Elements: elements},
+			},
+		}
+	case map[string]interface{}:
+		// Check if it's a special type
+		if typeStr, ok := v["_type"].(string); ok && typeStr == "unit" {
+			return &v2.Value{Sum: &v2.Value_Unit{Unit: &emptypb.Empty{}}}
+		}
+
+		// Otherwise treat as record
+		fields := make([]*v2.RecordField, 0, len(v))
+		for key, val := range v {
+			if key != "_type" {
+				fields = append(fields, &v2.RecordField{
+					Label: key,
+					Value: mapToValue(val),
+				})
+			}
+		}
+		return &v2.Value{
+			Sum: &v2.Value_Record{
+				Record: &v2.Record{Fields: fields},
+			},
+		}
+	default:
+		// For unsupported types, return nil
+		return nil
+	}
+}
+
+// convertToRecord converts a map[string]interface{} to a proto Record
+func convertToRecord(data map[string]interface{}) *v2.Record {
+	if data == nil {
+		return nil
+	}
+
+	fields := make([]*v2.RecordField, 0, len(data))
+	for key, val := range data {
+		fields = append(fields, &v2.RecordField{
+			Label: key,
+			Value: mapToValue(val),
+		})
+	}
+
+	return &v2.Record{Fields: fields}
+}
+
+// valueFromRecord converts a proto Record to a map[string]interface{}
+func valueFromRecord(record *v2.Record) map[string]interface{} {
+	if record == nil {
+		return nil
+	}
+
+	result := make(map[string]interface{})
+	for _, field := range record.Fields {
+		result[field.Label] = valueFromProto(field.Value)
+	}
+	return result
 }
