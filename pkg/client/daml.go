@@ -2,56 +2,66 @@ package client
 
 import (
 	"context"
-	"crypto/tls"
-	"fmt"
 
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
+	"github.com/noders-team/go-daml/pkg/auth"
 )
 
 type DamlClient struct {
-	grpcAddress string
-	token       string
-	tlsConfig   *TlsConfig
+	config *Config
+}
+
+func NewDamlClient(token string, grpcAddress string) *DamlClient {
+	config := &Config{
+		Address: grpcAddress,
+	}
+	if token != "" {
+		config.Auth = &AuthConfig{
+			Token: token,
+		}
+	}
+	return &DamlClient{
+		config: config,
+	}
+}
+
+func (c *DamlClient) WithTLSConfig(cfg TlsConfig) *DamlClient {
+	c.config.TLS = &TLSConfig{
+		CertFile: cfg.Certificate,
+	}
+	return c
+}
+
+func (c *DamlClient) Build(ctx context.Context) (*damlBindingClient, error) {
+	client := NewClient(c.config)
+	conn, err := client.Connect(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewDamlBindingClient(c, conn.GRPCConn()), nil
 }
 
 type TlsConfig struct {
 	Certificate string
 }
 
-func NewDamlClient(token string, grpcAddress string) *DamlClient {
-	return &DamlClient{
-		grpcAddress: grpcAddress,
-		token:       token,
-	}
+func Connect(ctx context.Context, address string, opts ...ConfigOption) (*Connection, error) {
+	allOpts := append([]ConfigOption{WithAddress(address)}, opts...)
+	config := NewConfig(allOpts...)
+	client := NewClient(config)
+	return client.Connect(ctx)
 }
 
-func (c *DamlClient) WithTLSConfig(cfg TlsConfig) *DamlClient {
-	c.tlsConfig = &cfg
-	return c
+func ConnectWithToken(ctx context.Context, address, token string, opts ...ConfigOption) (*Connection, error) {
+	allOpts := append([]ConfigOption{WithAddress(address), WithToken(token)}, opts...)
+	config := NewConfig(allOpts...)
+	client := NewClient(config)
+	return client.Connect(ctx)
 }
 
-func (c *DamlClient) Build(ctx context.Context) (*damlBindingClient, error) {
-	var opts []grpc.DialOption
-
-	if c.tlsConfig != nil {
-		if c.tlsConfig.Certificate != "" {
-			creds, err := credentials.NewClientTLSFromFile(c.tlsConfig.Certificate, "")
-			if err != nil {
-				return nil, fmt.Errorf("failed to load TLS credentials: %w", err)
-			}
-			opts = append(opts, grpc.WithTransportCredentials(creds))
-		} else {
-			opts = append(opts, grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{})))
-		}
-	} else {
-		opts = append(opts, grpc.WithInsecure())
-	}
-
-	conn, err := grpc.Dial(c.grpcAddress, opts...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to DAML ledger: %w", err)
-	}
-
-	return NewDamlBindingClient(c, conn), nil
+func ConnectWithTokenProvider(ctx context.Context, address string, provider auth.TokenProvider, opts ...ConfigOption) (*Connection, error) {
+	allOpts := append([]ConfigOption{WithAddress(address), WithTokenProvider(provider)}, opts...)
+	config := NewConfig(allOpts...)
+	client := NewClient(config)
+	return client.Connect(ctx)
 }

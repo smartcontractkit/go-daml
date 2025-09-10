@@ -11,17 +11,13 @@ import (
 	"github.com/noders-team/go-daml/pkg/model"
 )
 
-// parseTemplateID parses a template ID string into its components
-// Format: packageId:ModuleName:EntityName
 func parseTemplateID(templateID string) (packageID, moduleName, entityName string) {
 	parts := strings.Split(templateID, ":")
 	if len(parts) == 3 {
 		return parts[0], parts[1], parts[2]
 	} else if len(parts) == 2 {
-		// Handle case where packageId might be missing
 		return "", parts[0], parts[1]
 	}
-	// Return the whole string as entity name if parsing fails
 	return "", "", templateID
 }
 
@@ -218,7 +214,6 @@ func archivedEventFromProto(pb *v2.ArchivedEvent) *model.ArchivedEvent {
 	}
 }
 
-// valueFromProto converts a proto Value to a map[string]interface{}
 func valueFromProto(pb *v2.Value) interface{} {
 	if pb == nil {
 		return nil
@@ -277,8 +272,6 @@ func valueFromProto(pb *v2.Value) interface{} {
 	}
 }
 
-// mapToValue converts a map[string]interface{} to a proto Value
-// This is a basic implementation that can be extended
 func mapToValue(data interface{}) *v2.Value {
 	if data == nil {
 		return nil
@@ -304,12 +297,9 @@ func mapToValue(data interface{}) *v2.Value {
 			},
 		}
 	case map[string]interface{}:
-		// Check if it's a special type
 		if typeStr, ok := v["_type"].(string); ok && typeStr == "unit" {
 			return &v2.Value{Sum: &v2.Value_Unit{Unit: &emptypb.Empty{}}}
 		}
-
-		// Otherwise treat as record
 		fields := make([]*v2.RecordField, 0, len(v))
 		for key, val := range v {
 			if key != "_type" {
@@ -325,12 +315,10 @@ func mapToValue(data interface{}) *v2.Value {
 			},
 		}
 	default:
-		// For unsupported types, return nil
 		return nil
 	}
 }
 
-// convertToRecord converts a map[string]interface{} to a proto Record
 func convertToRecord(data map[string]interface{}) *v2.Record {
 	if data == nil {
 		return nil
@@ -347,7 +335,6 @@ func convertToRecord(data map[string]interface{}) *v2.Record {
 	return &v2.Record{Fields: fields}
 }
 
-// valueFromRecord converts a proto Record to a map[string]interface{}
 func valueFromRecord(record *v2.Record) map[string]interface{} {
 	if record == nil {
 		return nil

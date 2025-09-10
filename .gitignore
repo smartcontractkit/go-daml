@@ -2,3 +2,4 @@
 .cover
 coverage.html
 vendor
+.DS_Store
