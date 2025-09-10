@@ -331,3 +331,125 @@ type FeaturesDescriptor struct {
 	PartyManagement  bool
 	OffsetCheckpoint bool
 }
+
+// Interactive Submission Service types
+type PrepareSubmissionRequest struct {
+	UserID                       string
+	CommandID                    string
+	Commands                     []*Command
+	MinLedgerTime                *MinLedgerTime
+	ActAs                        []string
+	ReadAs                       []string
+	DisclosedContracts           []*DisclosedContract
+	SynchronizerID               string
+	PackageIDSelectionPreference []string
+	VerboseHashing               bool
+	PrefetchContractKeys         []*PrefetchContractKey
+}
+
+type MinLedgerTime struct {
+	Time MinLedgerTimeValue
+}
+
+type MinLedgerTimeValue interface {
+	isMinLedgerTimeValue()
+}
+
+type MinLedgerTimeAbs struct {
+	Time time.Time
+}
+
+func (MinLedgerTimeAbs) isMinLedgerTimeValue() {}
+
+type MinLedgerTimeRel struct {
+	Duration time.Duration
+}
+
+func (MinLedgerTimeRel) isMinLedgerTimeValue() {}
+
+type DisclosedContract struct {
+	TemplateID       string
+	ContractID       string
+	CreatedEventBlob []byte
+	SynchronizerID   string
+}
+
+type PrefetchContractKey struct {
+	TemplateID  string
+	ContractKey map[string]interface{}
+}
+
+type PrepareSubmissionResponse struct {
+	PreparedTransaction     []byte
+	PreparedTransactionHash []byte
+	HashingSchemeVersion    HashingSchemeVersion
+	HashingDetails          string
+}
+
+type HashingSchemeVersion int32
+
+const (
+	HashingSchemeVersionUnspecified HashingSchemeVersion = 0
+	HashingSchemeVersionV2          HashingSchemeVersion = 2
+)
+
+type ExecuteSubmissionRequest struct {
+	PreparedTransaction  []byte
+	PartySignatures      []*SinglePartySignatures
+	DeduplicationPeriod  DeduplicationPeriod
+	SubmissionID         string
+	UserID               string
+	HashingSchemeVersion HashingSchemeVersion
+	MinLedgerTime        *MinLedgerTime
+}
+
+type SinglePartySignatures struct {
+	Party      string
+	Signatures []*Signature
+}
+
+type Signature struct {
+	Format               SignatureFormat
+	Signature            []byte
+	SignedBy             string
+	SigningAlgorithmSpec SigningAlgorithmSpec
+}
+
+type SignatureFormat int32
+
+const (
+	SignatureFormatUnspecified SignatureFormat = 0
+	SignatureFormatRaw         SignatureFormat = 1
+	SignatureFormatDER         SignatureFormat = 2
+	SignatureFormatConcat      SignatureFormat = 3
+	SignatureFormatSymbolic    SignatureFormat = 10000
+)
+
+type SigningAlgorithmSpec int32
+
+const (
+	SigningAlgorithmSpecUnspecified SigningAlgorithmSpec = 0
+	SigningAlgorithmSpecED25519     SigningAlgorithmSpec = 1
+	SigningAlgorithmSpecECDSASHA256 SigningAlgorithmSpec = 2
+	SigningAlgorithmSpecECDSASHA384 SigningAlgorithmSpec = 3
+)
+
+type ExecuteSubmissionResponse struct{}
+
+type GetPreferredPackageVersionRequest struct {
+	Parties        []string
+	PackageName    string
+	SynchronizerID string
+	VettingValidAt *time.Time
+}
+
+type GetPreferredPackageVersionResponse struct {
+	PackageReference *PackageReference
+	SynchronizerID   string
+}
+
+type PackageReference struct {
+	PackageID      string
+	PackageName    string
+	PackageVersion string
+}

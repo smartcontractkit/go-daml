@@ -3,11 +3,13 @@ package ledger
 import (
 	"strings"
 
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	v2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
+	"github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/interactive"
 	"github.com/noders-team/go-daml/pkg/model"
 )
 
@@ -343,6 +345,205 @@ func valueFromRecord(record *v2.Record) map[string]interface{} {
 	result := make(map[string]interface{})
 	for _, field := range record.Fields {
 		result[field.Label] = valueFromProto(field.Value)
+	}
+	return result
+}
+
+func prepareSubmissionRequestToProto(req *model.PrepareSubmissionRequest) *interactive.PrepareSubmissionRequest {
+	if req == nil {
+		return nil
+	}
+
+	pbReq := &interactive.PrepareSubmissionRequest{
+		UserId:                       req.UserID,
+		CommandId:                    req.CommandID,
+		Commands:                     commandsArrayToProto(req.Commands),
+		ActAs:                        req.ActAs,
+		ReadAs:                       req.ReadAs,
+		SynchronizerId:               req.SynchronizerID,
+		PackageIdSelectionPreference: req.PackageIDSelectionPreference,
+		VerboseHashing:               req.VerboseHashing,
+	}
+
+	if req.MinLedgerTime != nil {
+		pbReq.MinLedgerTime = minLedgerTimeToProto(req.MinLedgerTime)
+	}
+
+	if req.DisclosedContracts != nil {
+		pbReq.DisclosedContracts = disclosedContractsToProto(req.DisclosedContracts)
+	}
+
+	if req.PrefetchContractKeys != nil {
+		pbReq.PrefetchContractKeys = prefetchContractKeysToProto(req.PrefetchContractKeys)
+	}
+
+	return pbReq
+}
+
+func minLedgerTimeToProto(mlt *model.MinLedgerTime) *interactive.MinLedgerTime {
+	if mlt == nil || mlt.Time == nil {
+		return nil
+	}
+
+	pbMLT := &interactive.MinLedgerTime{}
+
+	switch t := mlt.Time.(type) {
+	case model.MinLedgerTimeAbs:
+		pbMLT.Time = &interactive.MinLedgerTime_MinLedgerTimeAbs{
+			MinLedgerTimeAbs: timestamppb.New(t.Time),
+		}
+	case model.MinLedgerTimeRel:
+		pbMLT.Time = &interactive.MinLedgerTime_MinLedgerTimeRel{
+			MinLedgerTimeRel: durationpb.New(t.Duration),
+		}
+	}
+
+	return pbMLT
+}
+
+func disclosedContractsToProto(contracts []*model.DisclosedContract) []*v2.DisclosedContract {
+	if contracts == nil {
+		return nil
+	}
+
+	result := make([]*v2.DisclosedContract, len(contracts))
+	for i, contract := range contracts {
+		result[i] = disclosedContractToProto(contract)
+	}
+	return result
+}
+
+func disclosedContractToProto(contract *model.DisclosedContract) *v2.DisclosedContract {
+	if contract == nil {
+		return nil
+	}
+
+	packageID, moduleName, entityName := parseTemplateID(contract.TemplateID)
+	pbContract := &v2.DisclosedContract{
+		TemplateId: &v2.Identifier{
+			PackageId:  packageID,
+			ModuleName: moduleName,
+			EntityName: entityName,
+		},
+		ContractId:       contract.ContractID,
+		SynchronizerId:   contract.SynchronizerID,
+		CreatedEventBlob: contract.CreatedEventBlob,
+	}
+
+	return pbContract
+}
+
+func prefetchContractKeysToProto(keys []*model.PrefetchContractKey) []*v2.PrefetchContractKey {
+	if keys == nil {
+		return nil
+	}
+
+	result := make([]*v2.PrefetchContractKey, len(keys))
+	for i, key := range keys {
+		packageID, moduleName, entityName := parseTemplateID(key.TemplateID)
+		result[i] = &v2.PrefetchContractKey{
+			TemplateId: &v2.Identifier{
+				PackageId:  packageID,
+				ModuleName: moduleName,
+				EntityName: entityName,
+			},
+			ContractKey: mapToValue(key.ContractKey),
+		}
+	}
+	return result
+}
+
+func prepareSubmissionResponseFromProto(pb *interactive.PrepareSubmissionResponse) *model.PrepareSubmissionResponse {
+	if pb == nil {
+		return nil
+	}
+
+	resp := &model.PrepareSubmissionResponse{
+		PreparedTransactionHash: pb.PreparedTransactionHash,
+		HashingSchemeVersion:    model.HashingSchemeVersion(pb.HashingSchemeVersion),
+	}
+
+	if pb.PreparedTransaction != nil {
+		data, _ := proto.Marshal(pb.PreparedTransaction)
+		resp.PreparedTransaction = data
+	}
+
+	if pb.HashingDetails != nil {
+		resp.HashingDetails = *pb.HashingDetails
+	}
+
+	return resp
+}
+
+func executeSubmissionRequestToProto(req *model.ExecuteSubmissionRequest) *interactive.ExecuteSubmissionRequest {
+	if req == nil {
+		return nil
+	}
+
+	pbReq := &interactive.ExecuteSubmissionRequest{
+		SubmissionId:         req.SubmissionID,
+		UserId:               req.UserID,
+		HashingSchemeVersion: interactive.HashingSchemeVersion(req.HashingSchemeVersion),
+	}
+
+	if req.PreparedTransaction != nil {
+		pt := &interactive.PreparedTransaction{}
+		proto.Unmarshal(req.PreparedTransaction, pt)
+		pbReq.PreparedTransaction = pt
+	}
+
+	if req.PartySignatures != nil && len(req.PartySignatures) > 0 {
+		pbReq.PartySignatures = &interactive.PartySignatures{
+			Signatures: singlePartySignaturesToProto(req.PartySignatures),
+		}
+	}
+
+	if req.MinLedgerTime != nil {
+		pbReq.MinLedgerTime = minLedgerTimeToProto(req.MinLedgerTime)
+	}
+
+	switch dp := req.DeduplicationPeriod.(type) {
+	case model.DeduplicationDuration:
+		pbReq.DeduplicationPeriod = &interactive.ExecuteSubmissionRequest_DeduplicationDuration{
+			DeduplicationDuration: durationpb.New(dp.Duration),
+		}
+	case model.DeduplicationOffset:
+		pbReq.DeduplicationPeriod = &interactive.ExecuteSubmissionRequest_DeduplicationOffset{
+			DeduplicationOffset: dp.Offset,
+		}
+	}
+
+	return pbReq
+}
+
+func singlePartySignaturesToProto(sigs []*model.SinglePartySignatures) []*interactive.SinglePartySignatures {
+	if sigs == nil {
+		return nil
+	}
+
+	result := make([]*interactive.SinglePartySignatures, len(sigs))
+	for i, sig := range sigs {
+		result[i] = &interactive.SinglePartySignatures{
+			Party:      sig.Party,
+			Signatures: signaturesToProto(sig.Signatures),
+		}
+	}
+	return result
+}
+
+func signaturesToProto(sigs []*model.Signature) []*interactive.Signature {
+	if sigs == nil {
+		return nil
+	}
+
+	result := make([]*interactive.Signature, len(sigs))
+	for i, sig := range sigs {
+		result[i] = &interactive.Signature{
+			Format:               interactive.SignatureFormat(sig.Format),
+			Signature:            sig.Signature,
+			SignedBy:             sig.SignedBy,
+			SigningAlgorithmSpec: interactive.SigningAlgorithmSpec(sig.SigningAlgorithmSpec),
+		}
 	}
 	return result
 }
