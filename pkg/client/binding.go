@@ -3,27 +3,29 @@ package client
 import (
 	"github.com/noders-team/go-daml/pkg/service/admin"
 	"github.com/noders-team/go-daml/pkg/service/ledger"
+	"github.com/noders-team/go-daml/pkg/service/testing"
 	"google.golang.org/grpc"
 )
 
 type damlBindingClient struct {
-	client                     *DamlClient
-	grpcCl                     *grpc.ClientConn
-	UserMng                    admin.UserManagement
-	PartyMng                   admin.PartyManagement
-	PruningMng                 admin.ParticipantPruning
-	PackageMng                 admin.PackageManagement
-	CommandInspectionMng       admin.CommandInspection
-	IdentityProviderMng        admin.IdentityProviderConfig
-	CommandCompletion          ledger.CommandCompletion
-	CommandService             ledger.CommandService
-	CommandSubmission          ledger.CommandSubmission
-	EventQuery                 ledger.EventQuery
-	PackageService             ledger.PackageService
-	StateService               ledger.StateService
-	UpdateService              ledger.UpdateService
-	VersionService             ledger.VersionService
+	client                       *DamlClient
+	grpcCl                       *grpc.ClientConn
+	UserMng                      admin.UserManagement
+	PartyMng                     admin.PartyManagement
+	PruningMng                   admin.ParticipantPruning
+	PackageMng                   admin.PackageManagement
+	CommandInspectionMng         admin.CommandInspection
+	IdentityProviderMng          admin.IdentityProviderConfig
+	CommandCompletion            ledger.CommandCompletion
+	CommandService               ledger.CommandService
+	CommandSubmission            ledger.CommandSubmission
+	EventQuery                   ledger.EventQuery
+	PackageService               ledger.PackageService
+	StateService                 ledger.StateService
+	UpdateService                ledger.UpdateService
+	VersionService               ledger.VersionService
 	InteractiveSubmissionService ledger.InteractiveSubmissionService
+	TimeService                  testing.TimeService
 }
 
 func NewDamlBindingClient(client *DamlClient, grpc *grpc.ClientConn) *damlBindingClient {
@@ -45,6 +47,7 @@ func NewDamlBindingClient(client *DamlClient, grpc *grpc.ClientConn) *damlBindin
 		UpdateService:                ledger.NewUpdateServiceClient(grpc),
 		VersionService:               ledger.NewVersionServiceClient(grpc),
 		InteractiveSubmissionService: ledger.NewInteractiveSubmissionServiceClient(grpc),
+		TimeService:                  testing.NewTimeServiceClient(grpc),
 	}
 }
 
