@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/types/known/fieldmaskpb"
 
 	adminv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/admin"
 	"github.com/noders-team/go-daml/pkg/model"
@@ -15,7 +16,7 @@ type PartyManagement interface {
 	GetParties(ctx context.Context, parties []string, identityProviderID string) ([]*model.PartyDetails, error)
 	ListKnownParties(ctx context.Context, pageToken string, pageSize int32, identityProviderID string) (*model.ListKnownPartiesResponse, error)
 	AllocateParty(ctx context.Context, partyIDHint string, localMetadata map[string]string, identityProviderID string) (*model.PartyDetails, error)
-	UpdatePartyDetails(ctx context.Context, party *model.PartyDetails) (*model.PartyDetails, error)
+	UpdatePartyDetails(ctx context.Context, party *model.PartyDetails, updateMask *model.UpdateMask) (*model.PartyDetails, error)
 	UpdatePartyIdentityProviderID(ctx context.Context, party string, sourceIdentityProviderID string, targetIdentityProviderID string) error
 }
 
@@ -95,9 +96,15 @@ func (c *partyManagement) AllocateParty(ctx context.Context, partyIDHint string,
 	return partyDetailsFromProto(resp.PartyDetails), nil
 }
 
-func (c *partyManagement) UpdatePartyDetails(ctx context.Context, party *model.PartyDetails) (*model.PartyDetails, error) {
+func (c *partyManagement) UpdatePartyDetails(ctx context.Context, party *model.PartyDetails, updateMask *model.UpdateMask) (*model.PartyDetails, error) {
 	req := &adminv2.UpdatePartyDetailsRequest{
 		PartyDetails: partyDetailsToProto(party),
+	}
+
+	if updateMask != nil && len(updateMask.Paths) > 0 {
+		req.UpdateMask = &fieldmaskpb.FieldMask{
+			Paths: updateMask.Paths,
+		}
 	}
 
 	resp, err := c.client.UpdatePartyDetails(ctx, req)

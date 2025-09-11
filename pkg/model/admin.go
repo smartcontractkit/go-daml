@@ -86,3 +86,7 @@ type IdentityProviderConfig struct {
 	JwksURL            string
 	Audience           string
 }
+
+type UpdateMask struct {
+	Paths []string
+}
