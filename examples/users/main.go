@@ -3,17 +3,23 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/noders-team/go-daml/pkg/client"
 	"github.com/noders-team/go-daml/pkg/model"
 )
 
-const (
-	grpcAddress = ""
-	bearerToken = ""
-)
-
 func main() {
+	grpcAddress := os.Getenv("GRPC_ADDRESS")
+	if grpcAddress == "" {
+		grpcAddress = "localhost:8080"
+	}
+
+	bearerToken := os.Getenv("BEARER_TOKEN")
+	if bearerToken == "" {
+		fmt.Println("Warning: BEARER_TOKEN environment variable not set")
+	}
+
 	tlsConfig := client.TlsConfig{}
 
 	cl, err := client.NewDamlClient(bearerToken, grpcAddress).
