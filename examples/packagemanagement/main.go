@@ -54,7 +54,7 @@ func main() {
 			Msg("package details")
 	}
 
-	darFilePath := "./examples/packagemanagement/rental-0_1_0-sdk_1_18_1-lf_1_14.dar"
+	darFilePath := "./test-data/test.dar"
 	log.Info().Str("path", darFilePath).Msg("testing DAR file upload")
 
 	darContent, err := os.ReadFile(darFilePath)
