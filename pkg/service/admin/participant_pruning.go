@@ -2,7 +2,6 @@ package admin
 
 import (
 	"context"
-	"fmt"
 
 	"google.golang.org/grpc"
 
@@ -34,7 +33,7 @@ func (c *participantPruning) Prune(ctx context.Context, pruneRequest *model.Prun
 
 	_, err := c.client.Prune(ctx, req)
 	if err != nil {
-		return fmt.Errorf("failed to prune: %w", err)
+		return err
 	}
 
 	return nil

@@ -2,7 +2,6 @@ package ledger
 
 import (
 	"context"
-	"fmt"
 
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -32,7 +31,7 @@ func (c *interactiveSubmissionService) PrepareSubmission(ctx context.Context, re
 	pbReq := prepareSubmissionRequestToProto(req)
 	pbResp, err := c.client.PrepareSubmission(ctx, pbReq)
 	if err != nil {
-		return nil, fmt.Errorf("failed to prepare submission: %w", err)
+		return nil, err
 	}
 	return prepareSubmissionResponseFromProto(pbResp), nil
 }
@@ -41,7 +40,7 @@ func (c *interactiveSubmissionService) ExecuteSubmission(ctx context.Context, re
 	pbReq := executeSubmissionRequestToProto(req)
 	_, err := c.client.ExecuteSubmission(ctx, pbReq)
 	if err != nil {
-		return nil, fmt.Errorf("failed to execute submission: %w", err)
+		return nil, err
 	}
 	return &model.ExecuteSubmissionResponse{}, nil
 }

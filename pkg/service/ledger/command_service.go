@@ -2,7 +2,6 @@ package ledger
 
 import (
 	"context"
-	"fmt"
 
 	"google.golang.org/grpc"
 
@@ -32,7 +31,7 @@ func (c *commandService) SubmitAndWait(ctx context.Context, req *model.SubmitAnd
 
 	resp, err := c.client.SubmitAndWait(ctx, protoReq)
 	if err != nil {
-		return nil, fmt.Errorf("failed to submit and wait: %w", err)
+		return nil, err
 	}
 
 	return &model.SubmitAndWaitResponse{

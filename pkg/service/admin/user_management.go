@@ -2,7 +2,6 @@ package admin
 
 import (
 	"context"
-	"fmt"
 
 	"google.golang.org/grpc"
 
@@ -52,7 +51,7 @@ func (c *userManagement) GetUser(ctx context.Context, userID string) (*model.Use
 
 	resp, err := c.client.GetUser(ctx, req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get user: %w", err)
+		return nil, err
 	}
 
 	return userFromProto(resp.User), nil
@@ -63,7 +62,7 @@ func (c *userManagement) ListUsers(ctx context.Context) ([]*model.User, error) {
 
 	resp, err := c.client.ListUsers(ctx, req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list users: %w", err)
+		return nil, err
 	}
 
 	return usersFromProto(resp.Users), nil
@@ -76,7 +75,7 @@ func (c *userManagement) DeleteUser(ctx context.Context, userID string) error {
 
 	_, err := c.client.DeleteUser(ctx, req)
 	if err != nil {
-		return fmt.Errorf("failed to delete user: %w", err)
+		return err
 	}
 
 	return nil
@@ -90,7 +89,7 @@ func (c *userManagement) GrantUserRights(ctx context.Context, userID string, rig
 
 	resp, err := c.client.GrantUserRights(ctx, req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to grant user rights: %w", err)
+		return nil, err
 	}
 
 	return rightsFromProto(resp.NewlyGrantedRights), nil
@@ -104,7 +103,7 @@ func (c *userManagement) RevokeUserRights(ctx context.Context, userID string, ri
 
 	resp, err := c.client.RevokeUserRights(ctx, req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to revoke user rights: %w", err)
+		return nil, err
 	}
 
 	return rightsFromProto(resp.NewlyRevokedRights), nil
@@ -117,7 +116,7 @@ func (c *userManagement) ListUserRights(ctx context.Context, userID string) ([]*
 
 	resp, err := c.client.ListUserRights(ctx, req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list user rights: %w", err)
+		return nil, err
 	}
 
 	return rightsFromProto(resp.Rights), nil

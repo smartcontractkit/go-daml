@@ -2,7 +2,6 @@ package ledger
 
 import (
 	"context"
-	"fmt"
 
 	"google.golang.org/grpc"
 
@@ -32,7 +31,7 @@ func (c *commandSubmission) Submit(ctx context.Context, req *model.SubmitRequest
 
 	_, err := c.client.Submit(ctx, protoReq)
 	if err != nil {
-		return nil, fmt.Errorf("failed to submit command: %w", err)
+		return nil, err
 	}
 
 	return &model.SubmitResponse{}, nil

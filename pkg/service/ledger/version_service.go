@@ -2,7 +2,6 @@ package ledger
 
 import (
 	"context"
-	"fmt"
 
 	"google.golang.org/grpc"
 
@@ -30,7 +29,7 @@ func (c *versionService) GetLedgerAPIVersion(ctx context.Context, req *model.Get
 
 	resp, err := c.client.GetLedgerApiVersion(ctx, protoReq)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get ledger API version: %w", err)
+		return nil, err
 	}
 
 	return &model.GetLedgerAPIVersionResponse{

@@ -38,7 +38,7 @@ func (c *stateService) GetActiveContracts(ctx context.Context, req *model.GetAct
 	stream, err := c.client.GetActiveContracts(ctx, protoReq)
 	if err != nil {
 		errCh := make(chan error, 1)
-		errCh <- fmt.Errorf("failed to get active contracts stream: %w", err)
+		errCh <- err
 		close(errCh)
 		return nil, errCh
 	}
@@ -56,7 +56,7 @@ func (c *stateService) GetActiveContracts(ctx context.Context, req *model.GetAct
 				return
 			}
 			if err != nil {
-				errCh <- fmt.Errorf("stream error: %w", err)
+				errCh <- err
 				return
 			}
 
@@ -79,7 +79,7 @@ func (c *stateService) GetConnectedSynchronizers(ctx context.Context, req *model
 
 	resp, err := c.client.GetConnectedSynchronizers(ctx, protoReq)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get connected synchronizers: %w", err)
+		return nil, err
 	}
 
 	return getConnectedSynchronizersResponseFromProto(resp), nil
@@ -90,7 +90,7 @@ func (c *stateService) GetLedgerEnd(ctx context.Context, req *model.GetLedgerEnd
 
 	resp, err := c.client.GetLedgerEnd(ctx, protoReq)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get ledger end: %w", err)
+		return nil, err
 	}
 
 	return &model.GetLedgerEndResponse{

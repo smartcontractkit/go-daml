@@ -2,7 +2,6 @@ package admin
 
 import (
 	"context"
-	"fmt"
 
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
@@ -36,7 +35,7 @@ func (c *partyManagement) GetParticipantID(ctx context.Context) (string, error) 
 
 	resp, err := c.client.GetParticipantId(ctx, req)
 	if err != nil {
-		return "", fmt.Errorf("failed to get participant ID: %w", err)
+		return "", err
 	}
 
 	return resp.ParticipantId, nil
@@ -50,7 +49,7 @@ func (c *partyManagement) GetParties(ctx context.Context, parties []string, iden
 
 	resp, err := c.client.GetParties(ctx, req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get parties: %w", err)
+		return nil, err
 	}
 
 	return partyDetailsFromProtos(resp.PartyDetails), nil
@@ -65,7 +64,7 @@ func (c *partyManagement) ListKnownParties(ctx context.Context, pageToken string
 
 	resp, err := c.client.ListKnownParties(ctx, req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list known parties: %w", err)
+		return nil, err
 	}
 
 	return &model.ListKnownPartiesResponse{
@@ -90,7 +89,7 @@ func (c *partyManagement) AllocateParty(ctx context.Context, partyIDHint string,
 
 	resp, err := c.client.AllocateParty(ctx, req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to allocate party: %w", err)
+		return nil, err
 	}
 
 	return partyDetailsFromProto(resp.PartyDetails), nil
@@ -109,7 +108,7 @@ func (c *partyManagement) UpdatePartyDetails(ctx context.Context, party *model.P
 
 	resp, err := c.client.UpdatePartyDetails(ctx, req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to update party details: %w", err)
+		return nil, err
 	}
 
 	return partyDetailsFromProto(resp.PartyDetails), nil
@@ -124,7 +123,7 @@ func (c *partyManagement) UpdatePartyIdentityProviderID(ctx context.Context, par
 
 	_, err := c.client.UpdatePartyIdentityProviderId(ctx, req)
 	if err != nil {
-		return fmt.Errorf("failed to update party identity provider ID: %w", err)
+		return err
 	}
 
 	return nil

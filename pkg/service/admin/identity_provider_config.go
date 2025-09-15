@@ -2,7 +2,6 @@ package admin
 
 import (
 	"context"
-	"fmt"
 
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
@@ -37,7 +36,7 @@ func (c *identityProviderConfig) CreateIdentityProviderConfig(ctx context.Contex
 
 	resp, err := c.client.CreateIdentityProviderConfig(ctx, req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create identity provider config: %w", err)
+		return nil, err
 	}
 
 	return identityProviderConfigFromProto(resp.IdentityProviderConfig), nil
@@ -50,7 +49,7 @@ func (c *identityProviderConfig) GetIdentityProviderConfig(ctx context.Context, 
 
 	resp, err := c.client.GetIdentityProviderConfig(ctx, req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get identity provider config: %w", err)
+		return nil, err
 	}
 
 	return identityProviderConfigFromProto(resp.IdentityProviderConfig), nil
@@ -71,7 +70,7 @@ func (c *identityProviderConfig) UpdateIdentityProviderConfig(ctx context.Contex
 
 	resp, err := c.client.UpdateIdentityProviderConfig(ctx, req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to update identity provider config: %w", err)
+		return nil, err
 	}
 
 	return identityProviderConfigFromProto(resp.IdentityProviderConfig), nil
@@ -82,7 +81,7 @@ func (c *identityProviderConfig) ListIdentityProviderConfigs(ctx context.Context
 
 	resp, err := c.client.ListIdentityProviderConfigs(ctx, req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list identity provider configs: %w", err)
+		return nil, err
 	}
 
 	return identityProviderConfigsFromProtos(resp.IdentityProviderConfigs), nil
@@ -95,7 +94,7 @@ func (c *identityProviderConfig) DeleteIdentityProviderConfig(ctx context.Contex
 
 	_, err := c.client.DeleteIdentityProviderConfig(ctx, req)
 	if err != nil {
-		return fmt.Errorf("failed to delete identity provider config: %w", err)
+		return err
 	}
 
 	return nil

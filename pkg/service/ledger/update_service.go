@@ -2,7 +2,6 @@ package ledger
 
 import (
 	"context"
-	"fmt"
 	"io"
 
 	"google.golang.org/grpc"
@@ -42,7 +41,7 @@ func (c *updateService) GetUpdates(ctx context.Context, req *model.GetUpdatesReq
 	stream, err := c.client.GetUpdates(ctx, protoReq)
 	if err != nil {
 		errCh := make(chan error, 1)
-		errCh <- fmt.Errorf("failed to get updates stream: %w", err)
+		errCh <- err
 		close(errCh)
 		return nil, errCh
 	}
@@ -60,7 +59,7 @@ func (c *updateService) GetUpdates(ctx context.Context, req *model.GetUpdatesReq
 				return
 			}
 			if err != nil {
-				errCh <- fmt.Errorf("stream error: %w", err)
+				errCh <- err
 				return
 			}
 
@@ -86,7 +85,7 @@ func (c *updateService) GetTransactionByID(ctx context.Context, req *model.GetTr
 
 	resp, err := c.client.GetTransactionById(ctx, protoReq)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get transaction by ID: %w", err)
+		return nil, err
 	}
 
 	return getTransactionResponseFromProto(resp), nil
@@ -100,7 +99,7 @@ func (c *updateService) GetTransactionByOffset(ctx context.Context, req *model.G
 
 	resp, err := c.client.GetTransactionByOffset(ctx, protoReq)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get transaction by offset: %w", err)
+		return nil, err
 	}
 
 	return getTransactionResponseFromProto(resp), nil
@@ -179,6 +178,7 @@ func eventFromProto(pb *v2.Event) *model.Event {
 		event.Created = createdEventFromProto(e.Created)
 	case *v2.Event_Archived:
 		event.Archived = archivedEventFromProto(e.Archived)
+		// TODO  *v2.Event_Exercised
 	}
 
 	return event

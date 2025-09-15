@@ -2,7 +2,6 @@ package admin
 
 import (
 	"context"
-	"fmt"
 
 	"google.golang.org/grpc"
 
@@ -34,7 +33,7 @@ func (c *commandInspection) GetCommandStatus(ctx context.Context, commandIDPrefi
 
 	resp, err := c.client.GetCommandStatus(ctx, req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get command status: %w", err)
+		return nil, err
 	}
 
 	return commandStatusFromProtos(resp.CommandStatus), nil

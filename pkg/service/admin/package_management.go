@@ -2,7 +2,6 @@ package admin
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"google.golang.org/grpc"
@@ -33,7 +32,7 @@ func (c *packageManagement) ListKnownPackages(ctx context.Context) ([]*model.Pac
 
 	resp, err := c.client.ListKnownPackages(ctx, req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list known packages: %w", err)
+		return nil, err
 	}
 
 	return packageDetailsFromProtos(resp.PackageDetails), nil
@@ -47,7 +46,7 @@ func (c *packageManagement) UploadDarFile(ctx context.Context, darFile []byte, s
 
 	_, err := c.client.UploadDarFile(ctx, req)
 	if err != nil {
-		return fmt.Errorf("failed to upload DAR file: %w", err)
+		return err
 	}
 
 	return nil
@@ -61,7 +60,7 @@ func (c *packageManagement) ValidateDarFile(ctx context.Context, darFile []byte,
 
 	_, err := c.client.ValidateDarFile(ctx, req)
 	if err != nil {
-		return fmt.Errorf("failed to validate DAR file: %w", err)
+		return err
 	}
 
 	return nil

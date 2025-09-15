@@ -2,7 +2,6 @@ package ledger
 
 import (
 	"context"
-	"fmt"
 	"io"
 
 	rpcstatus "google.golang.org/genproto/googleapis/rpc/status"
@@ -38,7 +37,7 @@ func (c *commandCompletion) CompletionStream(ctx context.Context, req *model.Com
 	stream, err := c.client.CompletionStream(ctx, streamReq)
 	if err != nil {
 		errCh := make(chan error, 1)
-		errCh <- fmt.Errorf("failed to create completion stream: %w", err)
+		errCh <- err
 		close(errCh)
 		return nil, errCh
 	}
@@ -56,7 +55,7 @@ func (c *commandCompletion) CompletionStream(ctx context.Context, req *model.Com
 				return
 			}
 			if err != nil {
-				errCh <- fmt.Errorf("stream error: %w", err)
+				errCh <- err
 				return
 			}
 

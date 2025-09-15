@@ -2,7 +2,6 @@ package ledger
 
 import (
 	"context"
-	"fmt"
 
 	"google.golang.org/grpc"
 
@@ -33,7 +32,7 @@ func (c *eventQuery) GetEventsByContractID(ctx context.Context, req *model.GetEv
 
 	resp, err := c.client.GetEventsByContractId(ctx, protoReq)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get events by contract ID: %w", err)
+		return nil, err
 	}
 
 	return getEventsByContractIDResponseFromProto(resp), nil

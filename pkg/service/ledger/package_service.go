@@ -2,7 +2,6 @@ package ledger
 
 import (
 	"context"
-	"fmt"
 
 	"google.golang.org/grpc"
 
@@ -32,7 +31,7 @@ func (c *packageService) ListPackages(ctx context.Context, req *model.ListPackag
 
 	resp, err := c.client.ListPackages(ctx, protoReq)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list packages: %w", err)
+		return nil, err
 	}
 
 	return &model.ListPackagesResponse{
@@ -47,7 +46,7 @@ func (c *packageService) GetPackage(ctx context.Context, req *model.GetPackageRe
 
 	resp, err := c.client.GetPackage(ctx, protoReq)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get package: %w", err)
+		return nil, err
 	}
 
 	return &model.GetPackageResponse{
@@ -64,7 +63,7 @@ func (c *packageService) GetPackageStatus(ctx context.Context, req *model.GetPac
 
 	resp, err := c.client.GetPackageStatus(ctx, protoReq)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get package status: %w", err)
+		return nil, err
 	}
 
 	return &model.GetPackageStatusResponse{

@@ -492,7 +492,7 @@ func executeSubmissionRequestToProto(req *model.ExecuteSubmissionRequest) *inter
 		pbReq.PreparedTransaction = pt
 	}
 
-	if req.PartySignatures != nil && len(req.PartySignatures) > 0 {
+	if len(req.PartySignatures) > 0 {
 		pbReq.PartySignatures = &interactive.PartySignatures{
 			Signatures: singlePartySignaturesToProto(req.PartySignatures),
 		}
