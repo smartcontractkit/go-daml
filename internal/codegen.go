@@ -8,6 +8,10 @@ import (
 	"path/filepath"
 	"strings"
 
+	"google.golang.org/protobuf/proto"
+
+	"github.com/digital-asset/dazl-client/v8/go/api/com/daml/daml_lf_1_17"
+	"github.com/digital-asset/dazl-client/v8/go/api/com/daml/daml_lf_2_1"
 	"github.com/noders-team/go-daml/internal/model"
 	"github.com/rs/zerolog/log"
 )
@@ -127,4 +131,229 @@ func GetManifest(srcPath string) (*model.Manifest, error) {
 	}
 
 	return manifest, nil
+}
+
+func GetAST(payload []byte, manifest *model.Manifest) (*model.Package, error) {
+	structs := make(map[string]*model.TmplStruct)
+
+	if strings.HasPrefix(manifest.SdkVersion, "1.") {
+		var archive daml_lf_1_17.Archive
+		err := proto.Unmarshal(payload, &archive)
+		if err != nil {
+			return nil, err
+		}
+
+		var payloadMapped daml_lf_1_17.ArchivePayload
+		err = proto.Unmarshal(archive.Payload, &payloadMapped)
+		if err != nil {
+			return nil, err
+		}
+
+		damlLf1 := payloadMapped.GetDamlLf_1()
+		for _, module := range damlLf1.Modules {
+			for _, dataType := range module.DataTypes {
+				name, err := extractDataTypeName(dataType.Name, damlLf1.InternedStrings)
+				if err != nil {
+					return nil, err
+				}
+				tmplStruct := model.TmplStruct{
+					Name: name,
+				}
+
+				log.Info().Msgf("data type: %+v", name)
+
+				switch v := dataType.DataCons.(type) {
+				case *daml_lf_1_17.DefDataType_Record:
+					for _, field := range v.Record.Fields {
+						fieldExtracted, typeExtracted, err := extractField(field, damlLf1.InternedStrings, damlLf1.InternedTypes)
+						if err != nil {
+							return nil, err
+						}
+						tmplStruct.Fields = append(tmplStruct.Fields, &model.TmplField{
+							Name: fieldExtracted,
+							Type: typeExtracted,
+						})
+					}
+				case *daml_lf_1_17.DefDataType_Variant:
+					for _, field := range v.Variant.Fields {
+						fieldExtracted, typeExtracted, err := extractField(field, damlLf1.InternedStrings, damlLf1.InternedTypes)
+						if err != nil {
+							return nil, err
+						}
+						tmplStruct.Fields = append(tmplStruct.Fields, &model.TmplField{
+							Name: fieldExtracted,
+							Type: typeExtracted,
+						})
+						log.Info().Msgf("variant constructor: %s, type: %s", fieldExtracted, typeExtracted)
+					}
+				case *daml_lf_1_17.DefDataType_Enum:
+					for _, constructorStr := range v.Enum.ConstructorsStr {
+						tmplStruct.Fields = append(tmplStruct.Fields, &model.TmplField{
+							Name: constructorStr,
+							Type: "enum",
+						})
+						log.Info().Msgf("enum constructor: %s", constructorStr)
+					}
+					for _, constructorIdx := range v.Enum.ConstructorsInternedStr {
+						if int(constructorIdx) >= len(damlLf1.InternedStrings) {
+							return nil, fmt.Errorf("interned enum constructor index out of bounds: %d", constructorIdx)
+						}
+						constructorName := damlLf1.InternedStrings[constructorIdx]
+						tmplStruct.Fields = append(tmplStruct.Fields, &model.TmplField{
+							Name: constructorName,
+							Type: "enum",
+						})
+						log.Info().Msgf("enum constructor: %s", constructorName)
+					}
+				default:
+					log.Warn().Msgf("unknown data cons type: %T", v)
+				}
+				structs[name] = &tmplStruct
+			}
+		}
+	} else {
+		var archive daml_lf_2_1.Archive
+		err := proto.Unmarshal(payload, &archive)
+		if err != nil {
+			return nil, err
+		}
+
+		var payloadMapped daml_lf_2_1.ArchivePayload
+		err = proto.Unmarshal(archive.Payload, &payloadMapped)
+		if err != nil {
+			return nil, err
+		}
+
+		damlLf1 := payloadMapped.GetDamlLf_2()
+		for _, module := range damlLf1.Modules {
+			for _, dataType := range module.DataTypes {
+				log.Info().Msgf("data type: %+v", dataType)
+			}
+			for _, template := range module.Templates {
+				log.Info().Msgf("template: %+v", template)
+			}
+			for _, inter := range module.Interfaces {
+				log.Info().Msgf("interface: %+v", inter)
+			}
+		}
+	}
+
+	return &model.Package{
+		Structs: structs,
+	}, nil
+}
+
+func extractDataTypeName(dataTypeName interface{}, internedStrings []string) (string, error) {
+	switch v := dataTypeName.(type) {
+	case *daml_lf_1_17.DefDataType_NameInternedDname:
+		if int(v.NameInternedDname) >= len(internedStrings) {
+			return "", fmt.Errorf("interned string index out of bounds: %d", v.NameInternedDname)
+		}
+		return internedStrings[v.NameInternedDname], nil
+	case *daml_lf_1_17.DefDataType_NameDname:
+		return v.NameDname.String(), nil
+	default:
+		return "", fmt.Errorf("unknown name type: %T", dataTypeName)
+	}
+}
+
+func extractField(field *daml_lf_1_17.FieldWithType, internedStrings []string, internedTypes []*daml_lf_1_17.Type) (string, string, error) {
+	if field == nil {
+		return "", "", fmt.Errorf("field is nil")
+	}
+
+	var fieldName string
+	switch v := field.Field.(type) {
+	case *daml_lf_1_17.FieldWithType_FieldStr:
+		fieldName = v.FieldStr
+	case *daml_lf_1_17.FieldWithType_FieldInternedStr:
+		if int(v.FieldInternedStr) >= len(internedStrings) {
+			return "", "", fmt.Errorf("interned string index out of bounds: %d", v.FieldInternedStr)
+		}
+		fieldName = internedStrings[v.FieldInternedStr]
+	default:
+		return "", "", fmt.Errorf("unknown field type: %T", field.Field)
+	}
+
+	var fieldType string
+	if field.Type == nil {
+		return fieldName, "", fmt.Errorf("field type is nil")
+	}
+
+	//	*Type_Var_
+	//	*Type_Con_
+	//	*Type_Prim_
+	//	*Type_Forall_
+	//	*Type_Struct_
+	//	*Type_Nat
+	//	*Type_Syn_
+	//	*Type_Interned
+	switch v := field.Type.Sum.(type) {
+	case *daml_lf_1_17.Type_Interned:
+		if int(v.Interned) >= len(internedTypes) {
+			return fieldName, "", fmt.Errorf("interned type index out of bounds: %d", v.Interned)
+		}
+		if prim := internedTypes[v.Interned].GetPrim(); prim != nil {
+			fieldType = prim.String()
+		} else {
+			fieldType = "complex_interned_type"
+		}
+	case *daml_lf_1_17.Type_Prim_:
+		fieldType = v.Prim.String()
+	case *daml_lf_1_17.Type_Con_:
+		if v.Con.Tycon != nil {
+			switch {
+			case v.Con.Tycon.GetNameInternedDname() != 0:
+				if int(v.Con.Tycon.GetNameInternedDname()) >= len(internedStrings) {
+					return fieldName, "", fmt.Errorf("interned tycon index out of bounds: %d", v.Con.Tycon.GetNameInternedDname())
+				}
+				fieldType = internedStrings[v.Con.Tycon.GetNameInternedDname()]
+			case v.Con.Tycon.GetNameDname() != nil:
+				fieldType = v.Con.Tycon.GetNameDname().String()
+			default:
+				fieldType = "unknown_con_type"
+			}
+		} else {
+			fieldType = "con_without_tycon"
+		}
+	case *daml_lf_1_17.Type_Var_:
+		switch {
+		case v.Var.GetVarInternedStr() != 0:
+			if int(v.Var.GetVarInternedStr()) >= len(internedStrings) {
+				return fieldName, "", fmt.Errorf("interned var index out of bounds: %d", v.Var.GetVarInternedStr())
+			}
+			fieldType = internedStrings[v.Var.GetVarInternedStr()]
+		case v.Var.GetVarStr() != "":
+			fieldType = v.Var.GetVarStr()
+		default:
+			fieldType = "unnamed_var"
+		}
+	case *daml_lf_1_17.Type_Forall_:
+		fieldType = fmt.Sprintf("forall[%d_vars]", len(v.Forall.Vars))
+	case *daml_lf_1_17.Type_Struct_:
+		fieldType = fmt.Sprintf("struct[%d_fields]", len(v.Struct.Fields))
+	case *daml_lf_1_17.Type_Nat:
+		fieldType = fmt.Sprintf("nat_%d", v.Nat)
+	case *daml_lf_1_17.Type_Syn_:
+		if v.Syn.Tysyn != nil {
+			switch {
+			case v.Syn.Tysyn.GetNameInternedDname() != 0:
+				if int(v.Syn.Tysyn.GetNameInternedDname()) >= len(internedStrings) {
+					return fieldName, "", fmt.Errorf("interned tysyn index out of bounds: %d", v.Syn.Tysyn.GetNameInternedDname())
+				}
+				fieldType = fmt.Sprintf("syn_%s", internedStrings[v.Syn.Tysyn.GetNameInternedDname()])
+			case v.Syn.Tysyn.GetNameDname() != nil:
+				fieldType = fmt.Sprintf("syn_%s", v.Syn.Tysyn.GetNameDname().String())
+			default:
+				fieldType = "syn_unknown"
+			}
+		} else {
+			fieldType = "syn_without_name"
+		}
+	default:
+		return fieldName, "", fmt.Errorf("unsupported type sum: %T", field.Type.Sum)
+	}
+
+	log.Info().Msgf("field: %s, type: %s", fieldName, fieldType)
+	return fieldName, fieldType, nil
 }

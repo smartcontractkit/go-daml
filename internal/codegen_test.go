@@ -32,4 +32,8 @@ func TestGetMainDalf(t *testing.T) {
 	dalfContent, err := os.ReadFile(dalfFullPath)
 	require.NoError(t, err)
 	require.NotNil(t, dalfContent)
+
+	pkg, err := GetAST(dalfContent, manifest)
+	require.Nil(t, err)
+	require.NotEmpty(t, pkg.Structs)
 }
