@@ -7,3 +7,5 @@ vendor
 .claude
 .env
 coverage.out
+.qoderignore
+test-data/test_unzipped
