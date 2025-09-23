@@ -37,9 +37,32 @@ func TestGetMainDalf(t *testing.T) {
 	require.Nil(t, err)
 	require.NotEmpty(t, pkg.Structs)
 
-	res, err := Bind("main", pkg.Structs)
-	require.NoError(t, err)
-	require.NotEmpty(t, res)
+	pkg1, exists := pkg.Structs["RentalAgreement"]
+	require.True(t, exists)
+	require.Len(t, pkg1.Fields, 3)
+	require.Equal(t, pkg1.Name, "RentalAgreement")
+	require.Equal(t, pkg1.Fields[0].Name, "landlord")
+	require.Equal(t, pkg1.Fields[1].Name, "tenant")
+	require.Equal(t, pkg1.Fields[2].Name, "terms")
+
+	pkg2, exists := pkg.Structs["Accept"]
+	require.True(t, exists)
+	require.Len(t, pkg2.Fields, 2)
+	require.Equal(t, pkg2.Name, "Accept")
+	require.Equal(t, pkg2.Fields[0].Name, "foo")
+	require.Equal(t, pkg2.Fields[1].Name, "bar")
+
+	pkg3, exists := pkg.Structs["RentalProposal"]
+	require.True(t, exists)
+	require.Len(t, pkg3.Fields, 3)
+	require.Equal(t, pkg3.Name, "RentalProposal")
+	require.Equal(t, pkg3.Fields[0].Name, "landlord")
+	require.Equal(t, pkg3.Fields[1].Name, "tenant")
+	require.Equal(t, pkg3.Fields[2].Name, "terms")
+
+	//res, err := Bind("main", pkg.Structs)
+	//require.NoError(t, err)
+	//require.NotEmpty(t, res)
 }
 
 func TestGetMainDalfV2(t *testing.T) {

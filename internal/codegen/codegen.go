@@ -229,7 +229,11 @@ func (c *codeGenAst) extractField(field *daml.FieldWithType) (string, string, er
 		return "", "", fmt.Errorf("field is nil")
 	}
 
-	fieldName := c.getName(field.GetFieldInternedStr())
+	internedStrIdx := field.GetFieldInternedStr()
+	if int(internedStrIdx) >= len(c.Package.InternedStrings) {
+		return "", "", fmt.Errorf("invalid interned string index for field name: %d", internedStrIdx)
+	}
+	fieldName := c.Package.InternedStrings[internedStrIdx]
 	if field.Type == nil {
 		return fieldName, "", fmt.Errorf("field type is nil")
 	}
