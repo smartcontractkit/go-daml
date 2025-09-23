@@ -251,14 +251,13 @@ func (c *codeGenAst) extractField(field *daml.FieldWithType) (string, string, er
 	case *daml.Type_Interned:
 		prim := c.Package.InternedTypes[v.Interned]
 		if prim != nil {
-			fieldType = prim.String()
-			break
-		}
-
-		isConType := c.Package.InternedTypes[v.Interned].GetCon()
-		if isConType != nil {
-			tyconName := c.getName(isConType.Tycon.GetNameInternedDname())
-			fieldType = tyconName
+			isConType := prim.GetCon()
+			if isConType != nil {
+				tyconName := c.getName(isConType.Tycon.GetNameInternedDname())
+				fieldType = tyconName
+			} else {
+				fieldType = prim.String()
+			}
 		} else {
 			fieldType = "complex_interned_type"
 		}
