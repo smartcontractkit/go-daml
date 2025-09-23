@@ -60,7 +60,7 @@ func TestGetMainDalf(t *testing.T) {
 	require.Equal(t, pkg3.Fields[1].Name, "tenant")
 	require.Equal(t, pkg3.Fields[2].Name, "terms")
 
-	res, err := Bind("main", pkg.Structs)
+	res, err := Bind("main", pkg.PackageID, pkg.Structs)
 	require.NoError(t, err)
 	require.NotEmpty(t, res)
 
@@ -81,6 +81,8 @@ var (
 	_ = big.NewInt
 	_ = strings.NewReader
 )
+
+const PackageID = "20a17897a6664ecb8a4dd3e10b384c8cc41181d26ecbb446c2d65ae0928686c9"
 
 type PARTY string
 type TEXT string
@@ -242,7 +244,7 @@ func TestGetMainDalfV2(t *testing.T) {
 	require.Equal(t, "Record", simpleFieldsStruct.RawType, "SimpleFields should be Record type")
 	require.Equal(t, "Record", optionalFieldsStruct.RawType, "OptionalFields should be Record type")
 
-	res, err := Bind("main", pkg.Structs)
+	res, err := Bind("main", pkg.PackageID, pkg.Structs)
 	require.NoError(t, err)
 	require.NotEmpty(t, res)
 
@@ -263,6 +265,8 @@ var (
 	_ = big.NewInt
 	_ = strings.NewReader
 )
+
+const PackageID = "e2d906db3930143bfa53f43c7a69c218c8b499c03556485f312523090684ff34"
 
 type PARTY string
 type TEXT string

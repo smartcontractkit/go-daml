@@ -321,6 +321,7 @@ func GetAST(payload []byte, manifest *Manifest) (*Package, error) {
 	}
 
 	damlLf1 := payloadMapped.GetDamlLf_1()
+	packageID := archive.Hash
 	codeGen := NewCodegenAst(damlLf1)
 	for _, module := range damlLf1.Modules {
 		if len(damlLf1.InternedStrings) == 0 {
@@ -363,7 +364,8 @@ func GetAST(payload []byte, manifest *Manifest) (*Package, error) {
 	}
 
 	return &Package{
-		Structs: structs,
+		PackageID: packageID,
+		Structs:   structs,
 	}, nil
 }
 

@@ -25,7 +25,7 @@ func TestBind(t *testing.T) {
 		},
 	}
 
-	result, err := Bind("main", structs)
+	result, err := Bind("main", "test-package-id", structs)
 	if err != nil {
 		t.Fatalf("Bind failed: %v", err)
 	}
@@ -33,6 +33,10 @@ func TestBind(t *testing.T) {
 	// Check that the result contains expected content
 	if !strings.Contains(result, "package main") {
 		t.Error("Generated code does not contain correct package declaration")
+	}
+
+	if !strings.Contains(result, `const PackageID = "test-package-id"`) {
+		t.Error("Generated code does not contain PackageID constant")
 	}
 
 	if !strings.Contains(result, "type RentalProposal struct") {

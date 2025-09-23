@@ -15,6 +15,8 @@ var (
 	_ = strings.NewReader
 )
 
+const PackageID = "{{.PackageID}}"
+
 type PARTY string
 type TEXT string
 type INT64 int64

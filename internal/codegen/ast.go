@@ -16,10 +16,11 @@ type tmplField struct {
 }
 
 type Package struct {
-	Name     string
-	Version  string
-	Structs  map[string]*tmplStruct
-	Metadata *Metadata
+	Name      string
+	Version   string
+	PackageID string
+	Structs   map[string]*tmplStruct
+	Metadata  *Metadata
 }
 
 type Metadata struct {
