@@ -9,6 +9,7 @@ import (
 
 type TmplStruct struct {
 	Name        string
+	ModuleName  string
 	Fields      []*TmplField
 	RawType     string
 	IsTemplate  bool
@@ -102,6 +103,12 @@ func NormalizeDAMLType(damlType string) string {
 	// Handle unresolved variable types as interface{} for now
 	case strings.Contains(damlType, "var:{var_interned_str:"):
 		return "interface{}"
+	// Handle empty primitive types (likely UNIT)
+	case damlType == "prim:{}" || damlType == "{}":
+		return "UNIT"
+	// Handle special DAML built-in choice argument types that are actually UNIT
+	case damlType == "Archive":
+		return "UNIT"
 	default:
 		log.Warn().Msgf("unknown daml type %s", damlType)
 		return damlType

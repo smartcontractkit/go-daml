@@ -74,6 +74,8 @@ import (
 	"math/big"
 	"strings"
 	"time"
+
+	"github.com/noders-team/go-daml/pkg/model"
 )
 
 var (
@@ -96,6 +98,27 @@ type UNIT struct{}
 type LIST []string
 type MAP map[string]interface{}
 type OPTIONAL *interface{}
+type GENMAP map[string]interface{}
+
+// argsToMap converts typed arguments to map for ExerciseCommand
+func argsToMap(args interface{}) map[string]interface{} {
+	// For now, we'll use a simple approach
+	// In practice, you might want to implement proper struct-to-map conversion
+	if args == nil {
+		return map[string]interface{}{}
+	}
+
+	// If args is already a map, return it directly
+	if m, ok := args.(map[string]interface{}); ok {
+		return m
+	}
+
+	// For structs, you would typically use reflection or JSON marshaling
+	// For simplicity, we'll return the args in a generic wrapper
+	return map[string]interface{}{
+		"args": args,
+	}
+}
 
 // Accept is a Record type
 type Accept struct {
@@ -110,11 +133,45 @@ type RentalAgreement struct {
 	Terms    TEXT  ` + "`json:\"terms\"`" + `
 }
 
+// Choice methods for RentalAgreement
+
+// Archive exercises the Archive choice on this RentalAgreement contract
+func (t RentalAgreement) Archive(contractID string) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("%s:%s:%s", PackageID, "Rental", "RentalAgreement"),
+		ContractID: contractID,
+		Choice:     "Archive",
+		Arguments:  map[string]interface{}{},
+	}
+}
+
 // RentalProposal is a Template type
 type RentalProposal struct {
 	Landlord PARTY ` + "`json:\"landlord\"`" + `
 	Tenant   PARTY ` + "`json:\"tenant\"`" + `
 	Terms    TEXT  ` + "`json:\"terms\"`" + `
+}
+
+// Choice methods for RentalProposal
+
+// Archive exercises the Archive choice on this RentalProposal contract
+func (t RentalProposal) Archive(contractID string) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("%s:%s:%s", PackageID, "Rental", "RentalProposal"),
+		ContractID: contractID,
+		Choice:     "Archive",
+		Arguments:  map[string]interface{}{},
+	}
+}
+
+// Accept exercises the Accept choice on this RentalProposal contract
+func (t RentalProposal) Accept(contractID string, args Accept) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("%s:%s:%s", PackageID, "Rental", "RentalProposal"),
+		ContractID: contractID,
+		Choice:     "Accept",
+		Arguments:  argsToMap(args),
+	}
 }
 `
 
@@ -269,6 +326,8 @@ import (
 	"math/big"
 	"strings"
 	"time"
+
+	"github.com/noders-team/go-daml/pkg/model"
 )
 
 var (
@@ -291,6 +350,27 @@ type UNIT struct{}
 type LIST []string
 type MAP map[string]interface{}
 type OPTIONAL *interface{}
+type GENMAP map[string]interface{}
+
+// argsToMap converts typed arguments to map for ExerciseCommand
+func argsToMap(args interface{}) map[string]interface{} {
+	// For now, we'll use a simple approach
+	// In practice, you might want to implement proper struct-to-map conversion
+	if args == nil {
+		return map[string]interface{}{}
+	}
+
+	// If args is already a map, return it directly
+	if m, ok := args.(map[string]interface{}); ok {
+		return m
+	}
+
+	// For structs, you would typically use reflection or JSON marshaling
+	// For simplicity, we'll return the args in a generic wrapper
+	return map[string]interface{}{
+		"args": args,
+	}
+}
 
 // Address is a variant/union type
 type Address struct {
@@ -358,16 +438,62 @@ type American struct {
 	Address USAddress ` + "`json:\"address\"`" + `
 }
 
+// Choice methods for American
+
+// Archive exercises the Archive choice on this American contract
+func (t American) Archive(contractID string) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("%s:%s:%s", PackageID, "Address", "American"),
+		ContractID: contractID,
+		Choice:     "Archive",
+		Arguments:  map[string]interface{}{},
+	}
+}
+
 // Briton is a Template type
 type Briton struct {
 	Person  PARTY     ` + "`json:\"person\"`" + `
 	Address UKAddress ` + "`json:\"address\"`" + `
 }
 
+// Choice methods for Briton
+
+// Archive exercises the Archive choice on this Briton contract
+func (t Briton) Archive(contractID string) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("%s:%s:%s", PackageID, "Address", "Briton"),
+		ContractID: contractID,
+		Choice:     "Archive",
+		Arguments:  map[string]interface{}{},
+	}
+}
+
 // OptionalFields is a Template type
 type OptionalFields struct {
 	Party  PARTY    ` + "`json:\"party\"`" + `
 	AMaybe OPTIONAL ` + "`json:\"aMaybe\"`" + `
+}
+
+// Choice methods for OptionalFields
+
+// Archive exercises the Archive choice on this OptionalFields contract
+func (t OptionalFields) Archive(contractID string) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("%s:%s:%s", PackageID, "Primitives", "OptionalFields"),
+		ContractID: contractID,
+		Choice:     "Archive",
+		Arguments:  map[string]interface{}{},
+	}
+}
+
+// OptionalFieldsCleanUp exercises the OptionalFieldsCleanUp choice on this OptionalFields contract
+func (t OptionalFields) OptionalFieldsCleanUp(contractID string, args OptionalFieldsCleanUp) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("%s:%s:%s", PackageID, "Primitives", "OptionalFields"),
+		ContractID: contractID,
+		Choice:     "OptionalFieldsCleanUp",
+		Arguments:  argsToMap(args),
+	}
 }
 
 // OptionalFieldsCleanUp is a Record type
@@ -380,6 +506,18 @@ type Person struct {
 	Address Address ` + "`json:\"address\"`" + `
 }
 
+// Choice methods for Person
+
+// Archive exercises the Archive choice on this Person contract
+func (t Person) Archive(contractID string) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("%s:%s:%s", PackageID, "Address", "Person"),
+		ContractID: contractID,
+		Choice:     "Archive",
+		Arguments:  map[string]interface{}{},
+	}
+}
+
 // SimpleFields is a Template type
 type SimpleFields struct {
 	Party     PARTY     ` + "`json:\"party\"`" + `
@@ -389,6 +527,28 @@ type SimpleFields struct {
 	AText     TEXT      ` + "`json:\"aText\"`" + `
 	ADate     DATE      ` + "`json:\"aDate\"`" + `
 	ADatetime TIMESTAMP ` + "`json:\"aDatetime\"`" + `
+}
+
+// Choice methods for SimpleFields
+
+// SimpleFieldsCleanUp exercises the SimpleFieldsCleanUp choice on this SimpleFields contract
+func (t SimpleFields) SimpleFieldsCleanUp(contractID string, args SimpleFieldsCleanUp) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("%s:%s:%s", PackageID, "Primitives", "SimpleFields"),
+		ContractID: contractID,
+		Choice:     "SimpleFieldsCleanUp",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// Archive exercises the Archive choice on this SimpleFields contract
+func (t SimpleFields) Archive(contractID string) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("%s:%s:%s", PackageID, "Primitives", "SimpleFields"),
+		ContractID: contractID,
+		Choice:     "Archive",
+		Arguments:  map[string]interface{}{},
+	}
 }
 
 // SimpleFieldsCleanUp is a Record type
@@ -493,6 +653,8 @@ import (
 	"math/big"
 	"strings"
 	"time"
+
+	"github.com/noders-team/go-daml/pkg/model"
 )
 
 var (
@@ -516,6 +678,26 @@ type LIST []string
 type MAP map[string]interface{}
 type OPTIONAL *interface{}
 
+// argsToMap converts typed arguments to map for ExerciseCommand
+func argsToMap(args interface{}) map[string]interface{} {
+	// For now, we'll use a simple approach
+	// In practice, you might want to implement proper struct-to-map conversion
+	if args == nil {
+		return map[string]interface{}{}
+	}
+
+	// If args is already a map, return it directly
+	if m, ok := args.(map[string]interface{}); ok {
+		return m
+	}
+
+	// For structs, you would typically use reflection or JSON marshaling
+	// For simplicity, we'll return the args in a generic wrapper
+	return map[string]interface{}{
+		"args": args,
+	}
+}
+
 // Accept is a Record type
 type Accept struct {
 }
@@ -533,6 +715,18 @@ const (
 type MappyContract struct {
 	Operator PARTY  ` + "`json:\"operator\"`" + `
 	Value    GENMAP ` + "`json:\"value\"`" + `
+}
+
+// Choice methods for MappyContract
+
+// Archive exercises the Archive choice on this MappyContract contract
+func (t MappyContract) Archive(contractID string) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("%s:%s:%s", PackageID, "AllKindsOf", "MappyContract"),
+		ContractID: contractID,
+		Choice:     "Archive",
+		Arguments:  map[string]interface{}{},
+	}
 }
 
 // MyPair is a Record type
@@ -559,6 +753,28 @@ type OneOfEverything struct {
 	SomeMeasurement NUMERIC   ` + "`json:\"someMeasurement\"`" + `
 	SomeEnum        Color     ` + "`json:\"someEnum\"`" + `
 	TheUnit         UNIT      ` + "`json:\"theUnit\"`" + `
+}
+
+// Choice methods for OneOfEverything
+
+// Archive exercises the Archive choice on this OneOfEverything contract
+func (t OneOfEverything) Archive(contractID string) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("%s:%s:%s", PackageID, "AllKindsOf", "OneOfEverything"),
+		ContractID: contractID,
+		Choice:     "Archive",
+		Arguments:  map[string]interface{}{},
+	}
+}
+
+// Accept exercises the Accept choice on this OneOfEverything contract
+func (t OneOfEverything) Accept(contractID string, args Accept) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("%s:%s:%s", PackageID, "AllKindsOf", "OneOfEverything"),
+		ContractID: contractID,
+		Choice:     "Accept",
+		Arguments:  argsToMap(args),
+	}
 }
 
 // VPair is a variant/union type

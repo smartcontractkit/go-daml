@@ -7,6 +7,8 @@ import (
 	"strings"
 	"errors"
 	"time"
+	
+	"github.com/noders-team/go-daml/pkg/model"
 )
 
 var (
@@ -17,18 +19,42 @@ var (
 
 const PackageID = "{{.PackageID}}"
 
-type PARTY string
-type TEXT string
-type INT64 int64
-type BOOL bool
-type DECIMAL *big.Int
-type NUMERIC *big.Int
-type DATE time.Time
-type TIMESTAMP time.Time
-type UNIT struct{}
-type LIST []string
-type MAP map[string]interface{}
-type OPTIONAL *interface{}
+type (
+	PARTY string
+	TEXT string
+	INT64 int64
+	BOOL bool
+	DECIMAL *big.Int
+	NUMERIC *big.Int
+	DATE time.Time
+	TIMESTAMP time.Time
+	UNIT struct{}
+	LIST []string
+	MAP map[string]interface{}
+	OPTIONAL *interface{}
+	GENMAP map[string]interface{}
+)
+
+// argsToMap converts typed arguments to map for ExerciseCommand
+func argsToMap(args interface{}) map[string]interface{} {
+	// For now, we'll use a simple approach
+	// In practice, you might want to implement proper struct-to-map conversion
+	if args == nil {
+		return map[string]interface{}{}
+	}
+	
+	// If args is already a map, return it directly
+	if m, ok := args.(map[string]interface{}); ok {
+		return m
+	}
+	
+	// For structs, you would typically use reflection or JSON marshaling
+	// For simplicity, we'll return the args in a generic wrapper
+	return map[string]interface{}{
+		"args": args,
+	}
+}
+
 
 {{$structs := .Structs}}
 {{range $structs}}
@@ -106,6 +132,22 @@ type OPTIONAL *interface{}
 		return fmt.Sprintf("%v", t.{{capitalise .Key.Name}})
 		{{end}}
 	}
+	{{end}}
+	{{if and .IsTemplate .Choices}}
+	{{$templateName := .Name}}
+	{{$moduleName := .ModuleName}}
+	// Choice methods for {{capitalise .Name}}
+	{{range $choice := .Choices}}
+	// {{capitalise $choice.Name}} exercises the {{$choice.Name}} choice on this {{capitalise $templateName}} contract
+	func (t {{capitalise $templateName}}) {{capitalise $choice.Name}}(contractID string{{if $choice.ArgType}}, args {{$choice.ArgType}}{{end}}) *model.ExerciseCommand {
+		return &model.ExerciseCommand{
+			TemplateID: fmt.Sprintf("%s:%s:%s", PackageID, "{{$moduleName}}", "{{capitalise $templateName}}"),
+			ContractID: contractID,
+			Choice: "{{$choice.Name}}",
+			{{if $choice.ArgType}}Arguments: argsToMap(args),{{else}}Arguments: map[string]interface{}{},{{end}}
+		}
+	}
+	{{end}}
 	{{end}}
 	{{end}}
 {{end}}
