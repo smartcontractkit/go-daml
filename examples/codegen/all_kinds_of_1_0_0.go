@@ -17,7 +17,7 @@ var (
 	_ = strings.NewReader
 )
 
-const PackageID = "6d7e83e81a0a7960eec37340f5b11e7a61606bd9161f413684bc345c3f387948"
+const PackageID = "ddf0d6396a862eaa7f8d647e39d090a6b04c4a3fd6736aa1730ebc9fca6be664"
 
 type (
 	PARTY     string

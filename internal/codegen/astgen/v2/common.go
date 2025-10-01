@@ -18,24 +18,24 @@ func NewCodegenAst(payload []byte) *codeGenAst {
 	return &codeGenAst{payload: payload}
 }
 
-func (c *codeGenAst) GetTemplateStructs() (string, map[string]*model.TmplStruct, error) {
+func (c *codeGenAst) GetTemplateStructs() (map[string]*model.TmplStruct, error) {
 	structs := make(map[string]*model.TmplStruct)
 
 	var archive daml.Archive
 	err := proto.Unmarshal(c.payload, &archive)
 	if err != nil {
-		return "", nil, err
+		return nil, err
 	}
 
 	var payloadMapped daml.ArchivePayload
 	err = proto.Unmarshal(archive.Payload, &payloadMapped)
 	if err != nil {
-		return "", nil, err
+		return nil, err
 	}
 
 	damlLf1 := payloadMapped.GetDamlLf_1()
 	if damlLf1 == nil {
-		return "", nil, errors.New("unsupported daml version")
+		return nil, errors.New("unsupported daml version")
 	}
 
 	for _, module := range damlLf1.Modules {
@@ -50,7 +50,7 @@ func (c *codeGenAst) GetTemplateStructs() (string, map[string]*model.TmplStruct,
 		// Process templates first (template-centric approach)
 		templates, err := c.getTemplates(damlLf1, module, moduleName)
 		if err != nil {
-			return "", nil, err
+			return nil, err
 		}
 		for key, val := range templates {
 			structs[key] = val
@@ -59,7 +59,7 @@ func (c *codeGenAst) GetTemplateStructs() (string, map[string]*model.TmplStruct,
 		// Process interfaces
 		interfaces, err := c.getInterfaces(damlLf1, module, moduleName)
 		if err != nil {
-			return "", nil, err
+			return nil, err
 		}
 		for key, val := range interfaces {
 			structs[key] = val
@@ -68,7 +68,7 @@ func (c *codeGenAst) GetTemplateStructs() (string, map[string]*model.TmplStruct,
 		// Process remaining data types that aren't covered by templates/interfaces
 		dataTypes, err := c.getDataTypes(damlLf1, module, moduleName)
 		if err != nil {
-			return "", nil, err
+			return nil, err
 		}
 		for key, val := range dataTypes {
 			// Only add if not already processed as part of templates/interfaces
@@ -78,7 +78,7 @@ func (c *codeGenAst) GetTemplateStructs() (string, map[string]*model.TmplStruct,
 		}
 	}
 
-	return archive.Hash, structs, nil
+	return structs, nil
 }
 
 func (c *codeGenAst) getName(pkg *daml.Package, id int32) string {

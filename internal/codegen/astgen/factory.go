@@ -15,7 +15,7 @@ const (
 )
 
 type AstGen interface {
-	GetTemplateStructs() (string, map[string]*model.TmplStruct, error)
+	GetTemplateStructs() (map[string]*model.TmplStruct, error)
 }
 
 func GetAstGenFromVersion(payload []byte, ver string) (AstGen, error) {

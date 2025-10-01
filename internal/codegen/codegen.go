@@ -154,8 +154,6 @@ func GetManifest(srcPath string) (*model.Manifest, error) {
 }
 
 func GetAST(payload []byte, manifest *model.Manifest) (*model.Package, error) {
-	structs := make(map[string]*model.TmplStruct)
-
 	var version string
 	if strings.HasPrefix(manifest.SdkVersion, astgen.V3) {
 		version = astgen.V3
@@ -169,13 +167,31 @@ func GetAST(payload []byte, manifest *model.Manifest) (*model.Package, error) {
 	if err != nil {
 		return nil, err
 	}
-	packageID, structs, err := gen.GetTemplateStructs()
+	var structs map[string]*model.TmplStruct
+	structs, err = gen.GetTemplateStructs()
 	if err != nil {
 		return nil, err
+	}
+
+	packageID := getPackageID(manifest.MainDalf)
+	if packageID == "" {
+		return nil, fmt.Errorf("could not extract package ID from MainDalf: %s", manifest.MainDalf)
 	}
 
 	return &model.Package{
 		PackageID: packageID,
 		Structs:   structs,
 	}, nil
+}
+
+func getPackageID(mainDalf string) string {
+	parts := strings.Split(mainDalf, "/")
+	filename := strings.TrimSuffix(parts[len(parts)-1], ".dalf")
+
+	lastHyphen := strings.LastIndex(filename, "-")
+	if lastHyphen != -1 && lastHyphen < len(filename)-1 {
+		return filename[lastHyphen+1:]
+	}
+
+	return ""
 }
