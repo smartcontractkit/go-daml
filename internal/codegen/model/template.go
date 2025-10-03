@@ -97,7 +97,7 @@ func NormalizeDAMLType(damlType string) string {
 		return "string"
 	// Handle numeric builtin IDs from DAML LF 2.1
 	case damlType == "19":
-		return "GENMAP" // Builtin ID 19 is typically GENMAP
+		return "GENMAP"
 	case damlType == "20":
 		return "TEXTMAP"
 	// Handle unresolved variable types as interface{} for now
@@ -110,7 +110,7 @@ func NormalizeDAMLType(damlType string) string {
 	case damlType == "Archive":
 		return "UNIT"
 	default:
-		log.Warn().Msgf("unknown daml type %s", damlType)
+		log.Warn().Msgf("unknown daml type %s, using as-is", damlType)
 		return damlType
 	}
 }

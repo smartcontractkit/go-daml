@@ -13,6 +13,7 @@ import (
 	. "github.com/noders-team/go-daml/pkg/types"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -170,7 +171,7 @@ func TestCodegenIntegration(t *testing.T) {
 	}
 	log.Info().Msgf("response.UpdateID: %s", response.UpdateID)
 
-	time.Sleep(5 * time.Second)
+	// time.Sleep(5 * time.Second)
 	respUpd, err := cl.UpdateService.GetTransactionByID(ctx, &model.GetTransactionByIDRequest{
 		UpdateID:          response.UpdateID,
 		RequestingParties: []string{party},
@@ -178,6 +179,7 @@ func TestCodegenIntegration(t *testing.T) {
 	if err != nil {
 		log.Fatal().Err(err).Str("packageId", PackageID).Msg("failed to GetTransactionByID")
 	}
+	require.NotNil(t, respUpd.Transaction, "expected transaction")
 	if respUpd.Transaction != nil {
 		for _, event := range respUpd.Transaction.Events {
 			if exercisedEvent := event.Exercised; exercisedEvent != nil {

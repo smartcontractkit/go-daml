@@ -76,6 +76,7 @@ import (
 	"time"
 
 	"github.com/noders-team/go-daml/pkg/model"
+	. "github.com/noders-team/go-daml/pkg/types"
 )
 
 var (
@@ -86,35 +87,15 @@ var (
 
 const PackageID = "20a17897a6664ecb8a4dd3e10b384c8cc41181d26ecbb446c2d65ae0928686c9"
 
-type PARTY string
-type TEXT string
-type INT64 int64
-type BOOL bool
-type DECIMAL *big.Int
-type NUMERIC *big.Int
-type DATE time.Time
-type TIMESTAMP time.Time
-type UNIT struct{}
-type LIST []string
-type MAP map[string]interface{}
-type OPTIONAL *interface{}
-type GENMAP map[string]interface{}
-
-// argsToMap converts typed arguments to map for ExerciseCommand
 func argsToMap(args interface{}) map[string]interface{} {
-	// For now, we'll use a simple approach
-	// In practice, you might want to implement proper struct-to-map conversion
 	if args == nil {
 		return map[string]interface{}{}
 	}
 
-	// If args is already a map, return it directly
 	if m, ok := args.(map[string]interface{}); ok {
 		return m
 	}
 
-	// For structs, you would typically use reflection or JSON marshaling
-	// For simplicity, we'll return the args in a generic wrapper
 	return map[string]interface{}{
 		"args": args,
 	}
@@ -131,6 +112,27 @@ type RentalAgreement struct {
 	Landlord PARTY ` + "`json:\"landlord\"`" + `
 	Tenant   PARTY ` + "`json:\"tenant\"`" + `
 	Terms    TEXT  ` + "`json:\"terms\"`" + `
+}
+
+// GetTemplateID returns the template ID for this template
+func (t RentalAgreement) GetTemplateID() string {
+	return fmt.Sprintf("%s:%s:%s", PackageID, "Rental", "RentalAgreement")
+}
+
+// CreateCommand returns a CreateCommand for this template
+func (t RentalAgreement) CreateCommand() *model.CreateCommand {
+	args := make(map[string]interface{})
+
+	args["landlord"] = map[string]interface{}{"_type": "party", "value": string(t.Landlord)}
+
+	args["tenant"] = map[string]interface{}{"_type": "party", "value": string(t.Tenant)}
+
+	args["terms"] = string(t.Terms)
+
+	return &model.CreateCommand{
+		TemplateID: t.GetTemplateID(),
+		Arguments:  args,
+	}
 }
 
 // Choice methods for RentalAgreement
@@ -150,6 +152,27 @@ type RentalProposal struct {
 	Landlord PARTY ` + "`json:\"landlord\"`" + `
 	Tenant   PARTY ` + "`json:\"tenant\"`" + `
 	Terms    TEXT  ` + "`json:\"terms\"`" + `
+}
+
+// GetTemplateID returns the template ID for this template
+func (t RentalProposal) GetTemplateID() string {
+	return fmt.Sprintf("%s:%s:%s", PackageID, "Rental", "RentalProposal")
+}
+
+// CreateCommand returns a CreateCommand for this template
+func (t RentalProposal) CreateCommand() *model.CreateCommand {
+	args := make(map[string]interface{})
+
+	args["landlord"] = map[string]interface{}{"_type": "party", "value": string(t.Landlord)}
+
+	args["tenant"] = map[string]interface{}{"_type": "party", "value": string(t.Tenant)}
+
+	args["terms"] = string(t.Terms)
+
+	return &model.CreateCommand{
+		TemplateID: t.GetTemplateID(),
+		Arguments:  args,
+	}
 }
 
 // Choice methods for RentalProposal

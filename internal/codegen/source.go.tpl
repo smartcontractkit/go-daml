@@ -20,21 +20,15 @@ var (
 
 const PackageID = "{{.PackageID}}"
 
-// argsToMap converts typed arguments to map for ExerciseCommand
 func argsToMap(args interface{}) map[string]interface{} {
-	// For now, we'll use a simple approach
-	// In practice, you might want to implement proper struct-to-map conversion
 	if args == nil {
 		return map[string]interface{}{}
 	}
 	
-	// If args is already a map, return it directly
 	if m, ok := args.(map[string]interface{}); ok {
 		return m
 	}
 	
-	// For structs, you would typically use reflection or JSON marshaling
-	// For simplicity, we'll return the args in a generic wrapper
 	return map[string]interface{}{
 		"args": args,
 	}

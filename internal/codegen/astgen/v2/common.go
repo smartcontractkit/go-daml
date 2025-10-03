@@ -10,6 +10,15 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+const (
+	RawTypeTemplate  = "Template"
+	RawTypeOptional  = "OPTIONAL"
+	RawTypeInterface = "Interface"
+	RawTypeRecord    = "Record"
+	RawTypeVariant   = "Variant"
+	RawTypeEnum      = "Enum"
+)
+
 type codeGenAst struct {
 	payload []byte
 }
@@ -47,7 +56,6 @@ func (c *codeGenAst) GetTemplateStructs() (map[string]*model.TmplStruct, error) 
 		moduleName := damlLf1.InternedStrings[idx[len(idx)-1]]
 		log.Info().Msgf("processing module %s", moduleName)
 
-		// Process templates first (template-centric approach)
 		templates, err := c.getTemplates(damlLf1, module, moduleName)
 		if err != nil {
 			return nil, err
@@ -56,7 +64,6 @@ func (c *codeGenAst) GetTemplateStructs() (map[string]*model.TmplStruct, error) 
 			structs[key] = val
 		}
 
-		// Process interfaces
 		interfaces, err := c.getInterfaces(damlLf1, module, moduleName)
 		if err != nil {
 			return nil, err
@@ -65,13 +72,11 @@ func (c *codeGenAst) GetTemplateStructs() (map[string]*model.TmplStruct, error) 
 			structs[key] = val
 		}
 
-		// Process remaining data types that aren't covered by templates/interfaces
 		dataTypes, err := c.getDataTypes(damlLf1, module, moduleName)
 		if err != nil {
 			return nil, err
 		}
 		for key, val := range dataTypes {
-			// Only add if not already processed as part of templates/interfaces
 			if _, exists := structs[key]; !exists {
 				structs[key] = val
 			}
@@ -102,8 +107,6 @@ func (c *codeGenAst) getTemplates(pkg *daml.Package, module *daml.Module, module
 			continue
 		}
 
-		log.Info().Msgf("processing template: %s", templateName)
-
 		var templateDataType *daml.DefDataType
 		for _, dataType := range module.DataTypes {
 			dtName := c.getName(pkg, dataType.GetNameInternedDname())
@@ -121,7 +124,7 @@ func (c *codeGenAst) getTemplates(pkg *daml.Package, module *daml.Module, module
 		tmplStruct := model.TmplStruct{
 			Name:       templateName,
 			ModuleName: moduleName,
-			RawType:    "Template",
+			RawType:    RawTypeTemplate,
 			IsTemplate: true,
 			Choices:    make([]*model.TmplChoice, 0),
 		}
@@ -137,52 +140,20 @@ func (c *codeGenAst) getTemplates(pkg *daml.Package, module *daml.Module, module
 					Name:       fieldExtracted,
 					Type:       typeExtracted,
 					RawType:    field.String(),
-					IsOptional: typeExtracted == "OPTIONAL",
+					IsOptional: typeExtracted == RawTypeOptional,
 				})
 			}
 		default:
 			log.Warn().Msgf("template %s has non-record data type: %T", templateName, v)
 		}
 
-		for _, choice := range template.Choices {
-			var choiceName string
-			switch v := choice.Name.(type) {
-			case *daml.TemplateChoice_NameStr:
-				choiceName = v.NameStr
-			case *daml.TemplateChoice_NameInternedStr:
-				choiceName = pkg.InternedStrings[v.NameInternedStr]
-			default:
-				log.Warn().Msgf("unknown choice name type: %T", v)
-				continue
-			}
+		choices := c.getChoices(pkg, template.Choices)
+		tmplStruct.Choices = append(tmplStruct.Choices, choices...)
 
-			choiceStruct := &model.TmplChoice{
-				Name:        choiceName,
-				IsConsuming: choice.Consuming,
-			}
-
-			// Extract argument type if present
-			if argBinder := choice.GetArgBinder(); argBinder != nil && argBinder.Type != nil {
-				argType := c.extractType(pkg, argBinder.Type)
-				// Only set ArgType if it's not a UNIT type
-				if argType != "UNIT" && argType != "" {
-					choiceStruct.ArgType = argType
-				}
-			}
-
-			// Extract return type
-			if retType := choice.GetRetType(); retType != nil {
-				choiceStruct.ReturnType = c.extractType(pkg, retType)
-			}
-
-			tmplStruct.Choices = append(tmplStruct.Choices, choiceStruct)
-		}
-
-		// Extract key if present
 		if template.Key != nil {
 			keyType := template.Key.GetType().String()
 			normalizedKeyType := model.NormalizeDAMLType(keyType)
-			log.Info().Msgf("template %s has key of type: %s (normalized: %s)", templateName, keyType, normalizedKeyType)
+			log.Debug().Msgf("template %s has key of type: %s (normalized: %s)", templateName, keyType, normalizedKeyType)
 			keyFieldNames := c.parseKeyExpression(pkg, template.Key)
 
 			if len(keyFieldNames) > 0 {
@@ -203,7 +174,6 @@ func (c *codeGenAst) getTemplates(pkg *daml.Package, module *daml.Module, module
 
 				if keyField != nil {
 					tmplStruct.Key = keyField
-					log.Info().Msgf("template %s key field: %s", templateName, keyFieldName)
 				}
 			}
 		}
@@ -219,58 +189,58 @@ func (c *codeGenAst) getInterfaces(pkg *daml.Package, module *daml.Module, modul
 
 	for _, iface := range module.Interfaces {
 		interfaceName := c.getName(pkg, iface.TyconInternedDname)
-		log.Info().Msgf("processing interface: %s", interfaceName)
+		log.Debug().Msgf("processing interface: %s", interfaceName)
 
 		tmplStruct := model.TmplStruct{
 			Name:        interfaceName,
 			ModuleName:  moduleName,
-			RawType:     "Interface",
+			RawType:     RawTypeInterface,
 			IsInterface: true,
 			Choices:     make([]*model.TmplChoice, 0),
 		}
 
-		// Extract interface choices
-		for _, choice := range iface.Choices {
-			var choiceName string
-			switch v := choice.Name.(type) {
-			case *daml.TemplateChoice_NameStr:
-				choiceName = v.NameStr
-			case *daml.TemplateChoice_NameInternedStr:
-				choiceName = pkg.InternedStrings[v.NameInternedStr]
-			default:
-				log.Warn().Msgf("unknown choice name type: %T", v)
-				continue
-			}
-
-			choiceStruct := &model.TmplChoice{
-				Name:        choiceName,
-				IsConsuming: choice.Consuming,
-			}
-
-			// Extract argument type if present
-			if argBinder := choice.GetArgBinder(); argBinder != nil && argBinder.Type != nil {
-				argType := c.extractType(pkg, argBinder.Type)
-				// Only set ArgType if it's not a UNIT type
-				if argType != "UNIT" && argType != "" {
-					choiceStruct.ArgType = argType
-				}
-			}
-
-			// Extract return type
-			if retType := choice.GetRetType(); retType != nil {
-				choiceStruct.ReturnType = c.extractType(pkg, retType)
-			}
-
-			tmplStruct.Choices = append(tmplStruct.Choices, choiceStruct)
-		}
-
-		// TODO: Process interface view if needed
-		// iface.View contains the view type information
+		choices := c.getChoices(pkg, iface.Choices)
+		tmplStruct.Choices = append(tmplStruct.Choices, choices...)
 
 		structs[interfaceName] = &tmplStruct
 	}
 
 	return structs, nil
+}
+
+func (c *codeGenAst) getChoices(pkg *daml.Package, choices []*daml.TemplateChoice) []*model.TmplChoice {
+	res := make([]*model.TmplChoice, 0)
+	for _, choice := range choices {
+		var choiceName string
+		switch v := choice.Name.(type) {
+		case *daml.TemplateChoice_NameStr:
+			choiceName = v.NameStr
+		case *daml.TemplateChoice_NameInternedStr:
+			choiceName = pkg.InternedStrings[v.NameInternedStr]
+		default:
+			log.Debug().Msgf("unknown choice name type: %T", v)
+			continue
+		}
+
+		choiceStruct := &model.TmplChoice{
+			Name:        choiceName,
+			IsConsuming: choice.Consuming,
+		}
+
+		if argBinder := choice.GetArgBinder(); argBinder != nil && argBinder.Type != nil {
+			argType := c.extractType(pkg, argBinder.Type)
+			if argType != "UNIT" && argType != "" {
+				choiceStruct.ArgType = argType
+			}
+		}
+
+		if retType := choice.GetRetType(); retType != nil {
+			choiceStruct.ReturnType = c.extractType(pkg, retType)
+		}
+		res = append(res, choiceStruct)
+	}
+
+	return res
 }
 
 func (c *codeGenAst) getDataTypes(pkg *daml.Package, module *daml.Module, moduleName string) (map[string]*model.TmplStruct, error) {
@@ -288,7 +258,7 @@ func (c *codeGenAst) getDataTypes(pkg *daml.Package, module *daml.Module, module
 
 		switch v := dataType.DataCons.(type) {
 		case *daml.DefDataType_Record:
-			tmplStruct.RawType = "Record"
+			tmplStruct.RawType = RawTypeRecord
 			for _, field := range v.Record.Fields {
 				fieldExtracted, typeExtracted, err := c.extractField(pkg, field)
 				if err != nil {
@@ -301,7 +271,7 @@ func (c *codeGenAst) getDataTypes(pkg *daml.Package, module *daml.Module, module
 				})
 			}
 		case *daml.DefDataType_Variant:
-			tmplStruct.RawType = "Variant"
+			tmplStruct.RawType = RawTypeVariant
 			for _, field := range v.Variant.Fields {
 				fieldExtracted, typeExtracted, err := c.extractField(pkg, field)
 				if err != nil {
@@ -313,23 +283,23 @@ func (c *codeGenAst) getDataTypes(pkg *daml.Package, module *daml.Module, module
 					RawType:    field.String(),
 					IsOptional: true,
 				})
-				log.Info().Msgf("variant constructor: %s, type: %s", fieldExtracted, typeExtracted)
+				log.Debug().Msgf("variant constructor: %s, type: %s", fieldExtracted, typeExtracted)
 			}
 		case *daml.DefDataType_Enum:
-			tmplStruct.RawType = "Enum"
+			tmplStruct.RawType = RawTypeEnum
 			for _, constructorIdx := range v.Enum.ConstructorsInternedStr {
 				constructorName := c.getName(pkg, constructorIdx)
 				tmplStruct.Fields = append(tmplStruct.Fields, &model.TmplField{
 					Name: constructorName,
 					Type: "enum",
 				})
-				log.Info().Msgf("enum constructor: %s", constructorName)
+				log.Debug().Msgf("enum constructor: %s", constructorName)
 			}
 		case *daml.DefDataType_Interface:
 			tmplStruct.RawType = "Interface"
-			log.Warn().Msgf("interface not supported %s", v.Interface.String())
+			log.Warn().Msgf("interface not supported %s, ignoring", v.Interface.String())
 		default:
-			log.Warn().Msgf("unknown data cons type: %T", v)
+			log.Warn().Msgf("unknown data cons type: %T, ignoring", v)
 		}
 		structs[name] = &tmplStruct
 	}
@@ -337,7 +307,6 @@ func (c *codeGenAst) getDataTypes(pkg *daml.Package, module *daml.Module, module
 	return structs, nil
 }
 
-// parseKeyExpression parses the key expression to extract field names used in the key
 func (c *codeGenAst) parseKeyExpression(pkg *daml.Package, key *daml.DefTemplate_DefKey) []string {
 	var fieldNames []string
 
@@ -345,35 +314,37 @@ func (c *codeGenAst) parseKeyExpression(pkg *daml.Package, key *daml.DefTemplate
 		return fieldNames
 	}
 
-	if key.GetKey() != nil {
-		keyExpr := key.GetKey()
-		if keyExpr.GetProjections() != nil {
-			projections := keyExpr.GetProjections()
-			for _, proj := range projections.Projections {
-				if proj.GetFieldInternedStr() != 0 {
-					fieldName := pkg.InternedStrings[proj.GetFieldInternedStr()]
-					fieldNames = append(fieldNames, fieldName)
-				} else if proj.GetFieldStr() != "" {
-					fieldNames = append(fieldNames, proj.GetFieldStr())
-				}
-			}
-		} else if keyExpr.GetRecord() != nil {
-			record := keyExpr.GetRecord()
-			for _, field := range record.Fields {
-				if field.GetFieldInternedStr() != 0 {
-					fieldName := pkg.InternedStrings[field.GetFieldInternedStr()]
-					fieldNames = append(fieldNames, fieldName)
-				} else if field.GetFieldStr() != "" {
-					fieldNames = append(fieldNames, field.GetFieldStr())
-				}
+	if key.GetComplexKey() != nil {
+		log.Debug().Msg("complex key expressions are not fully supported yet")
+		return fieldNames
+	}
+
+	if key.GetKey() == nil {
+		log.Debug().Msgf("key expression is nil, ignoring")
+		return fieldNames
+	}
+
+	keyExpr := key.GetKey()
+	if keyExpr.GetProjections() != nil {
+		projections := keyExpr.GetProjections()
+		for _, proj := range projections.Projections {
+			if proj.GetFieldInternedStr() != 0 {
+				fieldName := pkg.InternedStrings[proj.GetFieldInternedStr()]
+				fieldNames = append(fieldNames, fieldName)
+			} else if proj.GetFieldStr() != "" {
+				fieldNames = append(fieldNames, proj.GetFieldStr())
 			}
 		}
-	} else if key.GetComplexKey() != nil {
-		// Complex key expression - needs full expression parsing
-		// For now, log and return empty
-		log.Warn().Msg("complex key expressions are not fully supported yet")
-		// For complex expressions, we'll fall back to type matching
-		// This handles cases where the key is an expression rather than direct field access
+	} else if keyExpr.GetRecord() != nil {
+		record := keyExpr.GetRecord()
+		for _, field := range record.Fields {
+			if field.GetFieldInternedStr() != 0 {
+				fieldName := pkg.InternedStrings[field.GetFieldInternedStr()]
+				fieldNames = append(fieldNames, fieldName)
+			} else if field.GetFieldStr() != "" {
+				fieldNames = append(fieldNames, field.GetFieldStr())
+			}
+		}
 	}
 
 	return fieldNames
@@ -388,27 +359,25 @@ func (c *codeGenAst) extractType(pkg *daml.Package, typ *daml.Type) string {
 	switch v := typ.Sum.(type) {
 	case *daml.Type_Interned:
 		prim := pkg.InternedTypes[v.Interned]
-		if prim != nil {
-			isConType := prim.GetCon()
-			if isConType != nil {
-				tyconName := c.getName(pkg, isConType.Tycon.GetNameInternedDname())
-				fieldType = tyconName
-			} else {
-				fieldType = prim.String()
-			}
+		if prim == nil {
+			return "unknown_internet_type"
+		}
+		isConType := prim.GetCon()
+		if isConType != nil {
+			tyconName := c.getName(pkg, isConType.Tycon.GetNameInternedDname())
+			fieldType = tyconName
 		} else {
-			fieldType = "complex_interned_type"
+			fieldType = prim.String()
 		}
 	case *daml.Type_Con_:
-		if v.Con.Tycon != nil {
-			switch {
-			case v.Con.Tycon.GetNameInternedDname() != 0:
-				fieldType = c.getName(pkg, v.Con.Tycon.GetNameInternedDname())
-			default:
-				fieldType = "unknown_con_type"
-			}
-		} else {
-			fieldType = "con_without_tycon"
+		if v.Con.Tycon == nil {
+			return "unknown_vcon_tycon"
+		}
+		switch {
+		case v.Con.Tycon.GetNameInternedDname() != 0:
+			fieldType = c.getName(pkg, v.Con.Tycon.GetNameInternedDname())
+		default:
+			fieldType = "unknown_con_type"
 		}
 	case *daml.Type_Var_:
 		switch {
@@ -423,15 +392,14 @@ func (c *codeGenAst) extractType(pkg *daml.Package, typ *daml.Type) string {
 			fieldType = "unnamed_var"
 		}
 	case *daml.Type_Syn_:
-		if v.Syn.Tysyn != nil {
-			switch {
-			case v.Syn.Tysyn.GetNameInternedDname() != 0:
-				fieldType = fmt.Sprintf("syn_%s", c.getName(pkg, v.Syn.Tysyn.GetNameInternedDname()))
-			default:
-				fieldType = "syn_unknown"
-			}
-		} else {
-			fieldType = "syn_without_name"
+		if v.Syn.Tysyn == nil {
+			return "unknown_syn_without_name"
+		}
+		switch {
+		case v.Syn.Tysyn.GetNameInternedDname() != 0:
+			fieldType = fmt.Sprintf("syn_%s", c.getName(pkg, v.Syn.Tysyn.GetNameInternedDname()))
+		default:
+			fieldType = "syn_unknown"
 		}
 	default:
 		fieldType = fmt.Sprintf("unknown_type_%T", typ.Sum)
@@ -456,7 +424,6 @@ func (c *codeGenAst) extractField(pkg *daml.Package, field *daml.FieldWithType) 
 
 	//	*Type_Var_
 	//	*Type_Con_
-	//	*Type_Builtin_
 	//	*Type_Syn_
 	//	*Type_Interned
 	var fieldType string
