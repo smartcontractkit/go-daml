@@ -19,21 +19,20 @@ var (
 
 const PackageID = "ddf0d6396a862eaa7f8d647e39d090a6b04c4a3fd6736aa1730ebc9fca6be664"
 
-// argsToMap converts typed arguments to map for ExerciseCommand
+type Template interface {
+	CreateCommand() *model.CreateCommand
+	GetTemplateID() string
+}
+
 func argsToMap(args interface{}) map[string]interface{} {
-	// For now, we'll use a simple approach
-	// In practice, you might want to implement proper struct-to-map conversion
 	if args == nil {
 		return map[string]interface{}{}
 	}
 
-	// If args is already a map, return it directly
 	if m, ok := args.(map[string]interface{}); ok {
 		return m
 	}
 
-	// For structs, you would typically use reflection or JSON marshaling
-	// For simplicity, we'll return the args in a generic wrapper
 	return map[string]interface{}{
 		"args": args,
 	}
@@ -131,7 +130,9 @@ func (t OneOfEverything) CreateCommand() *model.CreateCommand {
 
 	args["someInteger"] = int64(t.SomeInteger)
 
-	args["someDecimal"] = t.SomeDecimal
+	if t.SomeDecimal != nil {
+		args["someDecimal"] = (*big.Int)(t.SomeDecimal).String()
+	}
 
 	if t.SomeMaybe != nil {
 		args["someMaybe"] = t.SomeMaybe
@@ -157,7 +158,9 @@ func (t OneOfEverything) CreateCommand() *model.CreateCommand {
 
 	args["someUglyNesting"] = t.SomeUglyNesting
 
-	args["someMeasurement"] = t.SomeMeasurement
+	if t.SomeMeasurement != nil {
+		args["someMeasurement"] = (*big.Int)(t.SomeMeasurement).String()
+	}
 
 	args["someEnum"] = t.SomeEnum
 

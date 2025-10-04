@@ -1,6 +1,8 @@
 package ledger
 
 import (
+	"math/big"
+	"reflect"
 	"strings"
 	"time"
 
@@ -13,6 +15,7 @@ import (
 	"github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/interactive"
 	"github.com/noders-team/go-daml/pkg/model"
 	"github.com/noders-team/go-daml/pkg/types"
+	"github.com/rs/zerolog/log"
 )
 
 func parseTemplateID(templateID string) (packageID, moduleName, entityName string) {
@@ -361,9 +364,29 @@ func mapToValue(data interface{}) *v2.Value {
 				Record: &v2.Record{Fields: fields},
 			},
 		}
+	case *big.Int:
+		return &v2.Value{Sum: &v2.Value_Numeric{Numeric: v.String()}}
+	case types.NUMERIC:
+		return &v2.Value{Sum: &v2.Value_Numeric{Numeric: (*big.Int)(v).String()}}
+	case types.DATE:
+		return &v2.Value{Sum: &v2.Value_Date{Date: int32((time.Time)(v).Unix() / 86400)}}
+	case time.Time:
+		return &v2.Value{Sum: &v2.Value_Date{Date: int32(v.Unix() / 86400)}}
+	case types.TIMESTAMP:
+		return &v2.Value{Sum: &v2.Value_Timestamp{Timestamp: int64((time.Time)(v).Unix())}}
+	case types.LIST:
+		return &v2.Value{Sum: &v2.Value_List{List: &v2.List{Elements: mapValues(v)}}}
 	default:
 		return nil
 	}
+}
+
+func mapValues(values []string) []*v2.Value {
+	result := make([]*v2.Value, len(values))
+	for i, v := range values {
+		result[i] = mapToValue(v)
+	}
+	return result
 }
 
 func convertToRecord(data map[string]interface{}) *v2.Record {
@@ -373,9 +396,14 @@ func convertToRecord(data map[string]interface{}) *v2.Record {
 
 	fields := make([]*v2.RecordField, 0, len(data))
 	for key, val := range data {
+		val := mapToValue(val)
+		if val == nil {
+			log.Warn().Msgf("unsupported type %s for field %s, ignoring", reflect.TypeOf(val), key)
+			continue
+		}
 		fields = append(fields, &v2.RecordField{
 			Label: key,
-			Value: mapToValue(val),
+			Value: val,
 		})
 	}
 
