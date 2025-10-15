@@ -30,11 +30,10 @@ type TmplField struct {
 }
 
 type TmplChoice struct {
-	Name        string
-	ArgType     string
-	ReturnType  string
-	IsConsuming bool
-	Controllers []string
+	Name          string
+	ArgType       string
+	ReturnType    string
+	InterfaceName string // The name of the interface this choice comes from (empty for template choices)
 }
 
 type Package struct {

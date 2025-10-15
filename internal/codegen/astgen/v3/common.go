@@ -227,11 +227,10 @@ func (c *codeGenAst) getTemplates(pkg *daml.Package, module *daml.Module, module
 							if !found {
 								// Clone the interface choice for this template
 								tmplStruct.Choices = append(tmplStruct.Choices, &model.TmplChoice{
-									Name:        ifaceChoice.Name,
-									ArgType:     ifaceChoice.ArgType,
-									ReturnType:  ifaceChoice.ReturnType,
-									IsConsuming: ifaceChoice.IsConsuming,
-									Controllers: ifaceChoice.Controllers,
+									Name:          ifaceChoice.Name,
+									ArgType:       ifaceChoice.ArgType,
+									ReturnType:    ifaceChoice.ReturnType,
+									InterfaceName: interfaceName,
 								})
 							}
 						}
@@ -251,8 +250,7 @@ func (c *codeGenAst) getChoices(pkg *daml.Package, choices []*daml.TemplateChoic
 	for _, choice := range choices {
 		choiceName := pkg.InternedStrings[choice.NameInternedStr]
 		choiceStruct := &model.TmplChoice{
-			Name:        choiceName,
-			IsConsuming: choice.Consuming,
+			Name: choiceName,
 		}
 
 		// Extract argument type if present

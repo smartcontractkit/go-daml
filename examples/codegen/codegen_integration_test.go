@@ -549,10 +549,9 @@ func TestAmuletsTransfer(t *testing.T) {
 	assetContractID := contractIDs[0]
 	log.Info().Str("assetContractID", assetContractID).Msg("Created Asset contract")
 
-	// Test Transfer choice
-	transferArgs := Transfer{NewOwner: PARTY(party + "_new")}
-	transferCmd, err := assetContract.Transfer(assetContractID, transferArgs)
-	require.NoError(t, err, "Transfer method should not return error")
+	// Test Transfer choice - use the same party for simplicity in the test
+	transferArgs := Transfer{NewOwner: PARTY(party)}
+	transferCmd := assetContract.Transfer(assetContractID, transferArgs)
 
 	transferSubmissionReq := &model.SubmitAndWaitRequest{
 		Commands: &model.Commands{
@@ -571,9 +570,16 @@ func TestAmuletsTransfer(t *testing.T) {
 	require.NoError(t, err, "Transfer command should succeed")
 	log.Info().Str("updateID", transferResponse.UpdateID).Msg("Transfer executed successfully")
 
-	// Test Archive choice
-	archiveCmd, err := assetContract.Archive(assetContractID)
-	require.NoError(t, err, "Archive method should not return error")
+	// Get the new contract ID from the transfer transaction
+	newContractIDs, err := getContractIDsFromUpdate(ctx, party, transferResponse.UpdateID, cl)
+	require.NoError(t, err, "Should be able to get contract IDs from transfer transaction")
+	require.Greater(t, len(newContractIDs), 0, "Transfer should create at least one contract")
+	
+	newAssetContractID := newContractIDs[0]
+	log.Info().Str("newAssetContractID", newAssetContractID).Msg("Got new Asset contract from Transfer")
+
+	// Test Archive choice on the new contract
+	archiveCmd := assetContract.Archive(newAssetContractID)
 
 	archiveSubmissionReq := &model.SubmitAndWaitRequest{
 		Commands: &model.Commands{

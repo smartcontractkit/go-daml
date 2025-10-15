@@ -31,7 +31,7 @@ type Template interface {
 type {{capitalise .Name}} interface {
 	{{range $choice := .Choices}}
 	// {{capitalise $choice.Name}} executes the {{$choice.Name}} choice
-	{{capitalise $choice.Name}}(contractID string{{if and (ne $choice.ArgType "UNIT") (ne $choice.ArgType "")}}, args {{$choice.ArgType}}{{end}}) (*model.ExerciseCommand, error)
+	{{capitalise $choice.Name}}(contractID string{{if and (ne $choice.ArgType "UNIT") (ne $choice.ArgType "")}}, args {{$choice.ArgType}}{{end}}) *model.ExerciseCommand
 	{{end}}
 }
 {{end}}
@@ -44,6 +44,15 @@ func argsToMap(args interface{}) map[string]interface{} {
 	
 	if m, ok := args.(map[string]interface{}); ok {
 		return m
+	}
+	
+	// Check if the type has a toMap method
+	type mapper interface {
+		toMap() map[string]interface{}
+	}
+	
+	if mapper, ok := args.(mapper); ok {
+		return mapper.toMap()
 	}
 	
 	return map[string]interface{}{
@@ -151,6 +160,16 @@ func argsToMap(args interface{}) map[string]interface{} {
 		{{range $field := .Fields}}
 		{{capitalise $field.Name}} {{$field.Type}} `json:"{{$field.Name}}"`{{end}}
 	}
+	{{if and (eq .RawType "Record") (not .IsTemplate) (not .IsInterface)}}
+	
+	// toMap converts {{capitalise .Name}} to a map for DAML arguments
+	func (t {{capitalise .Name}}) toMap() map[string]interface{} {
+		return map[string]interface{}{
+			{{range $field := .Fields}}
+			"{{$field.Name}}": {{template "fieldToDAMLValue" $field}},{{end}}
+		}
+	}
+	{{end}}
 	{{if .IsTemplate}}
 	
 	// GetTemplateID returns the template ID for this template
@@ -205,14 +224,14 @@ func argsToMap(args interface{}) map[string]interface{} {
 	{{$moduleName := .ModuleName}}
 	// Choice methods for {{capitalise .Name}}
 	{{range $choice := .Choices}}
-	// {{capitalise $choice.Name}} exercises the {{$choice.Name}} choice on this {{capitalise $templateName}} contract
-	func (t {{capitalise $templateName}}) {{capitalise $choice.Name}}(contractID string{{if and (ne $choice.ArgType "UNIT") (ne $choice.ArgType "")}}, args {{$choice.ArgType}}{{end}}) (*model.ExerciseCommand, error) {
+	// {{capitalise $choice.Name}} exercises the {{$choice.Name}} choice on this {{capitalise $templateName}} contract{{if ne $choice.InterfaceName ""}} via the {{capitalise $choice.InterfaceName}} interface{{end}}
+	func (t {{capitalise $templateName}}) {{capitalise $choice.Name}}(contractID string{{if and (ne $choice.ArgType "UNIT") (ne $choice.ArgType "")}}, args {{$choice.ArgType}}{{end}}) *model.ExerciseCommand {
 		return &model.ExerciseCommand{
-			TemplateID: fmt.Sprintf("%s:%s:%s", PackageID, "{{$moduleName}}", "{{capitalise $templateName}}"),
+			{{if ne $choice.InterfaceName ""}}TemplateID: fmt.Sprintf("%s:%s:%s", {{capitalise $moduleName}}PackageID, "{{$moduleName}}", "{{capitalise $choice.InterfaceName}}"),{{else}}TemplateID: fmt.Sprintf("%s:%s:%s", {{capitalise $moduleName}}PackageID, "{{$moduleName}}", "{{capitalise $templateName}}"),{{end}}
 			ContractID: contractID,
 			Choice: "{{$choice.Name}}",
 			{{if and (ne $choice.ArgType "UNIT") (ne $choice.ArgType "")}}Arguments: argsToMap(args),{{else}}Arguments: map[string]interface{}{},{{end}}
-		}, nil
+		}
 	}
 	{{end}}
 	{{end}}

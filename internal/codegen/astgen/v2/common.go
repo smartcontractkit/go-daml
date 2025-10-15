@@ -223,8 +223,7 @@ func (c *codeGenAst) getChoices(pkg *daml.Package, choices []*daml.TemplateChoic
 		}
 
 		choiceStruct := &model.TmplChoice{
-			Name:        choiceName,
-			IsConsuming: choice.Consuming,
+			Name: choiceName,
 		}
 
 		if argBinder := choice.GetArgBinder(); argBinder != nil && argBinder.Type != nil {

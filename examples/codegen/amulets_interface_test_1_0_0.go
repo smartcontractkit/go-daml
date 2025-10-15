@@ -18,33 +18,14 @@ var (
 
 const InterfacePackageID = "8f919735d2daa1abb780808ad1fed686fc9229a039dc659ccb04e5fd5d071c90"
 
-type InterfaceTemplate interface {
-	CreateCommand() *model.CreateCommand
-	GetTemplateID() string
-}
-
 // Transferable is a DAML interface
 type Transferable interface {
 
 	// Archive executes the Archive choice
-	Archive(contractID string) (*model.ExerciseCommand, error)
+	Archive(contractID string) *model.ExerciseCommand
 
 	// Transfer executes the Transfer choice
-	Transfer(contractID string, args Transfer) (*model.ExerciseCommand, error)
-}
-
-func interfaceArgsToMap(args interface{}) map[string]interface{} {
-	if args == nil {
-		return map[string]interface{}{}
-	}
-
-	if m, ok := args.(map[string]interface{}); ok {
-		return m
-	}
-
-	return map[string]interface{}{
-		"args": args,
-	}
+	Transfer(contractID string, args Transfer) *model.ExerciseCommand
 }
 
 // Asset is a Template type
@@ -78,33 +59,33 @@ func (t Asset) CreateCommand() *model.CreateCommand {
 // Choice methods for Asset
 
 // Archive exercises the Archive choice on this Asset contract
-func (t Asset) Archive(contractID string) (*model.ExerciseCommand, error) {
+func (t Asset) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("%s:%s:%s", InterfacePackageID, "Interfaces", "Asset"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]interface{}{},
-	}, nil
+	}
 }
 
 // AssetTransfer exercises the AssetTransfer choice on this Asset contract
-func (t Asset) AssetTransfer(contractID string, args AssetTransfer) (*model.ExerciseCommand, error) {
+func (t Asset) AssetTransfer(contractID string, args AssetTransfer) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("%s:%s:%s", InterfacePackageID, "Interfaces", "Asset"),
 		ContractID: contractID,
 		Choice:     "AssetTransfer",
-		Arguments:  interfaceArgsToMap(args),
-	}, nil
+		Arguments:  argsToMap(args),
+	}
 }
 
-// Transfer exercises the Transfer choice on this Asset contract
-func (t Asset) Transfer(contractID string, args Transfer) (*model.ExerciseCommand, error) {
+// Transfer exercises the Transfer choice on this Asset contract via the Transferable interface
+func (t Asset) Transfer(contractID string, args Transfer) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("%s:%s:%s", InterfacePackageID, "Interfaces", "Asset"),
+		TemplateID: fmt.Sprintf("%s:%s:%s", InterfacePackageID, "Interfaces", "Transferable"),
 		ContractID: contractID,
 		Choice:     "Transfer",
-		Arguments:  interfaceArgsToMap(args),
-	}, nil
+		Arguments:  argsToMap(args),
+	}
 }
 
 // Verify interface implementations for Asset
@@ -114,6 +95,14 @@ var _ Transferable = (*Asset)(nil)
 // AssetTransfer is a Record type
 type AssetTransfer struct {
 	NewOwner PARTY `json:"newOwner"`
+}
+
+// toMap converts AssetTransfer to a map for DAML arguments
+func (t AssetTransfer) toMap() map[string]interface{} {
+	return map[string]interface{}{
+
+		"newOwner": map[string]interface{}{"_type": "party", "value": string(t.NewOwner)},
+	}
 }
 
 // Token is a Template type
@@ -149,23 +138,23 @@ func (t Token) CreateCommand() *model.CreateCommand {
 // Choice methods for Token
 
 // Archive exercises the Archive choice on this Token contract
-func (t Token) Archive(contractID string) (*model.ExerciseCommand, error) {
+func (t Token) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("%s:%s:%s", InterfacePackageID, "Interfaces", "Token"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]interface{}{},
-	}, nil
+	}
 }
 
-// Transfer exercises the Transfer choice on this Token contract
-func (t Token) Transfer(contractID string, args Transfer) (*model.ExerciseCommand, error) {
+// Transfer exercises the Transfer choice on this Token contract via the Transferable interface
+func (t Token) Transfer(contractID string, args Transfer) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("%s:%s:%s", InterfacePackageID, "Interfaces", "Token"),
+		TemplateID: fmt.Sprintf("%s:%s:%s", InterfacePackageID, "Interfaces", "Transferable"),
 		ContractID: contractID,
 		Choice:     "Transfer",
-		Arguments:  interfaceArgsToMap(args),
-	}, nil
+		Arguments:  argsToMap(args),
+	}
 }
 
 // Verify interface implementations for Token
@@ -177,7 +166,23 @@ type Transfer struct {
 	NewOwner PARTY `json:"newOwner"`
 }
 
+// toMap converts Transfer to a map for DAML arguments
+func (t Transfer) toMap() map[string]interface{} {
+	return map[string]interface{}{
+
+		"newOwner": map[string]interface{}{"_type": "party", "value": string(t.NewOwner)},
+	}
+}
+
 // TransferableView is a Record type
 type TransferableView struct {
 	Owner PARTY `json:"owner"`
+}
+
+// toMap converts TransferableView to a map for DAML arguments
+func (t TransferableView) toMap() map[string]interface{} {
+	return map[string]interface{}{
+
+		"owner": map[string]interface{}{"_type": "party", "value": string(t.Owner)},
+	}
 }

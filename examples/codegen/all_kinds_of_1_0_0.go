@@ -33,13 +33,28 @@ func argsToMap(args interface{}) map[string]interface{} {
 		return m
 	}
 
+	// Check if the type has a toMap method
+	type mapper interface {
+		toMap() map[string]interface{}
+	}
+
+	if mapper, ok := args.(mapper); ok {
+		return mapper.toMap()
+	}
+
 	return map[string]interface{}{
 		"args": args,
 	}
 }
 
 // Accept is a Record type
-type Accept struct{}
+type Accept struct {
+}
+
+// toMap converts Accept to a map for DAML arguments
+func (t Accept) toMap() map[string]interface{} {
+	return map[string]interface{}{}
+}
 
 // Color is an enum type
 type Color string
@@ -106,6 +121,15 @@ func (t MappyContract) Archive(contractID string) *model.ExerciseCommand {
 type MyPair struct {
 	Left  interface{} `json:"left"`
 	Right interface{} `json:"right"`
+}
+
+// toMap converts MyPair to a map for DAML arguments
+func (t MyPair) toMap() map[string]interface{} {
+	return map[string]interface{}{
+
+		"left":  t.Left,
+		"right": t.Right,
+	}
 }
 
 // OneOfEverything is a Template type
@@ -230,6 +254,7 @@ type VPair struct {
 
 // MarshalJSON implements custom JSON marshaling for VPair
 func (v VPair) MarshalJSON() ([]byte, error) {
+
 	if v.Left != nil {
 		return json.Marshal(map[string]interface{}{
 			"tag":   "Left",
@@ -297,6 +322,7 @@ func (v *VPair) UnmarshalJSON(data []byte) error {
 
 // GetVariantTag implements types.VARIANT interface
 func (v VPair) GetVariantTag() string {
+
 	if v.Left != nil {
 		return "Left"
 	}
@@ -314,6 +340,7 @@ func (v VPair) GetVariantTag() string {
 
 // GetVariantValue implements types.VARIANT interface
 func (v VPair) GetVariantValue() interface{} {
+
 	if v.Left != nil {
 		return v.Left
 	}
