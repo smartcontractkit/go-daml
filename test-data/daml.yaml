@@ -1,0 +1,9 @@
+sdk-version: 3.3.0-snapshot.20250507.0
+name: amulets-interface-test
+version: 1.0.0
+source: .
+build-options:
+  - -Wno-upgrade-interfaces
+dependencies:
+  - daml-prim
+  - daml-stdlib

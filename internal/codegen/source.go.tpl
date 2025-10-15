@@ -1,7 +1,7 @@
 package {{.Package}}
 
 import (
-	"encoding/json"
+	{{$hasVariant := false}}{{range .Structs}}{{if eq .RawType "Variant"}}{{$hasVariant = true}}{{end}}{{end}}{{if $hasVariant}}"encoding/json"{{end}}
 	"fmt"
 	"math/big"
 	"strings"
@@ -24,6 +24,19 @@ type Template interface {
 	GetTemplateID() string
 }
 
+{{$structs := .Structs}}
+{{range $structs}}
+{{if .IsInterface}}
+// {{capitalise .Name}} is a DAML interface
+type {{capitalise .Name}} interface {
+	{{range $choice := .Choices}}
+	// {{capitalise $choice.Name}} executes the {{$choice.Name}} choice
+	{{capitalise $choice.Name}}(contractID string{{if and (ne $choice.ArgType "UNIT") (ne $choice.ArgType "")}}, args {{$choice.ArgType}}{{end}}) (*model.ExerciseCommand, error)
+	{{end}}
+}
+{{end}}
+{{end}}
+
 func argsToMap(args interface{}) map[string]interface{} {
 	if args == nil {
 		return map[string]interface{}{}
@@ -41,6 +54,7 @@ func argsToMap(args interface{}) map[string]interface{} {
 
 {{$structs := .Structs}}
 {{range $structs}}
+	{{if not .IsInterface}}
 	{{if eq .RawType "Variant"}}
 	// {{capitalise .Name}} is a variant/union type
 	type {{capitalise .Name}} struct {
@@ -192,14 +206,22 @@ func argsToMap(args interface{}) map[string]interface{} {
 	// Choice methods for {{capitalise .Name}}
 	{{range $choice := .Choices}}
 	// {{capitalise $choice.Name}} exercises the {{$choice.Name}} choice on this {{capitalise $templateName}} contract
-	func (t {{capitalise $templateName}}) {{capitalise $choice.Name}}(contractID string{{if $choice.ArgType}}, args {{$choice.ArgType}}{{end}}) *model.ExerciseCommand {
+	func (t {{capitalise $templateName}}) {{capitalise $choice.Name}}(contractID string{{if and (ne $choice.ArgType "UNIT") (ne $choice.ArgType "")}}, args {{$choice.ArgType}}{{end}}) (*model.ExerciseCommand, error) {
 		return &model.ExerciseCommand{
 			TemplateID: fmt.Sprintf("%s:%s:%s", PackageID, "{{$moduleName}}", "{{capitalise $templateName}}"),
 			ContractID: contractID,
 			Choice: "{{$choice.Name}}",
-			{{if $choice.ArgType}}Arguments: argsToMap(args),{{else}}Arguments: map[string]interface{}{},{{end}}
-		}
+			{{if and (ne $choice.ArgType "UNIT") (ne $choice.ArgType "")}}Arguments: argsToMap(args),{{else}}Arguments: map[string]interface{}{},{{end}}
+		}, nil
 	}
+	{{end}}
+	{{end}}
+	{{if and .IsTemplate .Implements}}
+	{{$templateName := .Name}}
+	// Verify interface implementations for {{capitalise .Name}}
+	{{range $interface := .Implements}}
+	var _ {{capitalise $interface}} = (*{{capitalise $templateName}})(nil)
+	{{end}}
 	{{end}}
 	{{end}}
 	{{end}}

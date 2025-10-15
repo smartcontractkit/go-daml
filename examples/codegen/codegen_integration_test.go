@@ -19,10 +19,11 @@ import (
 )
 
 const (
-	grpcAddress = "localhost:3901"
-	bearerToken = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJodHRwczovL2NhbnRvbi5uZXR3b3JrLmdsb2JhbCIsInN1YiI6ImxlZGdlci1hcGktdXNlciJ9.A0VZW69lWWNVsjZmDDpVvr1iQ_dJLga3f-K2bicdtsc"
-	darFilePath = "../../test-data/all-kinds-of-1.0.0.dar"
-	user        = "app-provider"
+	grpcAddress      = "localhost:3901"
+	bearerToken      = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJodHRwczovL2NhbnRvbi5uZXR3b3JrLmdsb2JhbCIsInN1YiI6ImxlZGdlci1hcGktdXNlciJ9.A0VZW69lWWNVsjZmDDpVvr1iQ_dJLga3f-K2bicdtsc"
+	darFilePath      = "../../test-data/all-kinds-of-1.0.0.dar"
+	interfaceDarPath = "../../test-data/amulets-interface-test-1.0.0.dar"
+	user             = "app-provider"
 )
 
 func TestCodegenIntegration(t *testing.T) {
@@ -213,6 +214,28 @@ func TestCodegenIntegrationAllFieldsContract(t *testing.T) {
 		}
 	}
 
+	// subscribing to updates
+	updRes, errRes := cl.UpdateService.GetUpdates(context.Background(), &model.GetUpdatesRequest{Filter: &model.TransactionFilter{
+		FiltersByParty: map[string]*model.Filters{
+			party: {},
+		},
+	}})
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case upd, ok := <-updRes:
+				if !ok {
+					return
+				}
+				log.Info().Msgf("update: %v", upd)
+			case err := <-errRes:
+				log.Fatal().Err(err).Msg("failed to get updates")
+			}
+		}
+	}()
+
 	rights, err := cl.UserMng.ListUserRights(ctx, user)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to list user rights")
@@ -333,9 +356,13 @@ func TestCodegenIntegrationAllFieldsContract(t *testing.T) {
 }
 
 func packageUpload(ctx context.Context, uploadedPackageName string, cl *client.DamlBindingClient) error {
-	darContent, err := os.ReadFile(darFilePath)
+	return packageUploadWithPath(ctx, uploadedPackageName, darFilePath, PackageID, cl)
+}
+
+func packageUploadWithPath(ctx context.Context, uploadedPackageName, darPath, packageID string, cl *client.DamlBindingClient) error {
+	darContent, err := os.ReadFile(darPath)
 	if err != nil {
-		return fmt.Errorf("error reading darFilePath")
+		return fmt.Errorf("error reading dar file %s: %v", darPath, err)
 	}
 
 	if !packageExists(uploadedPackageName, cl) {
@@ -346,7 +373,7 @@ func packageUpload(ctx context.Context, uploadedPackageName string, cl *client.D
 
 		err = cl.PackageMng.ValidateDarFile(ctx, darContent, submissionID)
 		if err != nil {
-			return fmt.Errorf("DAR validation failed for %s %v", darFilePath, err)
+			return fmt.Errorf("DAR validation failed for %s %v", darPath, err)
 		}
 
 		uploadSubmissionID := "upload-" + time.Now().Format("20060102150405")
@@ -362,7 +389,7 @@ func packageUpload(ctx context.Context, uploadedPackageName string, cl *client.D
 		}
 	}
 	status, err := cl.PackageService.GetPackageStatus(ctx,
-		&model.GetPackageStatusRequest{PackageID: PackageID})
+		&model.GetPackageStatusRequest{PackageID: packageID})
 	if err != nil {
 		return fmt.Errorf("failed to get package status %v", err)
 	}
@@ -460,4 +487,110 @@ func getContractIDsFromUpdate(ctx context.Context, party, updateID string, cl *c
 	}
 
 	return contractIDs, nil
+}
+
+func TestAmuletsTransfer(t *testing.T) {
+	zerolog.SetGlobalLevel(zerolog.InfoLevel)
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+
+	log.Info().Str("interfacePackageID", InterfacePackageID).Msg("Using interface package ID")
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// Reuse client setup from existing tests
+	builder := client.NewDamlClient(bearerToken, grpcAddress)
+	if strings.HasSuffix(grpcAddress, ":443") {
+		tlsConfig := client.TlsConfig{}
+		builder = builder.WithTLSConfig(tlsConfig)
+	}
+
+	cl, err := builder.Build(context.Background())
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to build DAML client")
+	}
+
+	if err = cl.Ping(ctx); err != nil {
+		log.Fatal().Err(err).Msg("failed to ping DAML client")
+	}
+
+	// Upload interface package using existing pattern
+	uploadedPackageName := "amulets-interface-test"
+	err = packageUploadWithPath(ctx, uploadedPackageName, interfaceDarPath, InterfacePackageID, cl)
+	if err != nil {
+		log.Panic().Msgf("error: %v", err)
+	}
+
+	// Reuse party and rights setup
+	party := ""
+	users, err := cl.UserMng.ListUsers(ctx)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to list users")
+	}
+	for _, u := range users {
+		if u.ID == user {
+			party = u.PrimaryParty
+			log.Info().Msgf("user %s has primary party %s, using it", u.ID, u.PrimaryParty)
+		}
+	}
+
+	// Create Asset contract
+	assetContract := Asset{
+		Owner: PARTY(party),
+		Name:  TEXT("Test Asset"),
+		Value: INT64(100),
+	}
+
+	contractIDs, err := createContract(ctx, party, cl, assetContract)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to create Asset contract")
+	}
+
+	require.Greater(t, len(contractIDs), 0, "Expected at least one contract to be created")
+	assetContractID := contractIDs[0]
+	log.Info().Str("assetContractID", assetContractID).Msg("Created Asset contract")
+
+	// Test Transfer choice
+	transferArgs := Transfer{NewOwner: PARTY(party + "_new")}
+	transferCmd, err := assetContract.Transfer(assetContractID, transferArgs)
+	require.NoError(t, err, "Transfer method should not return error")
+
+	transferSubmissionReq := &model.SubmitAndWaitRequest{
+		Commands: &model.Commands{
+			WorkflowID:   "transfer-workflow-" + time.Now().Format("20060102150405"),
+			CommandID:    "transfer-" + time.Now().Format("20060102150405"),
+			ActAs:        []string{party},
+			SubmissionID: "transfer-sub-" + time.Now().Format("20060102150405"),
+			DeduplicationPeriod: model.DeduplicationDuration{
+				Duration: 60 * time.Second,
+			},
+			Commands: []*model.Command{{Command: transferCmd}},
+		},
+	}
+
+	transferResponse, err := cl.CommandService.SubmitAndWait(ctx, transferSubmissionReq)
+	require.NoError(t, err, "Transfer command should succeed")
+	log.Info().Str("updateID", transferResponse.UpdateID).Msg("Transfer executed successfully")
+
+	// Test Archive choice
+	archiveCmd, err := assetContract.Archive(assetContractID)
+	require.NoError(t, err, "Archive method should not return error")
+
+	archiveSubmissionReq := &model.SubmitAndWaitRequest{
+		Commands: &model.Commands{
+			WorkflowID:   "archive-workflow-" + time.Now().Format("20060102150405"),
+			CommandID:    "archive-" + time.Now().Format("20060102150405"),
+			ActAs:        []string{party},
+			SubmissionID: "archive-sub-" + time.Now().Format("20060102150405"),
+			DeduplicationPeriod: model.DeduplicationDuration{
+				Duration: 60 * time.Second,
+			},
+			Commands: []*model.Command{{Command: archiveCmd}},
+		},
+	}
+
+	archiveResponse, err := cl.CommandService.SubmitAndWait(ctx, archiveSubmissionReq)
+	require.NoError(t, err, "Archive command should succeed")
+	log.Info().Str("updateID", archiveResponse.UpdateID).Msg("Archive executed successfully")
+
+	log.Info().Msg("TestAmuletsTransfer completed successfully")
 }
