@@ -68,6 +68,27 @@ func (c *codeGenAst) GetTemplateStructs() (map[string]*model.TmplStruct, error) 
 		return nil, errors.New("unsupported daml version")
 	}
 
+	// First pass: collect all interfaces
+	interfaceMap := make(map[string]*model.TmplStruct)
+	for _, module := range damlLf.Modules {
+		if len(damlLf.InternedStrings) == 0 {
+			continue
+		}
+
+		idx := damlLf.InternedDottedNames[module.GetNameInternedDname()].SegmentsInternedStr
+		moduleName := damlLf.InternedStrings[idx[len(idx)-1]]
+
+		interfaces, err := c.getInterfaces(damlLf, module, moduleName)
+		if err != nil {
+			return nil, err
+		}
+		for key, val := range interfaces {
+			interfaceMap[key] = val
+			structs[key] = val
+		}
+	}
+
+	// Second pass: process data types and templates
 	for _, module := range damlLf.Modules {
 		if len(damlLf.InternedStrings) == 0 {
 			continue
@@ -85,19 +106,11 @@ func (c *codeGenAst) GetTemplateStructs() (map[string]*model.TmplStruct, error) 
 			structs[key] = val
 		}
 
-		templates, err := c.getTemplates(damlLf, module, moduleName)
+		templates, err := c.getTemplates(damlLf, module, moduleName, interfaceMap)
 		if err != nil {
 			return nil, err
 		}
 		for key, val := range templates {
-			structs[key] = val
-		}
-
-		interfaces, err := c.getInterfaces(damlLf, module, moduleName)
-		if err != nil {
-			return nil, err
-		}
-		for key, val := range interfaces {
 			structs[key] = val
 		}
 
@@ -111,7 +124,7 @@ func (c *codeGenAst) getName(pkg *daml.Package, id int32) string {
 	return pkg.InternedStrings[idx[len(idx)-1]]
 }
 
-func (c *codeGenAst) getTemplates(pkg *daml.Package, module *daml.Module, moduleName string) (map[string]*model.TmplStruct, error) {
+func (c *codeGenAst) getTemplates(pkg *daml.Package, module *daml.Module, moduleName string, interfaces map[string]*model.TmplStruct) (map[string]*model.TmplStruct, error) {
 	structs := make(map[string]*model.TmplStruct, 0)
 
 	for _, template := range module.Templates {
@@ -192,6 +205,36 @@ func (c *codeGenAst) getTemplates(pkg *daml.Package, module *daml.Module, module
 			}
 		}
 
+		if len(template.Implements) > 0 {
+			for _, impl := range template.Implements {
+				if impl.Interface != nil {
+					interfaceName := c.getName(pkg, impl.Interface.GetNameInternedDname())
+					tmplStruct.Implements = append(tmplStruct.Implements, interfaceName)
+					log.Debug().Msgf("template %s implements interface: %s", templateName, interfaceName)
+
+					if interfaceStruct, exists := interfaces[interfaceName]; exists {
+						for _, ifaceChoice := range interfaceStruct.Choices {
+							found := false
+							for _, tmplChoice := range tmplStruct.Choices {
+								if tmplChoice.Name == ifaceChoice.Name {
+									found = true
+									break
+								}
+							}
+							if !found {
+								tmplStruct.Choices = append(tmplStruct.Choices, &model.TmplChoice{
+									Name:          ifaceChoice.Name,
+									ArgType:       ifaceChoice.ArgType,
+									ReturnType:    ifaceChoice.ReturnType,
+									InterfaceName: interfaceName,
+								})
+							}
+						}
+					}
+				}
+			}
+		}
+
 		structs[templateName] = &tmplStruct
 	}
 
@@ -203,8 +246,7 @@ func (c *codeGenAst) getChoices(pkg *daml.Package, choices []*daml.TemplateChoic
 	for _, choice := range choices {
 		choiceName := pkg.InternedStrings[choice.NameInternedStr]
 		choiceStruct := &model.TmplChoice{
-			Name:        choiceName,
-			IsConsuming: choice.Consuming,
+			Name: choiceName,
 		}
 
 		// Extract argument type if present

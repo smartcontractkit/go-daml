@@ -33,3 +33,10 @@ type ENUM interface {
 	GetEnumConstructor() string
 	GetEnumTypeID() string
 }
+
+func (p PARTY) ToMap() map[string]interface{} {
+	return map[string]interface{}{
+		"_type": "party",
+		"value": string(p),
+	}
+}

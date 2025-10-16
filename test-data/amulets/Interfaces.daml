@@ -1,0 +1,55 @@
+module Interfaces where
+
+-- Define an interface for things that can be transferred
+interface Transferable where
+  viewtype TransferableView
+  
+  transferAsset : Party -> Update (ContractId Transferable)
+  getOwner : Party
+  
+  choice Transfer : ContractId Transferable
+    with
+      newOwner : Party
+    controller (signatory this)
+    do
+      transferAsset this newOwner
+
+data TransferableView = TransferableView
+  with
+    owner : Party
+  deriving (Eq, Show)
+
+-- A simple asset template that implements Transferable
+template Asset
+  with
+    owner : Party
+    name : Text
+    value : Int
+  where
+    signatory owner
+    
+    interface instance Transferable for Asset where
+      view = TransferableView owner
+      transferAsset newOwner = toInterfaceContractId <$> create this with owner = newOwner
+      getOwner = owner
+      
+    choice AssetTransfer : ContractId Asset
+      with
+        newOwner : Party
+      controller owner
+      do
+        create this with owner = newOwner
+
+-- Another template that implements Transferable
+template Token
+  with
+    issuer : Party
+    owner : Party
+    amount : Decimal
+  where
+    signatory issuer, owner
+    
+    interface instance Transferable for Token where
+      view = TransferableView owner
+      transferAsset newOwner = toInterfaceContractId <$> create this with owner = newOwner
+      getOwner = owner

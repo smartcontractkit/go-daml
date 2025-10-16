@@ -1,7 +1,7 @@
 package {{.Package}}
 
 import (
-	"encoding/json"
+	{{$hasVariant := false}}{{range .Structs}}{{if eq .RawType "Variant"}}{{$hasVariant = true}}{{end}}{{end}}{{if $hasVariant}}"encoding/json"{{end}}
 	"fmt"
 	"math/big"
 	"strings"
@@ -24,6 +24,19 @@ type Template interface {
 	GetTemplateID() string
 }
 
+{{$structs := .Structs}}
+{{range $structs}}
+{{if .IsInterface}}
+// {{capitalise .Name}} is a DAML interface
+type {{capitalise .Name}} interface {
+	{{range $choice := .Choices}}
+	// {{capitalise $choice.Name}} executes the {{$choice.Name}} choice
+	{{capitalise $choice.Name}}(contractID string{{if and (ne $choice.ArgType "UNIT") (ne $choice.ArgType "")}}, args {{$choice.ArgType}}{{end}}) *model.ExerciseCommand
+	{{end}}
+}
+{{end}}
+{{end}}
+
 func argsToMap(args interface{}) map[string]interface{} {
 	if args == nil {
 		return map[string]interface{}{}
@@ -31,6 +44,15 @@ func argsToMap(args interface{}) map[string]interface{} {
 	
 	if m, ok := args.(map[string]interface{}); ok {
 		return m
+	}
+	
+	// Check if the type has a toMap method
+	type mapper interface {
+		toMap() map[string]interface{}
+	}
+	
+	if mapper, ok := args.(mapper); ok {
+		return mapper.toMap()
 	}
 	
 	return map[string]interface{}{
@@ -41,6 +63,7 @@ func argsToMap(args interface{}) map[string]interface{} {
 
 {{$structs := .Structs}}
 {{range $structs}}
+	{{if not .IsInterface}}
 	{{if eq .RawType "Variant"}}
 	// {{capitalise .Name}} is a variant/union type
 	type {{capitalise .Name}} struct {
@@ -137,6 +160,16 @@ func argsToMap(args interface{}) map[string]interface{} {
 		{{range $field := .Fields}}
 		{{capitalise $field.Name}} {{$field.Type}} `json:"{{$field.Name}}"`{{end}}
 	}
+	{{if and (eq .RawType "Record") (not .IsTemplate) (not .IsInterface)}}
+	
+	// toMap converts {{capitalise .Name}} to a map for DAML arguments
+	func (t {{capitalise .Name}}) toMap() map[string]interface{} {
+		return map[string]interface{}{
+			{{range $field := .Fields}}
+			"{{$field.Name}}": {{template "fieldToDAMLValue" $field}},{{end}}
+		}
+	}
+	{{end}}
 	{{if .IsTemplate}}
 	
 	// GetTemplateID returns the template ID for this template
@@ -191,20 +224,28 @@ func argsToMap(args interface{}) map[string]interface{} {
 	{{$moduleName := .ModuleName}}
 	// Choice methods for {{capitalise .Name}}
 	{{range $choice := .Choices}}
-	// {{capitalise $choice.Name}} exercises the {{$choice.Name}} choice on this {{capitalise $templateName}} contract
-	func (t {{capitalise $templateName}}) {{capitalise $choice.Name}}(contractID string{{if $choice.ArgType}}, args {{$choice.ArgType}}{{end}}) *model.ExerciseCommand {
+	// {{capitalise $choice.Name}} exercises the {{$choice.Name}} choice on this {{capitalise $templateName}} contract{{if ne $choice.InterfaceName ""}} via the {{capitalise $choice.InterfaceName}} interface{{end}}
+	func (t {{capitalise $templateName}}) {{capitalise $choice.Name}}(contractID string{{if and (ne $choice.ArgType "UNIT") (ne $choice.ArgType "")}}, args {{$choice.ArgType}}{{end}}) *model.ExerciseCommand {
 		return &model.ExerciseCommand{
-			TemplateID: fmt.Sprintf("%s:%s:%s", PackageID, "{{$moduleName}}", "{{capitalise $templateName}}"),
+			{{if ne $choice.InterfaceName ""}}TemplateID: fmt.Sprintf("%s:%s:%s", PackageID, "{{$moduleName}}", "{{capitalise $choice.InterfaceName}}"),{{else}}TemplateID: fmt.Sprintf("%s:%s:%s", PackageID, "{{$moduleName}}", "{{capitalise $templateName}}"),{{end}}
 			ContractID: contractID,
 			Choice: "{{$choice.Name}}",
-			{{if $choice.ArgType}}Arguments: argsToMap(args),{{else}}Arguments: map[string]interface{}{},{{end}}
+			{{if and (ne $choice.ArgType "UNIT") (ne $choice.ArgType "")}}Arguments: argsToMap(args),{{else}}Arguments: map[string]interface{}{},{{end}}
 		}
 	}
+	{{end}}
+	{{end}}
+	{{if and .IsTemplate .Implements}}
+	{{$templateName := .Name}}
+	// Verify interface implementations for {{capitalise .Name}}
+	{{range $interface := .Implements}}
+	var _ {{capitalise $interface}} = (*{{capitalise $templateName}})(nil)
+	{{end}}
 	{{end}}
 	{{end}}
 	{{end}}
 {{end}}
 
-{{define "fieldToDAMLValue"}}{{if .IsOptional}}{{$baseType := stringsTrimPrefix .Type "*"}}{{if eq $baseType "INT64"}}int64(*t.{{capitalise .Name}}){{else if eq $baseType "TEXT"}}string(*t.{{capitalise .Name}}){{else if eq $baseType "BOOL"}}bool(*t.{{capitalise .Name}}){{else if eq $baseType "PARTY"}}map[string]interface{}{"_type": "party", "value": string(*t.{{capitalise .Name}})}{{else if eq $baseType "NUMERIC"}}(*big.Int)(*t.{{capitalise .Name}}){{else if eq $baseType "DECIMAL"}}(*big.Int)(*t.{{capitalise .Name}}){{else if eq $baseType "DATE"}}*t.{{capitalise .Name}}{{else if eq $baseType "TIMESTAMP"}}*t.{{capitalise .Name}}{{else if eq $baseType "UNIT"}}map[string]interface{}{"_type": "unit"}{{else}}*t.{{capitalise .Name}}{{end}}{{else if eq .Type "PARTY"}}map[string]interface{}{"_type": "party", "value": string(t.{{capitalise .Name}})}{{else if eq .Type "TEXT"}}string(t.{{capitalise .Name}}){{else if eq .Type "INT64"}}int64(t.{{capitalise .Name}}){{else if eq .Type "BOOL"}}bool(t.{{capitalise .Name}}){{else if eq .Type "NUMERIC"}}(*big.Int)(t.{{capitalise .Name}}){{else if eq .Type "DECIMAL"}}(*big.Int)(t.{{capitalise .Name}}){{else if eq .Type "DATE"}}t.{{capitalise .Name}}{{else if eq .Type "TIMESTAMP"}}t.{{capitalise .Name}}{{else if eq .Type "UNIT"}}map[string]interface{}{"_type": "unit"}{{else if eq .Type "LIST"}}t.{{capitalise .Name}}{{else if eq .Type "GENMAP"}}map[string]interface{}{"_type": "genmap", "value": t.{{capitalise .Name}}}{{else if eq .Type "MAP"}}t.{{capitalise .Name}}{{else if eq .Type "OPTIONAL"}}t.{{capitalise .Name}}{{else if eq .Type "string"}}string(t.{{capitalise .Name}}){{else}}t.{{capitalise .Name}}{{end}}{{end}}
+{{define "fieldToDAMLValue"}}{{if .IsOptional}}{{$baseType := stringsTrimPrefix .Type "*"}}{{if eq $baseType "INT64"}}int64(*t.{{capitalise .Name}}){{else if eq $baseType "TEXT"}}string(*t.{{capitalise .Name}}){{else if eq $baseType "BOOL"}}bool(*t.{{capitalise .Name}}){{else if eq $baseType "PARTY"}}(*t.{{capitalise .Name}}).ToMap(){{else if eq $baseType "NUMERIC"}}(*big.Int)(*t.{{capitalise .Name}}){{else if eq $baseType "DECIMAL"}}(*big.Int)(*t.{{capitalise .Name}}){{else if eq $baseType "DATE"}}*t.{{capitalise .Name}}{{else if eq $baseType "TIMESTAMP"}}*t.{{capitalise .Name}}{{else if eq $baseType "UNIT"}}map[string]interface{}{"_type": "unit"}{{else}}*t.{{capitalise .Name}}{{end}}{{else if eq .Type "PARTY"}}t.{{capitalise .Name}}.ToMap(){{else if eq .Type "TEXT"}}string(t.{{capitalise .Name}}){{else if eq .Type "INT64"}}int64(t.{{capitalise .Name}}){{else if eq .Type "BOOL"}}bool(t.{{capitalise .Name}}){{else if eq .Type "NUMERIC"}}(*big.Int)(t.{{capitalise .Name}}){{else if eq .Type "DECIMAL"}}(*big.Int)(t.{{capitalise .Name}}){{else if eq .Type "DATE"}}t.{{capitalise .Name}}{{else if eq .Type "TIMESTAMP"}}t.{{capitalise .Name}}{{else if eq .Type "UNIT"}}map[string]interface{}{"_type": "unit"}{{else if eq .Type "LIST"}}t.{{capitalise .Name}}{{else if eq .Type "GENMAP"}}map[string]interface{}{"_type": "genmap", "value": t.{{capitalise .Name}}}{{else if eq .Type "MAP"}}t.{{capitalise .Name}}{{else if eq .Type "OPTIONAL"}}t.{{capitalise .Name}}{{else if eq .Type "string"}}string(t.{{capitalise .Name}}){{else}}t.{{capitalise .Name}}{{end}}{{end}}
 
 {{define "fieldIsNotEmpty"}}{{if eq .Type "PARTY"}}t.{{capitalise .Name}} != ""{{else if eq .Type "TEXT"}}t.{{capitalise .Name}} != ""{{else if eq .Type "INT64"}}t.{{capitalise .Name}} != 0{{else if eq .Type "BOOL"}}true{{else if eq .Type "NUMERIC"}}t.{{capitalise .Name}} != nil{{else if eq .Type "DECIMAL"}}t.{{capitalise .Name}} != nil{{else if eq .Type "DATE"}}!t.{{capitalise .Name}}.IsZero(){{else if eq .Type "TIMESTAMP"}}!t.{{capitalise .Name}}.IsZero(){{else if eq .Type "LIST"}}len(t.{{capitalise .Name}}) > 0{{else if eq .Type "GENMAP"}}t.{{capitalise .Name}} != nil && len(t.{{capitalise .Name}}) > 0{{else if eq .Type "MAP"}}t.{{capitalise .Name}} != nil && len(t.{{capitalise .Name}}) > 0{{else if eq .Type "OPTIONAL"}}t.{{capitalise .Name}} != nil{{else if .IsOptional}}t.{{capitalise .Name}} != nil{{else if .IsEnum}}t.{{capitalise .Name}} != ""{{else}}t.{{capitalise .Name}} != nil{{end}}{{end}}

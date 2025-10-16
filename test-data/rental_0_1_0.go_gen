@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -33,6 +32,15 @@ func argsToMap(args interface{}) map[string]interface{} {
 		return m
 	}
 
+	// Check if the type has a toMap method
+	type mapper interface {
+		toMap() map[string]interface{}
+	}
+
+	if mapper, ok := args.(mapper); ok {
+		return mapper.toMap()
+	}
+
 	return map[string]interface{}{
 		"args": args,
 	}
@@ -42,6 +50,15 @@ func argsToMap(args interface{}) map[string]interface{} {
 type Accept struct {
 	Foo TEXT  `json:"foo"`
 	Bar INT64 `json:"bar"`
+}
+
+// toMap converts Accept to a map for DAML arguments
+func (t Accept) toMap() map[string]interface{} {
+	return map[string]interface{}{
+
+		"foo": string(t.Foo),
+		"bar": int64(t.Bar),
+	}
 }
 
 // RentalAgreement is a Template type
@@ -60,9 +77,9 @@ func (t RentalAgreement) GetTemplateID() string {
 func (t RentalAgreement) CreateCommand() *model.CreateCommand {
 	args := make(map[string]interface{})
 
-	args["landlord"] = map[string]interface{}{"_type": "party", "value": string(t.Landlord)}
+	args["landlord"] = t.Landlord.ToMap()
 
-	args["tenant"] = map[string]interface{}{"_type": "party", "value": string(t.Tenant)}
+	args["tenant"] = t.Tenant.ToMap()
 
 	args["terms"] = string(t.Terms)
 
@@ -100,9 +117,9 @@ func (t RentalProposal) GetTemplateID() string {
 func (t RentalProposal) CreateCommand() *model.CreateCommand {
 	args := make(map[string]interface{})
 
-	args["landlord"] = map[string]interface{}{"_type": "party", "value": string(t.Landlord)}
+	args["landlord"] = t.Landlord.ToMap()
 
-	args["tenant"] = map[string]interface{}{"_type": "party", "value": string(t.Tenant)}
+	args["tenant"] = t.Tenant.ToMap()
 
 	args["terms"] = string(t.Terms)
 
