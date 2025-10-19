@@ -384,6 +384,14 @@ func (codec *JsonCodec) assignValue(jsonValue interface{}, target reflect.Value)
 			target.Set(reflect.Zero(target.Type()))
 			return nil
 		}
+		if target.Kind() == reflect.Struct {
+			target.Set(reflect.Zero(target.Type()))
+			return nil
+		}
+		if target.Kind() == reflect.String {
+			target.Set(reflect.Zero(target.Type()))
+			return nil
+		}
 		return fmt.Errorf("cannot assign nil to non-pointer type %v", target.Type())
 	}
 
@@ -500,6 +508,13 @@ func (codec *JsonCodec) assignValue(jsonValue interface{}, target reflect.Value)
 	case reflect.Float32, reflect.Float64:
 		return codec.assignFloatValue(jsonValue, target)
 
+	case reflect.Interface:
+		if target.Type().NumMethod() == 0 {
+			target.Set(reflect.ValueOf(jsonValue))
+			return nil
+		}
+		return fmt.Errorf("cannot assign to non-empty interface type: %v", target.Type())
+
 	default:
 		return fmt.Errorf("unsupported target type: %v", target.Type())
 	}
@@ -544,10 +559,20 @@ func (codec *JsonCodec) assignBigIntValue(jsonValue interface{}, target reflect.
 			target.Set(converter(bi))
 			return nil
 		}
+		if rat, ok := new(big.Rat).SetString(v); ok {
+			scaledInt := new(big.Int)
+			scaledInt.Mul(rat.Num(), big.NewInt(10000000000))
+			scaledInt.Div(scaledInt, rat.Denom())
+			target.Set(converter(scaledInt))
+			return nil
+		}
 		return fmt.Errorf("invalid string format for %s: %s", typeName, v)
 	case float64:
-		bi := big.NewInt(int64(v))
-		target.Set(converter(bi))
+		rat := new(big.Rat).SetFloat64(v)
+		scaledInt := new(big.Int)
+		scaledInt.Mul(rat.Num(), big.NewInt(10000000000))
+		scaledInt.Div(scaledInt, rat.Denom())
+		target.Set(converter(scaledInt))
 		return nil
 	case int64:
 		bi := big.NewInt(v)
@@ -559,29 +584,53 @@ func (codec *JsonCodec) assignBigIntValue(jsonValue interface{}, target reflect.
 }
 
 func (codec *JsonCodec) assignTimestampValue(jsonValue interface{}, target reflect.Value) error {
-	if str, ok := jsonValue.(string); ok {
-		if t, err := time.Parse("2006-01-02T15:04:05.000000Z", str); err == nil {
+	switch v := jsonValue.(type) {
+	case string:
+		if t, err := time.Parse("2006-01-02T15:04:05.000000Z", v); err == nil {
 			target.Set(reflect.ValueOf(types.TIMESTAMP(t)))
 			return nil
 		}
-		if t, err := time.Parse(time.RFC3339, str); err == nil {
+		if t, err := time.Parse(time.RFC3339, v); err == nil {
 			target.Set(reflect.ValueOf(types.TIMESTAMP(t)))
 			return nil
 		}
-		return fmt.Errorf("invalid timestamp format: %s", str)
+		return fmt.Errorf("invalid timestamp format: %s", v)
+	case float64:
+		t := time.Unix(int64(v)/1000000, (int64(v)%1000000)*1000)
+		target.Set(reflect.ValueOf(types.TIMESTAMP(t)))
+		return nil
+	case int64:
+		t := time.Unix(v/1000000, (v%1000000)*1000)
+		target.Set(reflect.ValueOf(types.TIMESTAMP(t)))
+		return nil
+	default:
+		return fmt.Errorf("expected string or number for TIMESTAMP, got %T", jsonValue)
 	}
-	return fmt.Errorf("expected string for TIMESTAMP, got %T", jsonValue)
 }
 
 func (codec *JsonCodec) assignDateValue(jsonValue interface{}, target reflect.Value) error {
-	if str, ok := jsonValue.(string); ok {
-		if t, err := time.Parse("2006-01-02", str); err == nil {
+	switch v := jsonValue.(type) {
+	case string:
+		if t, err := time.Parse("2006-01-02", v); err == nil {
 			target.Set(reflect.ValueOf(types.DATE(t)))
 			return nil
 		}
-		return fmt.Errorf("invalid date format: %s", str)
+		return fmt.Errorf("invalid date format: %s", v)
+	case float64:
+		t := time.Unix(int64(v)*86400, 0).UTC()
+		target.Set(reflect.ValueOf(types.DATE(t)))
+		return nil
+	case int64:
+		t := time.Unix(v*86400, 0).UTC()
+		target.Set(reflect.ValueOf(types.DATE(t)))
+		return nil
+	case int32:
+		t := time.Unix(int64(v)*86400, 0).UTC()
+		target.Set(reflect.ValueOf(types.DATE(t)))
+		return nil
+	default:
+		return fmt.Errorf("expected string or number for DATE, got %T", jsonValue)
 	}
-	return fmt.Errorf("expected string for DATE, got %T", jsonValue)
 }
 
 func (codec *JsonCodec) assignGenMapValue(jsonValue interface{}, target reflect.Value) error {

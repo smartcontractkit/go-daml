@@ -2,6 +2,7 @@ package ledger
 
 import (
 	"encoding/json"
+	"fmt"
 	"math/big"
 	"reflect"
 	"strings"
@@ -14,10 +15,13 @@ import (
 
 	v2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	"github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/interactive"
+	"github.com/noders-team/go-daml/pkg/codec"
 	"github.com/noders-team/go-daml/pkg/model"
 	"github.com/noders-team/go-daml/pkg/types"
 	"github.com/rs/zerolog/log"
 )
+
+var defaultJsonCodec = codec.NewJsonCodec()
 
 func parseTemplateID(templateID string) (packageID, moduleName, entityName string) {
 	parts := strings.Split(templateID, ":")
@@ -343,6 +347,19 @@ func valueFromProto(pb *v2.Value) interface{} {
 			result[entry.Key] = valueFromProto(entry.Value)
 		}
 		return result
+	case *v2.Value_Enum:
+		if v.Enum != nil {
+			return v.Enum.Constructor
+		}
+		return nil
+	case *v2.Value_Variant:
+		if v.Variant != nil {
+			return map[string]interface{}{
+				"tag":   v.Variant.Constructor,
+				"value": valueFromProto(v.Variant.Value),
+			}
+		}
+		return nil
 	default:
 		return nil
 	}
@@ -632,6 +649,38 @@ func valueFromRecord(record *v2.Record) map[string]interface{} {
 		result[field.Label] = valueFromProto(field.Value)
 	}
 	return result
+}
+
+func recordToStruct(record *v2.Record, target interface{}) error {
+	if record == nil {
+		return nil
+	}
+
+	if target == nil {
+		return fmt.Errorf("target cannot be nil")
+	}
+
+	rv := reflect.ValueOf(target)
+	if rv.Kind() != reflect.Ptr {
+		return fmt.Errorf("target must be a pointer, got %T", target)
+	}
+
+	if rv.IsNil() {
+		return fmt.Errorf("target pointer cannot be nil")
+	}
+
+	recordMap := valueFromRecord(record)
+
+	jsonData, err := json.Marshal(recordMap)
+	if err != nil {
+		return fmt.Errorf("failed to marshal record to JSON: %w", err)
+	}
+
+	if err := defaultJsonCodec.Unmarshall(jsonData, target); err != nil {
+		return fmt.Errorf("failed to unmarshal JSON to struct (target type: %T): %w", target, err)
+	}
+
+	return nil
 }
 
 func prepareSubmissionRequestToProto(req *model.PrepareSubmissionRequest) *interactive.PrepareSubmissionRequest {
