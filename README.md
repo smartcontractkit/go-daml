@@ -7,24 +7,29 @@ A comprehensive Go SDK for interacting with DAML ledgers, featuring a complete c
 
 ## Overview
 
-The Go DAML SDK provides everything needed to build Go applications that interact with DAML ledgers. It includes a full-featured client library for ledger operations, service layer abstractions for common patterns, and an integrated code generator that creates type-safe Go structs from DAML definitions.
+The Go DAML SDK provides a comprehensive toolkit for building Go applications that interact with DAML ledgers. It follows a modular architecture separating concerns between client interaction, service abstraction, and code generation. The SDK includes a full-featured gRPC client for ledger operations, high-level service abstractions for common patterns, and an integrated code generator that creates type-safe Go code from DAML definitions.
+
+The public SDK components are located under `pkg/`, which includes the client, service, model, auth, codec, errors, and types packages intended for direct use by application developers. The `internal/codegen/` directory contains the code generator implementation, which parses DAML-LF (DAML Language Format) binaries extracted from .dar archives and generates corresponding Go structs with proper JSON serialization logic.
 
 ## Features
 
 ### SDK Components
-- **Complete DAML Client Library** - Full gRPC client for DAML ledger API
-- **Service Layer Abstractions** - High-level services for common operations
-- **Admin Services** - Package management, user management, party management
-- **Ledger Services** - Command submission, event querying, state management
-- **Authentication Support** - Bearer token and custom auth implementations
-- **Error Handling** - Comprehensive DAML-specific error processing
+- **Complete DAML Client Library** - Full gRPC client for DAML Ledger API with connection management, authentication, and TLS support
+- **Service Layer Abstractions** - High-level services for common ledger and administrative operations
+- **Ledger Services** - Command submission, command completion, event querying, state management, update service, package service, version service, interactive submission
+- **Admin Services** - Package management, user management, party management, participant pruning, command inspection, identity provider configuration
+- **Authentication Support** - Bearer token authentication with automatic token injection via gRPC interceptors
+- **Error Handling** - Comprehensive DAML-specific error processing with categorized error types (authorization, validation, ledger-specific, connection errors)
+- **JSON Codec** - Custom JSON serialization/deserialization for complex DAML types including Records, Variants, Enums, and primitive types
 
 ### Code Generation
-- **Type-safe Go code generation** from DAML definitions
-- **Custom JSON serialization** for complex DAML types
+- **Type-safe Go code generation** from DAML definitions with proper type mapping
+- **Custom JSON serialization** for complex DAML types (Records, Variants, Enums)
 - **PackageID extraction** and embedding in generated code
-- **Cross-platform support** (Linux, macOS, Windows)
-- **Clean CLI interface** with comprehensive error handling
+- **Multi-version DAML-LF support** - Supports both DAML-LF v2 and v3 with automatic version detection
+- **Cross-platform support** (Linux, macOS, Windows - amd64 and arm64)
+- **Clean CLI interface** with comprehensive error handling and debug logging
+- **Template-based generation** using Go's text/template engine for flexible code generation
 
 ## Quick Start
 
@@ -59,9 +64,9 @@ go get github.com/noders-team/go-daml
 import (
     "context"
     "github.com/noders-team/go-daml/pkg/client"
+    "github.com/rs/zerolog/log"
 )
 
-// Create DAML client using builder pattern
 bearerToken := "your-auth-token"
 grpcAddress := "localhost:8080"
 tlsConfig := client.TlsConfig{}
@@ -72,6 +77,12 @@ cl, err := client.NewDamlClient(bearerToken, grpcAddress).
 if err != nil {
     log.Fatal().Err(err).Msg("failed to build DAML client")
 }
+
+cl.CommandService.SubmitAndWait(ctx, commands)
+cl.EventQueryService.GetActiveContracts(ctx, filter)
+cl.StateService.GetLedgerEnd(ctx)
+cl.UserMng.CreateUser(ctx, userRequest)
+cl.PartyMng.AllocateParty(ctx, partyRequest)
 ```
 
 ### Code Generation
@@ -153,24 +164,49 @@ The Go DAML SDK is organized into the following modules:
 
 ### Core SDK (`pkg/`)
 - **`pkg/client/`**: DAML ledger gRPC client implementation
-  - Connection management and configuration
-  - gRPC client bindings for DAML Ledger API
-  - Authentication and security handling
+  - **Builder pattern** for flexible client configuration
+  - Connection management with TLS support
+  - Authentication via Bearer tokens with automatic injection
+  - Service factory exposing all ledger and admin services
+  - gRPC interceptors for authentication and error handling
 
-- **`pkg/service/`**: High-level service abstractions
-  - **`service/ledger/`**: Ledger operations (commands, queries, events)
-  - **`service/admin/`**: Administrative operations (packages, users, parties)
-  - **`service/testing/`**: Testing utilities and time services
+- **`pkg/service/ledger/`**: Ledger operations
+  - **Command Service**: Submit commands synchronously
+  - **Command Completion**: Track command completion status
+  - **Command Submission**: Asynchronous command submission
+  - **Event Query Service**: Query active contracts, transaction trees, flat transactions
+  - **Interactive Submission**: Multi-step command submission workflows
+  - **State Service**: Query ledger state and configuration
+  - **Update Service**: Subscribe to ledger updates
+  - **Package Service**: Query and manage DAML packages
+  - **Version Service**: Get ledger API version information
 
-- **`pkg/model/`**: Common data models and type definitions
-- **`pkg/auth/`**: Authentication mechanisms (Bearer tokens, etc.)
-- **`pkg/errors/`**: DAML-specific error handling and processing
+- **`pkg/service/admin/`**: Administrative operations
+  - **Package Management**: Upload and validate DAR packages
+  - **User Management**: Create, update, list, and delete users with rights management
+  - **Party Management**: Allocate and manage parties
+  - **Participant Pruning**: Prune ledger history
+  - **Command Inspection**: Inspect command status
+  - **Identity Provider Configuration**: Configure identity providers
+
+- **`pkg/service/testing/`**: Testing utilities
+  - **Time Service**: Control ledger time for testing
+
+- **`pkg/model/`**: Common data models and type definitions for ledger and admin operations
+- **`pkg/auth/`**: Authentication mechanisms (Bearer token interceptor)
+- **`pkg/codec/`**: JSON codec for DAML types with custom marshaling/unmarshaling
+- **`pkg/errors/`**: DAML-specific error handling with categorized error types
+- **`pkg/types/`**: DAML type system definitions
 
 ### Code Generation (`internal/codegen/`)
-- **`codegen.go`**: DAR file processing and AST generation  
-- **`ast.go`**: Type definitions for template structures
-- **`template.go`**: Go template processing and binding
-- **`source.go.tpl`**: Go code generation template
+- **`codegen.go`**: DAR file processing, orchestration, and AST generation
+- **`astgen/factory.go`**: AST generator factory with automatic DAML-LF version detection
+- **`astgen/v2/`**: DAML-LF v2 AST generation implementation
+- **`astgen/v3/`**: DAML-LF v3 AST generation implementation
+- **`model/manifest.go`**: DAR manifest parsing and metadata extraction
+- **`model/template.go`**: Template data structures for code generation
+- **`template.go`**: Go template processing, binding, and file generation
+- **`template_test.go`**: Template generation tests
 
 ### CLI Tool (`cmd/`)
 - **`cmd/main.go`**: Command-line interface for code generation
@@ -193,7 +229,6 @@ import (
 )
 
 func main() {
-    // Get configuration from environment
     grpcAddress := os.Getenv("GRPC_ADDRESS")
     if grpcAddress == "" {
         grpcAddress = "localhost:8080"
@@ -206,7 +241,6 @@ func main() {
     
     tlsConfig := client.TlsConfig{}
     
-    // Initialize DAML client using builder pattern
     cl, err := client.NewDamlClient(bearerToken, grpcAddress).
         WithTLSConfig(tlsConfig).
         Build(context.Background())
@@ -214,12 +248,68 @@ func main() {
         log.Fatal().Err(err).Msg("failed to build DAML client")
     }
     
-    // Use the client for ledger operations
-    // Example: RunVersionService(cl), RunPackageService(cl), etc.
+    ctx := context.Background()
+    
+    version, err := cl.VersionService.GetLedgerApiVersion(ctx)
+    if err != nil {
+        log.Error().Err(err).Msg("failed to get ledger version")
+    }
+    
+    ledgerEnd, err := cl.StateService.GetLedgerEnd(ctx)
+    if err != nil {
+        log.Error().Err(err).Msg("failed to get ledger end")
+    }
+    
+    log.Info().Msgf("Connected to ledger API version: %s", version)
+    log.Info().Msgf("Current ledger end offset: %s", ledgerEnd)
 }
 ```
 
-### Example 2: Administrative Operations
+### Example 2: Command Submission and Event Querying
+```go
+package main
+
+import (
+    "context"
+    "github.com/noders-team/go-daml/pkg/client"
+    "github.com/noders-team/go-daml/pkg/model"
+    "github.com/rs/zerolog/log"
+)
+
+func main() {
+    cl, err := client.NewDamlClient("token", "localhost:8080").
+        Build(context.Background())
+    if err != nil {
+        log.Fatal().Err(err).Msg("failed to build client")
+    }
+    
+    ctx := context.Background()
+    
+    commands := &model.Commands{
+        ApplicationId: "my-app",
+        CommandId:     "cmd-001",
+        Party:         "Alice",
+        Commands:      []interface{}{},
+    }
+    
+    _, err = cl.CommandService.SubmitAndWait(ctx, commands)
+    if err != nil {
+        log.Error().Err(err).Msg("command submission failed")
+        return
+    }
+    
+    filter := &model.TransactionFilter{}
+    contracts, err := cl.EventQueryService.GetActiveContracts(ctx, filter)
+    if err != nil {
+        log.Error().Err(err).Msg("failed to query contracts")
+        return
+    }
+    
+    log.Info().Msgf("Retrieved %d active contracts", len(contracts))
+}
+```
+
+### Example 3: Administrative Operations
 ```go
 package main
 
@@ -227,6 +317,7 @@ import (
     "context"
     "os"
     "github.com/noders-team/go-daml/pkg/client"
+    "github.com/noders-team/go-daml/pkg/model"
     "github.com/rs/zerolog/log"
 )
 
@@ -239,7 +330,6 @@ func main() {
     bearerToken := os.Getenv("BEARER_TOKEN")
     tlsConfig := client.TlsConfig{}
     
-    // Build admin client
     cl, err := client.NewDamlClient(bearerToken, grpcAddress).
         WithTLSConfig(tlsConfig).
         Build(context.Background())
@@ -247,40 +337,75 @@ func main() {
         log.Fatal().Err(err).Msg("failed to build DAML client")
     }
     
-    // Perform administrative operations
-    // Example: RunUsersManagement(cl), RunPackageManagement(cl), etc.
-    // See examples/admin_app/ for complete implementations
+    ctx := context.Background()
+    
+    userReq := &model.CreateUserRequest{
+        UserId: "alice@example.com",
+        PrimaryParty: "Alice",
+    }
+    user, err := cl.UserMng.CreateUser(ctx, userReq)
+    if err != nil {
+        log.Error().Err(err).Msg("failed to create user")
+    }
+    
+    partyReq := &model.AllocatePartyRequest{
+        PartyIdHint: "NewParty",
+        DisplayName: "New Party Display Name",
+    }
+    party, err := cl.PartyMng.AllocateParty(ctx, partyReq)
+    if err != nil {
+        log.Error().Err(err).Msg("failed to allocate party")
+    }
+    
+    darBytes, _ := os.ReadFile("./contracts.dar")
+    uploadReq := &model.UploadDarFileRequest{
+        DarFile: darBytes,
+    }
+    _, err = cl.PackageMng.UploadDarFile(ctx, uploadReq)
+    if err != nil {
+        log.Error().Err(err).Msg("failed to upload DAR")
+    }
+    
+    log.Info().Msgf("Created user: %s", user.UserId)
+    log.Info().Msgf("Allocated party: %s", party.PartyId)
 }
 ```
 
 ## Architecture
 
 ### Processing Flow
-1. **DAR Extraction**: Unzip and parse DAR archive
-2. **Manifest Processing**: Extract metadata and main DALF file
-3. **DAML-LF Parsing**: Parse protobuf-encoded DAML definitions
-4. **AST Generation**: Convert to internal AST representation
-5. **Type Classification**: Identify Records, Variants, Enums
-6. **Code Generation**: Apply Go templates to generate type-safe code
-7. **File Output**: Write formatted Go source files
+1. **DAR Extraction**: Unzip and parse DAR archive using `UnzipDar()`
+2. **Manifest Processing**: Extract metadata (Main-Dalf, Sdk-Version, package names) from `META-INF/MANIFEST.MF`
+3. **DAML-LF Version Detection**: Determine DAML-LF version from package metadata
+4. **AST Generator Selection**: Choose appropriate AST generator (v2 or v3) via factory pattern
+5. **DAML-LF Parsing**: Parse protobuf-encoded DAML definitions from .dalf file
+6. **AST Generation**: Convert DAML-LF structures to internal AST representation
+7. **Type Classification**: Identify Records, Variants, Enums from DAML type definitions
+8. **Package ID Extraction**: Extract and embed package IDs in generated code
+9. **Template Application**: Apply Go templates to generate type-safe code with custom JSON marshaling
+10. **File Output**: Write formatted Go source files to output directory with proper package declarations
 
 ## Supported DAML Types
 
-| DAML Type | Go Representation | Notes |
-|-----------|------------------|-------|
-| `Party` | `PARTY` (string) | Party identifiers |
-| `Text` | `TEXT` (string) | Text values |
-| `Int` | `INT64` (int64) | 64-bit integers |
-| `Bool` | `BOOL` (bool) | Boolean values |
-| `Decimal` | `DECIMAL` (*big.Int) | Arbitrary precision decimals |
-| `Date` | `DATE` (time.Time) | Date values |
-| `Time` | `TIMESTAMP` (time.Time) | Timestamp values |
-| `Optional T` | `OPTIONAL` (*interface{}) | Optional values |
-| `[T]` | `LIST` ([]string) | Lists |
-| `Map T` | `MAP` (map[string]interface{}) | Maps |
-| Records | `struct` | Standard Go structs |
-| Variants | `struct` with optional fields | Union types with JSON marshaling |
-| Enums | `string` | Enumeration values |
+The SDK's JSON codec (`pkg/codec/json_codec.go`) provides comprehensive support for DAML type serialization:
+
+| DAML Type | Go Representation | JSON Format | Notes |
+|-----------|------------------|-------------|-------|
+| `Party` | `PARTY` (string) | String | Party identifiers |
+| `Text` | `TEXT` (string) | String | Text values |
+| `Int64` | `INT64` (int64) | Number | 64-bit integers |
+| `Numeric` | `NUMERIC` (string) | String | Arbitrary precision decimals |
+| `Bool` | `BOOL` (bool) | Boolean | Boolean values |
+| `Date` | `DATE` (time.Time) | String (YYYY-MM-DD) | Date values |
+| `Timestamp` | `TIMESTAMP` (time.Time) | String (RFC3339) | Timestamp values |
+| `ContractId` | `CONTRACT_ID` (string) | String | Contract identifiers |
+| `Optional T` | `OPTIONAL` (*interface{}) | Null or value | Optional values with custom unmarshaling |
+| `[T]` | `LIST` ([]interface{}) | Array | Lists with element validation |
+| `TextMap T` | `TEXT_MAP` (map[string]interface{}) | Object | Text-keyed maps |
+| `GenMap K V` | `GEN_MAP` ([]MapEntry) | Array of {key, value} | Generic maps |
+| Records | Go `struct` | Object | Standard Go structs with field mapping |
+| Variants | Go `struct` with optional fields | Object with constructor tag | Union types with JSON marshaling |
+| Enums | `string` | String | Enumeration values |
 
 ## Contributing
 
