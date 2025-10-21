@@ -1,4 +1,4 @@
-package codegen_test
+package codegen
 
 import (
 	"errors"
@@ -19,7 +19,7 @@ var (
 
 const (
 	PackageID  = "ddf0d6396a862eaa7f8d647e39d090a6b04c4a3fd6736aa1730ebc9fca6be664"
-	SDKVersion = "3.3.0-snapshot.20250417.0"
+	SDKVersion = "3.3.0-snapshot.20250507.0"
 )
 
 type Template interface {

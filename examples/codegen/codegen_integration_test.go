@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	. "github.com/noders-team/go-daml/examples/codegen"
 	interfaces "github.com/noders-team/go-daml/examples/codegen/interfaces"
 	"github.com/noders-team/go-daml/pkg/client"
 	"github.com/noders-team/go-daml/pkg/errors"
@@ -487,7 +488,9 @@ func TestAmuletsTransfer(t *testing.T) {
 		}
 	}
 
-	transferableInterfaceID := fmt.Sprintf("%s:%s:%s", interfaces.PackageID, "Interfaces", "Transferable")
+	transferableInterfaceID := interfaces.TransferableInterfaceID(nil)
+	log.Info().Str("transferableInterfaceID", transferableInterfaceID).Msg("Using generated TransferableInterfaceID() function with default PackageID")
+
 	updRes, errRes := cl.UpdateService.GetUpdates(context.Background(), &model.GetUpdatesRequest{
 		Filter: &model.TransactionFilter{
 			FiltersByParty: map[string]*model.Filters{
@@ -502,7 +505,8 @@ func TestAmuletsTransfer(t *testing.T) {
 					},
 				},
 			},
-		}})
+		},
+	})
 	go func() {
 		for {
 			select {

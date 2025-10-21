@@ -1,4 +1,4 @@
-package interfaces_test
+package interfaces
 
 import (
 	"errors"
@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"strings"
 
+	"github.com/noders-team/go-daml/pkg/codec"
 	"github.com/noders-team/go-daml/pkg/model"
 	. "github.com/noders-team/go-daml/pkg/types"
 )
@@ -16,7 +17,10 @@ var (
 	_ = strings.NewReader
 )
 
-const PackageID = "8f919735d2daa1abb780808ad1fed686fc9229a039dc659ccb04e5fd5d071c90"
+const (
+	PackageID  = "8f919735d2daa1abb780808ad1fed686fc9229a039dc659ccb04e5fd5d071c90"
+	SDKVersion = "3.3.0-snapshot.20250507.0"
+)
 
 type Template interface {
 	CreateCommand() *model.CreateCommand
@@ -83,6 +87,18 @@ func (t Asset) CreateCommand() *model.CreateCommand {
 	}
 }
 
+// MarshalJSON implements custom JSON marshaling for Asset using JsonCodec
+func (t Asset) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshall(t)
+}
+
+// UnmarshalJSON implements custom JSON unmarshaling for Asset using JsonCodec
+func (t *Asset) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshall(data, t)
+}
+
 // Choice methods for Asset
 
 // Archive exercises the Archive choice on this Asset contract
@@ -131,6 +147,18 @@ func (t AssetTransfer) toMap() map[string]interface{} {
 	}
 }
 
+// MarshalJSON implements custom JSON marshaling for AssetTransfer using JsonCodec
+func (t AssetTransfer) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshall(t)
+}
+
+// UnmarshalJSON implements custom JSON unmarshaling for AssetTransfer using JsonCodec
+func (t *AssetTransfer) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshall(data, t)
+}
+
 // Token is a Template type
 type Token struct {
 	Issuer PARTY   `json:"issuer"`
@@ -159,6 +187,18 @@ func (t Token) CreateCommand() *model.CreateCommand {
 		TemplateID: t.GetTemplateID(),
 		Arguments:  args,
 	}
+}
+
+// MarshalJSON implements custom JSON marshaling for Token using JsonCodec
+func (t Token) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshall(t)
+}
+
+// UnmarshalJSON implements custom JSON unmarshaling for Token using JsonCodec
+func (t *Token) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshall(data, t)
 }
 
 // Choice methods for Token
@@ -199,6 +239,18 @@ func (t Transfer) toMap() map[string]interface{} {
 	}
 }
 
+// MarshalJSON implements custom JSON marshaling for Transfer using JsonCodec
+func (t Transfer) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshall(t)
+}
+
+// UnmarshalJSON implements custom JSON unmarshaling for Transfer using JsonCodec
+func (t *Transfer) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshall(data, t)
+}
+
 // TransferableView is a Record type
 type TransferableView struct {
 	Owner PARTY `json:"owner"`
@@ -209,4 +261,25 @@ func (t TransferableView) toMap() map[string]interface{} {
 	return map[string]interface{}{
 		"owner": t.Owner.ToMap(),
 	}
+}
+
+// MarshalJSON implements custom JSON marshaling for TransferableView using JsonCodec
+func (t TransferableView) MarshalJSON() ([]byte, error) {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Marshall(t)
+}
+
+// UnmarshalJSON implements custom JSON unmarshaling for TransferableView using JsonCodec
+func (t *TransferableView) UnmarshalJSON(data []byte) error {
+	jsonCodec := codec.NewJsonCodec()
+	return jsonCodec.Unmarshall(data, t)
+}
+
+// TransferableInterfaceID returns the interface ID for the Transferable interface
+func TransferableInterfaceID(packageID *string) string {
+	pkgID := PackageID
+	if packageID != nil {
+		pkgID = *packageID
+	}
+	return fmt.Sprintf("%s:%s:%s", pkgID, "Interfaces", "Transferable")
 }
