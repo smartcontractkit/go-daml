@@ -116,6 +116,8 @@ func NormalizeDAMLType(damlType string) string {
 		return damlType
 	default:
 		log.Warn().Msgf("unknown daml type %s, using as-is", damlType)
-		return damlType
+		// Remove underscores from type names to match struct naming convention
+		// e.g., "TransferInstruction_Accept" -> "TransferInstructionAccept"
+		return strings.ReplaceAll(damlType, "_", "")
 	}
 }
