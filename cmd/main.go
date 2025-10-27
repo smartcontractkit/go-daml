@@ -9,6 +9,7 @@ import (
 	"github.com/rs/zerolog/log"
 
 	"github.com/noders-team/go-daml/internal/codegen"
+	"github.com/noders-team/go-daml/internal/codegen/model"
 	"github.com/spf13/cobra"
 )
 
@@ -58,6 +59,74 @@ This tool extracts DAML definitions from .dar archives and generates correspondi
 	}
 }
 
+func removePackageID(filename string) string {
+	lastHyphen := strings.LastIndex(filename, "-")
+	if lastHyphen == -1 {
+		return filename
+	}
+
+	potentialHash := filename[lastHyphen+1:]
+	if len(potentialHash) == 64 {
+		allHex := true
+		for _, ch := range potentialHash {
+			if !((ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F')) {
+				allHex = false
+				break
+			}
+		}
+		if allHex {
+			return filename[:lastHyphen]
+		}
+	}
+
+	return filename
+}
+
+func processDalf(dalfRelPath, unzippedPath, pkgName, sdkVersion, outputDir string, isMainDalf bool) error {
+	dalfFullPath := filepath.Join(unzippedPath, dalfRelPath)
+	dalfContent, err := os.ReadFile(dalfFullPath)
+	if err != nil {
+		return fmt.Errorf("failed to read dalf file '%s': %w", dalfFullPath, err)
+	}
+
+	manifest := &model.Manifest{
+		SdkVersion: sdkVersion,
+		MainDalf:   dalfRelPath,
+	}
+
+	pkg, err := codegen.GetAST(dalfContent, manifest)
+	if err != nil {
+		return fmt.Errorf("failed to generate AST: %w", err)
+	}
+
+	res, err := codegen.Bind(pkgName, pkg.PackageID, sdkVersion, pkg.Structs, isMainDalf)
+	if err != nil {
+		return fmt.Errorf("failed to generate Go code: %w", err)
+	}
+
+	parts := strings.Split(dalfRelPath, "/")
+	var baseFileName string
+	if len(parts) > 1 {
+		dalfFileName := parts[len(parts)-1]
+		baseFileName = strings.TrimSuffix(dalfFileName, ".dalf")
+	} else {
+		baseFileName = strings.TrimSuffix(dalfRelPath, ".dalf")
+	}
+
+	baseFileName = removePackageID(baseFileName)
+
+	sanitizedFileName := strings.ReplaceAll(strings.ReplaceAll(strings.ToLower(baseFileName), ".", "_"), "-", "_")
+	fileName := filepath.Join(outputDir, sanitizedFileName+".go")
+
+	err = os.WriteFile(fileName, []byte(res), 0o644)
+	if err != nil {
+		return fmt.Errorf("failed to save generated file '%s': %w", fileName, err)
+	}
+
+	log.Info().Msgf("successfully generated Go code: %s", fileName)
+	return nil
+}
+
 func runCodeGen(dar, outputDir, pkgFile string, debugMode bool) error {
 	if debugMode {
 		log.Info().Msg("debug mode enabled")
@@ -67,27 +136,11 @@ func runCodeGen(dar, outputDir, pkgFile string, debugMode bool) error {
 	if err != nil {
 		return fmt.Errorf("failed to unzip dar file '%s': %w", dar, err)
 	}
-	defer os.RemoveAll(unzippedPath) // Clean up temporary files
+	defer os.RemoveAll(unzippedPath)
 
 	manifest, err := codegen.GetManifest(unzippedPath)
 	if err != nil {
 		return fmt.Errorf("failed to get manifest from '%s': %w", unzippedPath, err)
-	}
-
-	dalfFullPath := filepath.Join(unzippedPath, manifest.MainDalf)
-	dalfContent, err := os.ReadFile(dalfFullPath)
-	if err != nil {
-		return fmt.Errorf("failed to read dalf file '%s': %w", dalfFullPath, err)
-	}
-
-	pkg, err := codegen.GetAST(dalfContent, manifest)
-	if err != nil {
-		return fmt.Errorf("failed to generate AST: %w", err)
-	}
-
-	res, err := codegen.Bind(pkgFile, pkg.PackageID, manifest.SdkVersion, pkg.Structs)
-	if err != nil {
-		return fmt.Errorf("failed to generate Go code: %w", err)
 	}
 
 	err = os.MkdirAll(outputDir, 0o755)
@@ -95,12 +148,45 @@ func runCodeGen(dar, outputDir, pkgFile string, debugMode bool) error {
 		return fmt.Errorf("failed to create output directory '%s': %w", outputDir, err)
 	}
 
-	fileName := filepath.Join(outputDir, strings.ReplaceAll(strings.ReplaceAll(strings.ToLower(manifest.Name), ".", "_"), "-", "_")+".go")
-	err = os.WriteFile(fileName, []byte(res), 0o644)
+	log.Info().Msgf("processing MainDalf: %s", manifest.MainDalf)
+	err = processDalf(manifest.MainDalf, unzippedPath, pkgFile, manifest.SdkVersion, outputDir, true)
 	if err != nil {
-		return fmt.Errorf("failed to save generated file '%s': %w", fileName, err)
+		return fmt.Errorf("failed to process MainDalf: %w", err)
 	}
 
-	log.Info().Msgf("successfully generated Go code: %s", fileName)
+	successCount := 1
+	failedCount := 0
+	skippedCount := 0
+
+	for _, dalf := range manifest.Dalfs {
+		if dalf == manifest.MainDalf {
+			log.Debug().Msgf("skipping MainDalf (already processed): %s", dalf)
+			skippedCount++
+			continue
+		}
+
+		dalfLower := strings.ToLower(dalf)
+		if strings.Contains(dalfLower, "prim") || strings.Contains(dalfLower, "stdlib") {
+			log.Debug().Msgf("skipping dalf (prim/stdlib): %s", dalf)
+			skippedCount++
+			continue
+		}
+
+		log.Info().Msgf("processing dependency dalf: %s", dalf)
+		err = processDalf(dalf, unzippedPath, pkgFile, manifest.SdkVersion, outputDir, false)
+		if err != nil {
+			log.Error().Err(err).Msgf("failed to process dalf: %s", dalf)
+			failedCount++
+			continue
+		}
+		successCount++
+	}
+
+	log.Info().Msgf("code generation summary: %d succeeded, %d failed, %d skipped", successCount, failedCount, skippedCount)
+
+	if successCount == 0 {
+		return fmt.Errorf("all dalf files failed to process")
+	}
+
 	return nil
 }

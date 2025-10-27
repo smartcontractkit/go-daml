@@ -273,7 +273,11 @@ func TestCodegenIntegrationAllFieldsContract(t *testing.T) {
 					return
 				}
 				if upd.Update.Transaction != nil {
-					log.Info().Str("updateID", upd.Update.Transaction.UpdateID).Str("workflowID", upd.Update.Transaction.WorkflowID).Int("events", len(upd.Update.Transaction.Events)).Msg("received transaction update")
+					log.Info().
+						Str("updateID", upd.Update.Transaction.UpdateID).
+						Str("workflowID", upd.Update.Transaction.WorkflowID).
+						Int("events", len(upd.Update.Transaction.Events)).
+						Msg("received transaction update")
 				} else if upd.Update.Reassignment != nil {
 					log.Info().Str("updateID", upd.Update.Reassignment.UpdateID).Msg("received reassignment update")
 				} else if upd.Update.OffsetCheckpoint != nil {
@@ -342,11 +346,11 @@ func TestCodegenIntegrationAllFieldsContract(t *testing.T) {
 
 	contractIDs, err := createContract(ctx, party, cl, mappyContract)
 	if err != nil {
-		log.Fatal().Err(err).Msgf("failed to create contract")
 		damlErr := errors.AsDamlError(err)
 		if strings.EqualFold(damlErr.ErrorCode, "COMMAND_PREPROCESSING_FAILED") {
 			log.Fatal().Msgf("failed to create contract: %s", damlErr.Message)
 		}
+		log.Fatal().Err(err).Msgf("failed to create contract")
 	}
 
 	log.Info().Str("templateID", mappyContract.GetTemplateID()).Msg("Using GetTemplateID method")
@@ -517,7 +521,10 @@ func TestAmuletsTransfer(t *testing.T) {
 					return
 				}
 				if upd.Update.Transaction != nil {
-					log.Info().Str("updateID", upd.Update.Transaction.UpdateID).Str("workflowID", upd.Update.Transaction.WorkflowID).Int("events", len(upd.Update.Transaction.Events)).Msg("received transaction update")
+					log.Info().Str("updateID", upd.Update.Transaction.UpdateID).
+						Str("workflowID", upd.Update.Transaction.WorkflowID).
+						Int("events", len(upd.Update.Transaction.Events)).
+						Msg("received transaction update")
 					for _, event := range upd.Update.Transaction.Events {
 						if event.Created != nil && len(event.Created.InterfaceViews) > 0 {
 							log.Info().Int("interfaceViews", len(event.Created.InterfaceViews)).Msg("received interface views in created event")
@@ -557,8 +564,8 @@ func TestAmuletsTransfer(t *testing.T) {
 
 	require.Greater(t, len(contractIDs), 0, "Expected at least one contract to be created")
 	assetContractID := contractIDs[0]
-	log.Info().Str("assetContractID", assetContractID).Msg("Created Asset contract")
-	log.Info().Str("createUpdateID", createUpdateID).Msg("Asset creation update ID - interface views visible in stream")
+	log.Info().Str("assetContractID", assetContractID).Msg("cCreated Asset contract")
+	log.Info().Str("createUpdateID", createUpdateID).Msg("asset creation update ID - interface views visible in stream")
 
 	transferArgs := interfaces.Transfer{NewOwner: PARTY(party)}
 	transferCmd := assetContract.Transfer(assetContractID, transferArgs)
@@ -577,16 +584,14 @@ func TestAmuletsTransfer(t *testing.T) {
 	}
 
 	transferResponse, err := cl.CommandService.SubmitAndWait(ctx, transferSubmissionReq)
-	require.NoError(t, err, "Transfer command should succeed")
-	log.Info().Str("updateID", transferResponse.UpdateID).Msg("Transfer executed successfully - interface views visible in stream")
+	require.NoError(t, err, "transfer command should succeed")
+	log.Info().Str("updateID", transferResponse.UpdateID).Msg("transfer executed successfully - interface views visible in stream")
 
 	newContractIDs, err := getContractIDsFromUpdate(ctx, party, transferResponse.UpdateID, cl)
-	require.NoError(t, err, "Should be able to get contract IDs from transfer transaction")
-	require.Greater(t, len(newContractIDs), 0, "Transfer should create at least one contract")
+	require.NoError(t, err, "should be able to get contract IDs from transfer transaction")
+	require.Greater(t, len(newContractIDs), 0, "transfer should create at least one contract")
 
 	newAssetContractID := newContractIDs[0]
-	log.Info().Str("newAssetContractID", newAssetContractID).Msg("Got new Asset contract from Transfer")
-
 	archiveCmd := assetContract.Archive(newAssetContractID)
 
 	archiveSubmissionReq := &model.SubmitAndWaitRequest{
@@ -603,14 +608,8 @@ func TestAmuletsTransfer(t *testing.T) {
 	}
 
 	archiveResponse, err := cl.CommandService.SubmitAndWait(ctx, archiveSubmissionReq)
-	require.NoError(t, err, "Archive command should succeed")
-	log.Info().Str("updateID", archiveResponse.UpdateID).Msg("Archive executed successfully")
-
-	log.Info().Msg("✓ TestAmuletsTransfer completed successfully")
-	log.Info().Msg("✓ Interface filter with Transferable interface verified - check logs above for interface views")
-	log.Info().Msgf("✓ Created Asset contract with updateID: %s", createUpdateID)
-	log.Info().Msgf("✓ Transferred Asset contract with updateID: %s", transferResponse.UpdateID)
-	log.Info().Msgf("✓ Archived Asset contract with updateID: %s", archiveResponse.UpdateID)
+	require.NoError(t, err, "archive command should succeed")
+	log.Info().Str("updateID", archiveResponse.UpdateID).Msg("archive executed successfully")
 }
 
 func packageUpload(ctx context.Context, uploadedPackageName string, cl *client.DamlBindingClient) error {

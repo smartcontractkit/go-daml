@@ -17,6 +17,7 @@ var (
 	_ = strings.NewReader
 )
 
+{{if .IsMainDalf}}
 const PackageID = "{{.PackageID}}"
 const SDKVersion = "{{.SdkVersion}}"
 
@@ -24,6 +25,7 @@ type Template interface {
 	CreateCommand() *model.CreateCommand
 	GetTemplateID() string
 }
+{{end}}
 
 {{$structs := .Structs}}
 {{range $structs}}
@@ -38,29 +40,30 @@ type {{capitalise .Name}} interface {
 {{end}}
 {{end}}
 
+{{if .IsMainDalf}}
 func argsToMap(args interface{}) map[string]interface{} {
 	if args == nil {
 		return map[string]interface{}{}
 	}
-	
+
 	if m, ok := args.(map[string]interface{}); ok {
 		return m
 	}
-	
+
 	// Check if the type has a toMap method
 	type mapper interface {
 		toMap() map[string]interface{}
 	}
-	
+
 	if mapper, ok := args.(mapper); ok {
 		return mapper.toMap()
 	}
-	
+
 	return map[string]interface{}{
 		"args": args,
 	}
 }
-
+{{end}}
 
 {{$structs := .Structs}}
 {{range $structs}}
