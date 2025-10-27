@@ -262,7 +262,7 @@ func (c *codeGenAst) getTemplates(pkg *daml.Package, module *daml.Module, module
 		if len(template.Implements) > 0 {
 			for _, impl := range template.Implements {
 				if impl.Interface != nil {
-					interfaceName := c.getName(pkg, impl.Interface.GetNameInternedDname())
+					interfaceName := "I" + c.getName(pkg, impl.Interface.GetNameInternedDname())
 					tmplStruct.Implements = append(tmplStruct.Implements, interfaceName)
 					log.Debug().Msgf("template %s implements interface: %s", templateName, interfaceName)
 
@@ -330,7 +330,7 @@ func (c *codeGenAst) getInterfaces(pkg *daml.Package, module *daml.Module, modul
 	structs := make(map[string]*model.TmplStruct, 0)
 
 	for _, iface := range module.Interfaces {
-		interfaceName := c.getName(pkg, iface.TyconInternedDname)
+		interfaceName := "I" + c.getName(pkg, iface.TyconInternedDname)
 		log.Info().Msgf("processing interface: %s", interfaceName)
 
 		tmplStruct := model.TmplStruct{

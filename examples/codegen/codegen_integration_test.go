@@ -492,8 +492,8 @@ func TestAmuletsTransfer(t *testing.T) {
 		}
 	}
 
-	transferableInterfaceID := interfaces.TransferableInterfaceID(nil)
-	log.Info().Str("transferableInterfaceID", transferableInterfaceID).Msg("Using generated TransferableInterfaceID() function with default PackageID")
+	transferableInterfaceID := interfaces.ITransferableInterfaceID(nil)
+	log.Info().Str("transferableInterfaceID", transferableInterfaceID).Msg("Using generated ITransferableInterfaceID() function with default PackageID")
 
 	updRes, errRes := cl.UpdateService.GetUpdates(context.Background(), &model.GetUpdatesRequest{
 		Filter: &model.TransactionFilter{

@@ -17,18 +17,17 @@ var (
 	_ = strings.NewReader
 )
 
-const (
-	PackageID  = "8f919735d2daa1abb780808ad1fed686fc9229a039dc659ccb04e5fd5d071c90"
-	SDKVersion = "3.3.0-snapshot.20250507.0"
-)
+const PackageID = "8f919735d2daa1abb780808ad1fed686fc9229a039dc659ccb04e5fd5d071c90"
+const SDKVersion = "3.3.0-snapshot.20250507.0"
 
 type Template interface {
 	CreateCommand() *model.CreateCommand
 	GetTemplateID() string
 }
 
-// Transferable is a DAML interface
-type Transferable interface {
+// ITransferable is a DAML interface
+type ITransferable interface {
+
 	// Archive executes the Archive choice
 	Archive(contractID string) *model.ExerciseCommand
 
@@ -121,10 +120,10 @@ func (t Asset) AssetTransfer(contractID string, args AssetTransfer) *model.Exerc
 	}
 }
 
-// Transfer exercises the Transfer choice on this Asset contract via the Transferable interface
+// Transfer exercises the Transfer choice on this Asset contract via the ITransferable interface
 func (t Asset) Transfer(contractID string, args Transfer) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("%s:%s:%s", PackageID, "Interfaces", "Transferable"),
+		TemplateID: fmt.Sprintf("%s:%s:%s", PackageID, "Interfaces", "ITransferable"),
 		ContractID: contractID,
 		Choice:     "Transfer",
 		Arguments:  argsToMap(args),
@@ -133,7 +132,7 @@ func (t Asset) Transfer(contractID string, args Transfer) *model.ExerciseCommand
 
 // Verify interface implementations for Asset
 
-var _ Transferable = (*Asset)(nil)
+var _ ITransferable = (*Asset)(nil)
 
 // AssetTransfer is a Record type
 type AssetTransfer struct {
@@ -143,6 +142,7 @@ type AssetTransfer struct {
 // toMap converts AssetTransfer to a map for DAML arguments
 func (t AssetTransfer) toMap() map[string]interface{} {
 	return map[string]interface{}{
+
 		"newOwner": t.NewOwner.ToMap(),
 	}
 }
@@ -213,10 +213,10 @@ func (t Token) Archive(contractID string) *model.ExerciseCommand {
 	}
 }
 
-// Transfer exercises the Transfer choice on this Token contract via the Transferable interface
+// Transfer exercises the Transfer choice on this Token contract via the ITransferable interface
 func (t Token) Transfer(contractID string, args Transfer) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("%s:%s:%s", PackageID, "Interfaces", "Transferable"),
+		TemplateID: fmt.Sprintf("%s:%s:%s", PackageID, "Interfaces", "ITransferable"),
 		ContractID: contractID,
 		Choice:     "Transfer",
 		Arguments:  argsToMap(args),
@@ -225,7 +225,7 @@ func (t Token) Transfer(contractID string, args Transfer) *model.ExerciseCommand
 
 // Verify interface implementations for Token
 
-var _ Transferable = (*Token)(nil)
+var _ ITransferable = (*Token)(nil)
 
 // Transfer is a Record type
 type Transfer struct {
@@ -235,6 +235,7 @@ type Transfer struct {
 // toMap converts Transfer to a map for DAML arguments
 func (t Transfer) toMap() map[string]interface{} {
 	return map[string]interface{}{
+
 		"newOwner": t.NewOwner.ToMap(),
 	}
 }
@@ -259,6 +260,7 @@ type TransferableView struct {
 // toMap converts TransferableView to a map for DAML arguments
 func (t TransferableView) toMap() map[string]interface{} {
 	return map[string]interface{}{
+
 		"owner": t.Owner.ToMap(),
 	}
 }
@@ -275,11 +277,11 @@ func (t *TransferableView) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
-// TransferableInterfaceID returns the interface ID for the Transferable interface
-func TransferableInterfaceID(packageID *string) string {
+// ITransferableInterfaceID returns the interface ID for the ITransferable interface
+func ITransferableInterfaceID(packageID *string) string {
 	pkgID := PackageID
 	if packageID != nil {
 		pkgID = *packageID
 	}
-	return fmt.Sprintf("%s:%s:%s", pkgID, "Interfaces", "Transferable")
+	return fmt.Sprintf("%s:%s:%s", pkgID, "Interfaces", "ITransferable")
 }

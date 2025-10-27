@@ -54,11 +54,9 @@ func capitalize(input string) string {
 		return input
 	}
 
-	if isAllCaps(input) {
-		return strings.ToUpper(input[:1]) + strings.ToLower(input[1:])
-	}
+	hasSeparators := strings.ContainsAny(input, "_- ")
 
-	if len(input) > 0 && input[0] >= 'A' && input[0] <= 'Z' && !strings.ContainsAny(input, "_- ") {
+	if !hasSeparators && len(input) > 0 && input[0] >= 'A' && input[0] <= 'Z' {
 		return input
 	}
 
@@ -105,10 +103,19 @@ func toCamelCase(input string) string {
 		if len(word) == 0 {
 			continue
 		}
-		if i == 0 {
-			result.WriteString(strings.ToLower(word[:1]) + strings.ToLower(word[1:]))
+
+		if isAllCaps(word) {
+			if i == 0 {
+				result.WriteString(strings.ToLower(word))
+			} else {
+				result.WriteString(strings.ToUpper(word[:1]) + strings.ToLower(word[1:]))
+			}
 		} else {
-			result.WriteString(strings.ToUpper(word[:1]) + strings.ToLower(word[1:]))
+			if i == 0 {
+				result.WriteString(strings.ToLower(word[:1]) + word[1:])
+			} else {
+				result.WriteString(strings.ToUpper(word[:1]) + word[1:])
+			}
 		}
 	}
 
