@@ -17,6 +17,7 @@ var (
 	_ = strings.NewReader
 )
 
+{{if .IsMainDalf}}
 const PackageID = "{{.PackageID}}"
 const SDKVersion = "{{.SdkVersion}}"
 
@@ -24,6 +25,7 @@ type Template interface {
 	CreateCommand() *model.CreateCommand
 	GetTemplateID() string
 }
+{{end}}
 
 {{$structs := .Structs}}
 {{range $structs}}
@@ -38,29 +40,30 @@ type {{capitalise .Name}} interface {
 {{end}}
 {{end}}
 
+{{if .IsMainDalf}}
 func argsToMap(args interface{}) map[string]interface{} {
 	if args == nil {
 		return map[string]interface{}{}
 	}
-	
+
 	if m, ok := args.(map[string]interface{}); ok {
 		return m
 	}
-	
+
 	// Check if the type has a toMap method
 	type mapper interface {
 		toMap() map[string]interface{}
 	}
-	
+
 	if mapper, ok := args.(mapper); ok {
 		return mapper.toMap()
 	}
-	
+
 	return map[string]interface{}{
 		"args": args,
 	}
 }
-
+{{end}}
 
 {{$structs := .Structs}}
 {{range $structs}}
@@ -236,7 +239,7 @@ func argsToMap(args interface{}) map[string]interface{} {
 	// {{capitalise $choice.Name}} exercises the {{$choice.Name}} choice on this {{capitalise $templateName}} contract{{if ne $choice.InterfaceName ""}} via the {{capitalise $choice.InterfaceName}} interface{{end}}
 	func (t {{capitalise $templateName}}) {{capitalise $choice.Name}}(contractID string{{if and (ne $choice.ArgType "UNIT") (ne $choice.ArgType "")}}, args {{$choice.ArgType}}{{end}}) *model.ExerciseCommand {
 		return &model.ExerciseCommand{
-			{{if ne $choice.InterfaceName ""}}TemplateID: fmt.Sprintf("%s:%s:%s", PackageID, "{{$moduleName}}", "{{capitalise $choice.InterfaceName}}"),{{else}}TemplateID: fmt.Sprintf("%s:%s:%s", PackageID, "{{$moduleName}}", "{{capitalise $templateName}}"),{{end}}
+			{{if ne $choice.InterfaceName ""}}TemplateID: fmt.Sprintf("%s:%s:%s", PackageID, "{{$moduleName}}", "{{capitalise $choice.InterfaceDAMLName}}"),{{else}}TemplateID: fmt.Sprintf("%s:%s:%s", PackageID, "{{$moduleName}}", "{{capitalise $templateName}}"),{{end}}
 			ContractID: contractID,
 			Choice: "{{$choice.Name}}",
 			{{if and (ne $choice.ArgType "UNIT") (ne $choice.ArgType "")}}Arguments: argsToMap(args),{{else}}Arguments: map[string]interface{}{},{{end}}
@@ -259,6 +262,7 @@ func argsToMap(args interface{}) map[string]interface{} {
 {{range $structs}}
 {{if .IsInterface}}
 {{$interfaceName := .Name}}
+{{$damlName := .DAMLName}}
 {{$moduleName := .ModuleName}}
 
 // {{capitalise $interfaceName}}InterfaceID returns the interface ID for the {{capitalise $interfaceName}} interface
@@ -267,7 +271,7 @@ func {{capitalise $interfaceName}}InterfaceID(packageID *string) string {
 	if packageID != nil {
 		pkgID = *packageID
 	}
-	return fmt.Sprintf("%s:%s:%s", pkgID, "{{$moduleName}}", "{{capitalise $interfaceName}}")
+	return fmt.Sprintf("%s:%s:%s", pkgID, "{{$moduleName}}", "{{capitalise $damlName}}")
 }
 {{end}}
 {{end}}

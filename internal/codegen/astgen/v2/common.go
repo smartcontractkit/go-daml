@@ -27,7 +27,47 @@ func NewCodegenAst(payload []byte) *codeGenAst {
 	return &codeGenAst{payload: payload}
 }
 
-func (c *codeGenAst) GetTemplateStructs() (map[string]*model.TmplStruct, error) {
+func (c *codeGenAst) GetInterfaces() (map[string]*model.TmplStruct, error) {
+	interfaceMap := make(map[string]*model.TmplStruct)
+
+	var archive daml.Archive
+	err := proto.Unmarshal(c.payload, &archive)
+	if err != nil {
+		return nil, err
+	}
+
+	var payloadMapped daml.ArchivePayload
+	err = proto.Unmarshal(archive.Payload, &payloadMapped)
+	if err != nil {
+		return nil, err
+	}
+
+	damlLf1 := payloadMapped.GetDamlLf_1()
+	if damlLf1 == nil {
+		return nil, errors.New("unsupported daml version")
+	}
+
+	for _, module := range damlLf1.Modules {
+		if len(damlLf1.InternedStrings) == 0 {
+			continue
+		}
+
+		idx := damlLf1.InternedDottedNames[module.GetNameInternedDname()].SegmentsInternedStr
+		moduleName := damlLf1.InternedStrings[idx[len(idx)-1]]
+
+		interfaces, err := c.getInterfaces(damlLf1, module, moduleName)
+		if err != nil {
+			return nil, err
+		}
+		for key, val := range interfaces {
+			interfaceMap[key] = val
+		}
+	}
+
+	return interfaceMap, nil
+}
+
+func (c *codeGenAst) GetTemplateStructs(_ map[string]model.InterfaceMap) (map[string]*model.TmplStruct, error) {
 	structs := make(map[string]*model.TmplStruct)
 
 	var archive daml.Archive
@@ -188,14 +228,16 @@ func (c *codeGenAst) getInterfaces(pkg *daml.Package, module *daml.Module, modul
 	structs := make(map[string]*model.TmplStruct, 0)
 
 	for _, iface := range module.Interfaces {
-		interfaceName := c.getName(pkg, iface.TyconInternedDname)
+		originalName := c.getName(pkg, iface.TyconInternedDname)
+		interfaceName := "I" + originalName
 		log.Debug().Msgf("processing interface: %s", interfaceName)
 
 		tmplStruct := model.TmplStruct{
 			Name:        interfaceName,
+			DAMLName:    originalName,
 			ModuleName:  moduleName,
 			RawType:     RawTypeInterface,
-			IsInterface: true,
+			IsInterface: true, // TODO dont need
 			Choices:     make([]*model.TmplChoice, 0),
 		}
 

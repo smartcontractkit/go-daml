@@ -33,7 +33,7 @@ func TestGetMainDalf(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, dalfContent)
 
-	ast, err := GetAST(dalfContent, manifest)
+	ast, err := GetAST(dalfContent, manifest, nil)
 	require.Nil(t, err)
 	require.NotEmpty(t, ast.Structs)
 
@@ -60,7 +60,7 @@ func TestGetMainDalf(t *testing.T) {
 	require.Equal(t, pkgRentalProposal.Fields[1].Name, "tenant")
 	require.Equal(t, pkgRentalProposal.Fields[2].Name, "terms")
 
-	res, err := Bind("main", ast.PackageID, manifest.SdkVersion, ast.Structs)
+	res, err := Bind("main", ast.PackageID, manifest.SdkVersion, ast.Structs, true)
 	require.NoError(t, err)
 	require.NotEmpty(t, res)
 
@@ -97,7 +97,7 @@ func TestGetMainDalfAllTypes(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, dalfContent)
 
-	ast, err := GetAST(dalfContent, manifest)
+	ast, err := GetAST(dalfContent, manifest, nil)
 	require.Nil(t, err)
 	require.NotEmpty(t, ast.Structs)
 
@@ -205,7 +205,7 @@ func TestGetMainDalfAllTypes(t *testing.T) {
 		require.Fail(t, "OptionalFields should be either Record or Template type, got: %s", optionalFieldsStruct.RawType)
 	}
 
-	res, err := Bind("main", ast.PackageID, manifest.SdkVersion, ast.Structs)
+	res, err := Bind("main", ast.PackageID, manifest.SdkVersion, ast.Structs, true)
 	require.NoError(t, err)
 	require.NotEmpty(t, res)
 
@@ -242,7 +242,7 @@ func TestGetMainDalfV3(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, dalfContent)
 
-	ast, err := GetAST(dalfContent, manifest)
+	ast, err := GetAST(dalfContent, manifest, nil)
 	require.Nil(t, err)
 	require.NotEmpty(t, ast.Structs)
 
@@ -280,7 +280,7 @@ func TestGetMainDalfV3(t *testing.T) {
 	require.Equal(t, colorStruct.Fields[1].Name, "Green")
 	require.Equal(t, colorStruct.Fields[2].Name, "Blue")
 
-	res, err := Bind("main", ast.PackageID, manifest.SdkVersion, ast.Structs)
+	res, err := Bind("main", ast.PackageID, manifest.SdkVersion, ast.Structs, true)
 	require.NoError(t, err)
 	require.NotEmpty(t, res)
 

@@ -50,8 +50,8 @@ func argsToMap(args interface{}) map[string]interface{} {
 
 // Address is a variant/union type
 type Address struct {
-	Us *USAddress `json:"US,omitempty"`
-	Uk *UKAddress `json:"UK,omitempty"`
+	US *USAddress `json:"US,omitempty"`
+	UK *UKAddress `json:"UK,omitempty"`
 }
 
 // MarshalJSON implements custom JSON marshaling for Address
@@ -69,11 +69,11 @@ func (v *Address) UnmarshalJSON(data []byte) error {
 // GetVariantTag implements types.VARIANT interface
 func (v Address) GetVariantTag() string {
 
-	if v.Us != nil {
+	if v.US != nil {
 		return "US"
 	}
 
-	if v.Uk != nil {
+	if v.UK != nil {
 		return "UK"
 	}
 
@@ -83,12 +83,12 @@ func (v Address) GetVariantTag() string {
 // GetVariantValue implements types.VARIANT interface
 func (v Address) GetVariantValue() interface{} {
 
-	if v.Us != nil {
-		return v.Us
+	if v.US != nil {
+		return v.US
 	}
 
-	if v.Uk != nil {
-		return v.Uk
+	if v.UK != nil {
+		return v.UK
 	}
 
 	return nil

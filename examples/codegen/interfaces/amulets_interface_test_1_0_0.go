@@ -27,8 +27,8 @@ type Template interface {
 	GetTemplateID() string
 }
 
-// Transferable is a DAML interface
-type Transferable interface {
+// ITransferable is a DAML interface
+type ITransferable interface {
 	// Archive executes the Archive choice
 	Archive(contractID string) *model.ExerciseCommand
 
@@ -121,7 +121,7 @@ func (t Asset) AssetTransfer(contractID string, args AssetTransfer) *model.Exerc
 	}
 }
 
-// Transfer exercises the Transfer choice on this Asset contract via the Transferable interface
+// Transfer exercises the Transfer choice on this Asset contract via the ITransferable interface
 func (t Asset) Transfer(contractID string, args Transfer) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("%s:%s:%s", PackageID, "Interfaces", "Transferable"),
@@ -133,7 +133,7 @@ func (t Asset) Transfer(contractID string, args Transfer) *model.ExerciseCommand
 
 // Verify interface implementations for Asset
 
-var _ Transferable = (*Asset)(nil)
+var _ ITransferable = (*Asset)(nil)
 
 // AssetTransfer is a Record type
 type AssetTransfer struct {
@@ -213,7 +213,7 @@ func (t Token) Archive(contractID string) *model.ExerciseCommand {
 	}
 }
 
-// Transfer exercises the Transfer choice on this Token contract via the Transferable interface
+// Transfer exercises the Transfer choice on this Token contract via the ITransferable interface
 func (t Token) Transfer(contractID string, args Transfer) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		TemplateID: fmt.Sprintf("%s:%s:%s", PackageID, "Interfaces", "Transferable"),
@@ -225,7 +225,7 @@ func (t Token) Transfer(contractID string, args Transfer) *model.ExerciseCommand
 
 // Verify interface implementations for Token
 
-var _ Transferable = (*Token)(nil)
+var _ ITransferable = (*Token)(nil)
 
 // Transfer is a Record type
 type Transfer struct {
@@ -275,8 +275,8 @@ func (t *TransferableView) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, t)
 }
 
-// TransferableInterfaceID returns the interface ID for the Transferable interface
-func TransferableInterfaceID(packageID *string) string {
+// ITransferableInterfaceID returns the interface ID for the ITransferable interface
+func ITransferableInterfaceID(packageID *string) string {
 	pkgID := PackageID
 	if packageID != nil {
 		pkgID = *packageID

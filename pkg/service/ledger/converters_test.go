@@ -1107,3 +1107,635 @@ func TestConvertToRecordSlices(t *testing.T) {
 		require.Equal(t, "daml3", damlList.Elements[2].GetText())
 	})
 }
+
+func TestConvertToRecordRELTIME(t *testing.T) {
+	t.Run("RELTIME type conversion - 1 second", func(t *testing.T) {
+		reltimeValue := types.RELTIME(1 * time.Second)
+
+		data := make(map[string]interface{})
+		data["duration"] = reltimeValue
+
+		record := convertToRecord(data)
+
+		require.NotNil(t, record)
+		require.Len(t, record.Fields, 1)
+		require.Equal(t, "duration", record.Fields[0].Label)
+
+		int64Value := record.Fields[0].Value.GetInt64()
+		require.Equal(t, int64(1000000), int64Value)
+	})
+
+	t.Run("RELTIME type conversion - 5 minutes", func(t *testing.T) {
+		reltimeValue := types.RELTIME(5 * time.Minute)
+
+		data := make(map[string]interface{})
+		data["duration"] = reltimeValue
+
+		record := convertToRecord(data)
+
+		require.NotNil(t, record)
+		require.Len(t, record.Fields, 1)
+		require.Equal(t, "duration", record.Fields[0].Label)
+
+		int64Value := record.Fields[0].Value.GetInt64()
+		require.Equal(t, int64(300000000), int64Value)
+	})
+
+	t.Run("RELTIME type conversion - 100 microseconds", func(t *testing.T) {
+		reltimeValue := types.RELTIME(100 * time.Microsecond)
+
+		data := make(map[string]interface{})
+		data["duration"] = reltimeValue
+
+		record := convertToRecord(data)
+
+		require.NotNil(t, record)
+		require.Len(t, record.Fields, 1)
+		require.Equal(t, "duration", record.Fields[0].Label)
+
+		int64Value := record.Fields[0].Value.GetInt64()
+		require.Equal(t, int64(100), int64Value)
+	})
+
+	t.Run("RELTIME in struct", func(t *testing.T) {
+		type TestReltimeStruct struct {
+			Owner       types.PARTY   `json:"owner"`
+			Duration    types.RELTIME `json:"duration"`
+			Name        types.TEXT    `json:"name"`
+			MaxDuration types.RELTIME `json:"maxDuration"`
+		}
+
+		testData := TestReltimeStruct{
+			Owner:       types.PARTY("alice"),
+			Duration:    types.RELTIME(30 * time.Second),
+			Name:        types.TEXT("test reltime"),
+			MaxDuration: types.RELTIME(1 * time.Hour),
+		}
+
+		data := make(map[string]interface{})
+		data["testStruct"] = testData
+
+		record := convertToRecord(data)
+
+		require.NotNil(t, record)
+		require.Len(t, record.Fields, 1)
+
+		structRecord := record.Fields[0].Value.GetRecord()
+		require.NotNil(t, structRecord)
+		require.Len(t, structRecord.Fields, 4)
+
+		fieldMap := make(map[string]*v2.RecordField)
+		for _, field := range structRecord.Fields {
+			fieldMap[field.Label] = field
+		}
+
+		require.Equal(t, "alice", fieldMap["owner"].Value.GetParty())
+		require.Equal(t, "test reltime", fieldMap["name"].Value.GetText())
+		require.Equal(t, int64(30000000), fieldMap["duration"].Value.GetInt64())
+		require.Equal(t, int64(3600000000), fieldMap["maxDuration"].Value.GetInt64())
+	})
+}
+
+func TestConvertToRecordSET(t *testing.T) {
+	t.Run("SET type conversion - strings", func(t *testing.T) {
+		setValue := types.SET{"item1", "item2", "item3"}
+
+		data := make(map[string]interface{})
+		data["set"] = setValue
+
+		record := convertToRecord(data)
+
+		require.NotNil(t, record)
+		require.Len(t, record.Fields, 1)
+		require.Equal(t, "set", record.Fields[0].Label)
+
+		listValue := record.Fields[0].Value.GetList()
+		require.NotNil(t, listValue)
+		require.Len(t, listValue.Elements, 3)
+		require.Equal(t, "item1", listValue.Elements[0].GetText())
+		require.Equal(t, "item2", listValue.Elements[1].GetText())
+		require.Equal(t, "item3", listValue.Elements[2].GetText())
+	})
+
+	t.Run("SET type conversion - integers", func(t *testing.T) {
+		setValue := types.SET{int64(1), int64(2), int64(3)}
+
+		data := make(map[string]interface{})
+		data["set"] = setValue
+
+		record := convertToRecord(data)
+
+		require.NotNil(t, record)
+		require.Len(t, record.Fields, 1)
+		require.Equal(t, "set", record.Fields[0].Label)
+
+		listValue := record.Fields[0].Value.GetList()
+		require.NotNil(t, listValue)
+		require.Len(t, listValue.Elements, 3)
+		require.Equal(t, int64(1), listValue.Elements[0].GetInt64())
+		require.Equal(t, int64(2), listValue.Elements[1].GetInt64())
+		require.Equal(t, int64(3), listValue.Elements[2].GetInt64())
+	})
+
+	t.Run("SET type conversion - mixed types", func(t *testing.T) {
+		setValue := types.SET{"text", int64(42), true}
+
+		data := make(map[string]interface{})
+		data["set"] = setValue
+
+		record := convertToRecord(data)
+
+		require.NotNil(t, record)
+		require.Len(t, record.Fields, 1)
+		require.Equal(t, "set", record.Fields[0].Label)
+
+		listValue := record.Fields[0].Value.GetList()
+		require.NotNil(t, listValue)
+		require.Len(t, listValue.Elements, 3)
+		require.Equal(t, "text", listValue.Elements[0].GetText())
+		require.Equal(t, int64(42), listValue.Elements[1].GetInt64())
+		require.Equal(t, true, listValue.Elements[2].GetBool())
+	})
+
+	t.Run("SET type conversion - empty set", func(t *testing.T) {
+		setValue := types.SET{}
+
+		data := make(map[string]interface{})
+		data["set"] = setValue
+
+		record := convertToRecord(data)
+
+		require.NotNil(t, record)
+		require.Len(t, record.Fields, 1)
+		require.Equal(t, "set", record.Fields[0].Label)
+
+		listValue := record.Fields[0].Value.GetList()
+		require.NotNil(t, listValue)
+		require.Len(t, listValue.Elements, 0)
+	})
+
+	t.Run("SET in struct", func(t *testing.T) {
+		type TestSetStruct struct {
+			Owner           types.PARTY `json:"owner"`
+			RequiredParties types.SET   `json:"requiredParties"`
+			Name            types.TEXT  `json:"name"`
+			AllowedValues   types.SET   `json:"allowedValues"`
+		}
+
+		testData := TestSetStruct{
+			Owner:           types.PARTY("alice"),
+			RequiredParties: types.SET{"alice", "bob", "charlie"},
+			Name:            types.TEXT("test set"),
+			AllowedValues:   types.SET{int64(1), int64(2), int64(3)},
+		}
+
+		data := make(map[string]interface{})
+		data["testStruct"] = testData
+
+		record := convertToRecord(data)
+
+		require.NotNil(t, record)
+		require.Len(t, record.Fields, 1)
+
+		structRecord := record.Fields[0].Value.GetRecord()
+		require.NotNil(t, structRecord)
+		require.Len(t, structRecord.Fields, 4)
+
+		fieldMap := make(map[string]*v2.RecordField)
+		for _, field := range structRecord.Fields {
+			fieldMap[field.Label] = field
+		}
+
+		require.Equal(t, "alice", fieldMap["owner"].Value.GetParty())
+		require.Equal(t, "test set", fieldMap["name"].Value.GetText())
+
+		partiesSet := fieldMap["requiredParties"].Value.GetList()
+		require.NotNil(t, partiesSet)
+		require.Len(t, partiesSet.Elements, 3)
+		require.Equal(t, "alice", partiesSet.Elements[0].GetText())
+		require.Equal(t, "bob", partiesSet.Elements[1].GetText())
+		require.Equal(t, "charlie", partiesSet.Elements[2].GetText())
+
+		valuesSet := fieldMap["allowedValues"].Value.GetList()
+		require.NotNil(t, valuesSet)
+		require.Len(t, valuesSet.Elements, 3)
+		require.Equal(t, int64(1), valuesSet.Elements[0].GetInt64())
+		require.Equal(t, int64(2), valuesSet.Elements[1].GetInt64())
+		require.Equal(t, int64(3), valuesSet.Elements[2].GetInt64())
+	})
+
+	t.Run("SET with DAML types", func(t *testing.T) {
+		setValue := types.SET{
+			types.PARTY("alice"),
+			types.PARTY("bob"),
+			types.PARTY("charlie"),
+		}
+
+		data := make(map[string]interface{})
+		data["parties"] = setValue
+
+		record := convertToRecord(data)
+
+		require.NotNil(t, record)
+		require.Len(t, record.Fields, 1)
+		require.Equal(t, "parties", record.Fields[0].Label)
+
+		listValue := record.Fields[0].Value.GetList()
+		require.NotNil(t, listValue)
+		require.Len(t, listValue.Elements, 3)
+		require.Equal(t, "alice", listValue.Elements[0].GetParty())
+		require.Equal(t, "bob", listValue.Elements[1].GetParty())
+		require.Equal(t, "charlie", listValue.Elements[2].GetParty())
+	})
+}
+
+func TestConvertToRecordRELTIMEAndSETIntegration(t *testing.T) {
+	t.Run("RELTIME and SET in same struct", func(t *testing.T) {
+		type TestIntegrationStruct struct {
+			Owner                types.PARTY   `json:"owner"`
+			TickDuration         types.RELTIME `json:"tickDuration"`
+			RequiredParties      types.SET     `json:"requiredParties"`
+			Name                 types.TEXT    `json:"name"`
+			MaxProcessingTime    types.RELTIME `json:"maxProcessingTime"`
+			AllowedSynchronizers types.SET     `json:"allowedSynchronizers"`
+		}
+
+		testData := TestIntegrationStruct{
+			Owner:                types.PARTY("alice"),
+			TickDuration:         types.RELTIME(10 * time.Second),
+			RequiredParties:      types.SET{"alice", "bob", "charlie"},
+			Name:                 types.TEXT("integration test"),
+			MaxProcessingTime:    types.RELTIME(5 * time.Minute),
+			AllowedSynchronizers: types.SET{"sync1", "sync2"},
+		}
+
+		data := make(map[string]interface{})
+		data["testStruct"] = testData
+
+		record := convertToRecord(data)
+
+		require.NotNil(t, record)
+		require.Len(t, record.Fields, 1)
+
+		structRecord := record.Fields[0].Value.GetRecord()
+		require.NotNil(t, structRecord)
+		require.Len(t, structRecord.Fields, 6)
+
+		fieldMap := make(map[string]*v2.RecordField)
+		for _, field := range structRecord.Fields {
+			fieldMap[field.Label] = field
+		}
+
+		require.Equal(t, "alice", fieldMap["owner"].Value.GetParty())
+		require.Equal(t, "integration test", fieldMap["name"].Value.GetText())
+
+		require.Equal(t, int64(10000000), fieldMap["tickDuration"].Value.GetInt64())
+		require.Equal(t, int64(300000000), fieldMap["maxProcessingTime"].Value.GetInt64())
+
+		partiesSet := fieldMap["requiredParties"].Value.GetList()
+		require.NotNil(t, partiesSet)
+		require.Len(t, partiesSet.Elements, 3)
+		require.Equal(t, "alice", partiesSet.Elements[0].GetText())
+		require.Equal(t, "bob", partiesSet.Elements[1].GetText())
+		require.Equal(t, "charlie", partiesSet.Elements[2].GetText())
+
+		syncSet := fieldMap["allowedSynchronizers"].Value.GetList()
+		require.NotNil(t, syncSet)
+		require.Len(t, syncSet.Elements, 2)
+		require.Equal(t, "sync1", syncSet.Elements[0].GetText())
+		require.Equal(t, "sync2", syncSet.Elements[1].GetText())
+	})
+}
+
+func TestConvertToRecordTUPLE2(t *testing.T) {
+	t.Run("TUPLE2 type conversion - strings", func(t *testing.T) {
+		tuple2Value := types.TUPLE2{
+			First:  "hello",
+			Second: "world",
+		}
+
+		data := make(map[string]interface{})
+		data["tuple"] = tuple2Value
+
+		record := convertToRecord(data)
+
+		require.NotNil(t, record)
+		require.Len(t, record.Fields, 1)
+		require.Equal(t, "tuple", record.Fields[0].Label)
+
+		tupleRecord := record.Fields[0].Value.GetRecord()
+		require.NotNil(t, tupleRecord)
+		require.Len(t, tupleRecord.Fields, 2)
+
+		fieldMap := make(map[string]*v2.RecordField)
+		for _, field := range tupleRecord.Fields {
+			fieldMap[field.Label] = field
+		}
+
+		require.Equal(t, "hello", fieldMap["_1"].Value.GetText())
+		require.Equal(t, "world", fieldMap["_2"].Value.GetText())
+	})
+
+	t.Run("TUPLE2 type conversion - integers", func(t *testing.T) {
+		tuple2Value := types.TUPLE2{
+			First:  int64(42),
+			Second: int64(100),
+		}
+
+		data := make(map[string]interface{})
+		data["tuple"] = tuple2Value
+
+		record := convertToRecord(data)
+
+		require.NotNil(t, record)
+		require.Len(t, record.Fields, 1)
+		require.Equal(t, "tuple", record.Fields[0].Label)
+
+		tupleRecord := record.Fields[0].Value.GetRecord()
+		require.NotNil(t, tupleRecord)
+		require.Len(t, tupleRecord.Fields, 2)
+
+		fieldMap := make(map[string]*v2.RecordField)
+		for _, field := range tupleRecord.Fields {
+			fieldMap[field.Label] = field
+		}
+
+		require.Equal(t, int64(42), fieldMap["_1"].Value.GetInt64())
+		require.Equal(t, int64(100), fieldMap["_2"].Value.GetInt64())
+	})
+
+	t.Run("TUPLE2 type conversion - mixed types", func(t *testing.T) {
+		tuple2Value := types.TUPLE2{
+			First:  "text",
+			Second: int64(42),
+		}
+
+		data := make(map[string]interface{})
+		data["tuple"] = tuple2Value
+
+		record := convertToRecord(data)
+
+		require.NotNil(t, record)
+		require.Len(t, record.Fields, 1)
+		require.Equal(t, "tuple", record.Fields[0].Label)
+
+		tupleRecord := record.Fields[0].Value.GetRecord()
+		require.NotNil(t, tupleRecord)
+		require.Len(t, tupleRecord.Fields, 2)
+
+		fieldMap := make(map[string]*v2.RecordField)
+		for _, field := range tupleRecord.Fields {
+			fieldMap[field.Label] = field
+		}
+
+		require.Equal(t, "text", fieldMap["_1"].Value.GetText())
+		require.Equal(t, int64(42), fieldMap["_2"].Value.GetInt64())
+	})
+
+	t.Run("TUPLE2 type conversion - DAML types", func(t *testing.T) {
+		tuple2Value := types.TUPLE2{
+			First:  types.PARTY("alice"),
+			Second: types.TEXT("test"),
+		}
+
+		data := make(map[string]interface{})
+		data["tuple"] = tuple2Value
+
+		record := convertToRecord(data)
+
+		require.NotNil(t, record)
+		require.Len(t, record.Fields, 1)
+		require.Equal(t, "tuple", record.Fields[0].Label)
+
+		tupleRecord := record.Fields[0].Value.GetRecord()
+		require.NotNil(t, tupleRecord)
+		require.Len(t, tupleRecord.Fields, 2)
+
+		fieldMap := make(map[string]*v2.RecordField)
+		for _, field := range tupleRecord.Fields {
+			fieldMap[field.Label] = field
+		}
+
+		require.Equal(t, "alice", fieldMap["_1"].Value.GetParty())
+		require.Equal(t, "test", fieldMap["_2"].Value.GetText())
+	})
+
+	t.Run("TUPLE2 in struct", func(t *testing.T) {
+		type TestTuple2Struct struct {
+			Owner      types.PARTY  `json:"owner"`
+			Coordinate types.TUPLE2 `json:"coordinate"`
+			Name       types.TEXT   `json:"name"`
+			Pair       types.TUPLE2 `json:"pair"`
+		}
+
+		testData := TestTuple2Struct{
+			Owner: types.PARTY("alice"),
+			Coordinate: types.TUPLE2{
+				First:  int64(100),
+				Second: int64(200),
+			},
+			Name: types.TEXT("test tuple2"),
+			Pair: types.TUPLE2{
+				First:  "key",
+				Second: "value",
+			},
+		}
+
+		data := make(map[string]interface{})
+		data["testStruct"] = testData
+
+		record := convertToRecord(data)
+
+		require.NotNil(t, record)
+		require.Len(t, record.Fields, 1)
+
+		structRecord := record.Fields[0].Value.GetRecord()
+		require.NotNil(t, structRecord)
+		require.Len(t, structRecord.Fields, 4)
+
+		fieldMap := make(map[string]*v2.RecordField)
+		for _, field := range structRecord.Fields {
+			fieldMap[field.Label] = field
+		}
+
+		require.Equal(t, "alice", fieldMap["owner"].Value.GetParty())
+		require.Equal(t, "test tuple2", fieldMap["name"].Value.GetText())
+
+		coordinateRecord := fieldMap["coordinate"].Value.GetRecord()
+		require.NotNil(t, coordinateRecord)
+		require.Len(t, coordinateRecord.Fields, 2)
+		coordFieldMap := make(map[string]*v2.RecordField)
+		for _, field := range coordinateRecord.Fields {
+			coordFieldMap[field.Label] = field
+		}
+		require.Equal(t, int64(100), coordFieldMap["_1"].Value.GetInt64())
+		require.Equal(t, int64(200), coordFieldMap["_2"].Value.GetInt64())
+
+		pairRecord := fieldMap["pair"].Value.GetRecord()
+		require.NotNil(t, pairRecord)
+		require.Len(t, pairRecord.Fields, 2)
+		pairFieldMap := make(map[string]*v2.RecordField)
+		for _, field := range pairRecord.Fields {
+			pairFieldMap[field.Label] = field
+		}
+		require.Equal(t, "key", pairFieldMap["_1"].Value.GetText())
+		require.Equal(t, "value", pairFieldMap["_2"].Value.GetText())
+	})
+
+	t.Run("Nested TUPLE2", func(t *testing.T) {
+		innerTuple := types.TUPLE2{
+			First:  "inner1",
+			Second: "inner2",
+		}
+
+		outerTuple := types.TUPLE2{
+			First:  innerTuple,
+			Second: int64(999),
+		}
+
+		data := make(map[string]interface{})
+		data["nestedTuple"] = outerTuple
+
+		record := convertToRecord(data)
+
+		require.NotNil(t, record)
+		require.Len(t, record.Fields, 1)
+		require.Equal(t, "nestedTuple", record.Fields[0].Label)
+
+		outerRecord := record.Fields[0].Value.GetRecord()
+		require.NotNil(t, outerRecord)
+		require.Len(t, outerRecord.Fields, 2)
+
+		outerFieldMap := make(map[string]*v2.RecordField)
+		for _, field := range outerRecord.Fields {
+			outerFieldMap[field.Label] = field
+		}
+
+		innerRecord := outerFieldMap["_1"].Value.GetRecord()
+		require.NotNil(t, innerRecord)
+		require.Len(t, innerRecord.Fields, 2)
+
+		innerFieldMap := make(map[string]*v2.RecordField)
+		for _, field := range innerRecord.Fields {
+			innerFieldMap[field.Label] = field
+		}
+
+		require.Equal(t, "inner1", innerFieldMap["_1"].Value.GetText())
+		require.Equal(t, "inner2", innerFieldMap["_2"].Value.GetText())
+		require.Equal(t, int64(999), outerFieldMap["_2"].Value.GetInt64())
+	})
+
+	t.Run("TUPLE2 with complex DAML types", func(t *testing.T) {
+		tuple2Value := types.TUPLE2{
+			First:  types.RELTIME(30 * time.Second),
+			Second: types.SET{"alice", "bob", "charlie"},
+		}
+
+		data := make(map[string]interface{})
+		data["complexTuple"] = tuple2Value
+
+		record := convertToRecord(data)
+
+		require.NotNil(t, record)
+		require.Len(t, record.Fields, 1)
+		require.Equal(t, "complexTuple", record.Fields[0].Label)
+
+		tupleRecord := record.Fields[0].Value.GetRecord()
+		require.NotNil(t, tupleRecord)
+		require.Len(t, tupleRecord.Fields, 2)
+
+		fieldMap := make(map[string]*v2.RecordField)
+		for _, field := range tupleRecord.Fields {
+			fieldMap[field.Label] = field
+		}
+
+		require.Equal(t, int64(30000000), fieldMap["_1"].Value.GetInt64())
+
+		setList := fieldMap["_2"].Value.GetList()
+		require.NotNil(t, setList)
+		require.Len(t, setList.Elements, 3)
+		require.Equal(t, "alice", setList.Elements[0].GetText())
+		require.Equal(t, "bob", setList.Elements[1].GetText())
+		require.Equal(t, "charlie", setList.Elements[2].GetText())
+	})
+}
+
+func TestConvertToRecordRELTIMEAndSETAndTUPLE2Integration(t *testing.T) {
+	t.Run("RELTIME, SET, and TUPLE2 in same struct", func(t *testing.T) {
+		type TestFullIntegrationStruct struct {
+			Owner             types.PARTY   `json:"owner"`
+			TickDuration      types.RELTIME `json:"tickDuration"`
+			RequiredParties   types.SET     `json:"requiredParties"`
+			Name              types.TEXT    `json:"name"`
+			Coordinate        types.TUPLE2  `json:"coordinate"`
+			MaxProcessingTime types.RELTIME `json:"maxProcessingTime"`
+			Metadata          types.TUPLE2  `json:"metadata"`
+		}
+
+		testData := TestFullIntegrationStruct{
+			Owner:           types.PARTY("alice"),
+			TickDuration:    types.RELTIME(10 * time.Second),
+			RequiredParties: types.SET{"alice", "bob", "charlie"},
+			Name:            types.TEXT("full integration test"),
+			Coordinate: types.TUPLE2{
+				First:  int64(100),
+				Second: int64(200),
+			},
+			MaxProcessingTime: types.RELTIME(5 * time.Minute),
+			Metadata: types.TUPLE2{
+				First:  "version",
+				Second: "1.0.0",
+			},
+		}
+
+		data := make(map[string]interface{})
+		data["testStruct"] = testData
+
+		record := convertToRecord(data)
+
+		require.NotNil(t, record)
+		require.Len(t, record.Fields, 1)
+
+		structRecord := record.Fields[0].Value.GetRecord()
+		require.NotNil(t, structRecord)
+		require.Len(t, structRecord.Fields, 7)
+
+		fieldMap := make(map[string]*v2.RecordField)
+		for _, field := range structRecord.Fields {
+			fieldMap[field.Label] = field
+		}
+
+		require.Equal(t, "alice", fieldMap["owner"].Value.GetParty())
+		require.Equal(t, "full integration test", fieldMap["name"].Value.GetText())
+
+		require.Equal(t, int64(10000000), fieldMap["tickDuration"].Value.GetInt64())
+		require.Equal(t, int64(300000000), fieldMap["maxProcessingTime"].Value.GetInt64())
+
+		partiesSet := fieldMap["requiredParties"].Value.GetList()
+		require.NotNil(t, partiesSet)
+		require.Len(t, partiesSet.Elements, 3)
+		require.Equal(t, "alice", partiesSet.Elements[0].GetText())
+		require.Equal(t, "bob", partiesSet.Elements[1].GetText())
+		require.Equal(t, "charlie", partiesSet.Elements[2].GetText())
+
+		coordinateRecord := fieldMap["coordinate"].Value.GetRecord()
+		require.NotNil(t, coordinateRecord)
+		require.Len(t, coordinateRecord.Fields, 2)
+		coordFieldMap := make(map[string]*v2.RecordField)
+		for _, field := range coordinateRecord.Fields {
+			coordFieldMap[field.Label] = field
+		}
+		require.Equal(t, int64(100), coordFieldMap["_1"].Value.GetInt64())
+		require.Equal(t, int64(200), coordFieldMap["_2"].Value.GetInt64())
+
+		metadataRecord := fieldMap["metadata"].Value.GetRecord()
+		require.NotNil(t, metadataRecord)
+		require.Len(t, metadataRecord.Fields, 2)
+		metaFieldMap := make(map[string]*v2.RecordField)
+		for _, field := range metadataRecord.Fields {
+			metaFieldMap[field.Label] = field
+		}
+		require.Equal(t, "version", metaFieldMap["_1"].Value.GetText())
+		require.Equal(t, "1.0.0", metaFieldMap["_2"].Value.GetText())
+	})
+}

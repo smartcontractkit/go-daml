@@ -91,6 +91,12 @@ func (codec *JsonCodec) toDynamicValue(value interface{}) (interface{}, error) {
 		return codec.unitToDynamicValue(v), nil
 	case types.CONTRACT_ID:
 		return codec.contractIdToDynamicValue(v), nil
+	case types.RELTIME:
+		return codec.reltimeToDynamicValue(v), nil
+	case types.SET:
+		return codec.setToDynamicValue(v)
+	case types.TUPLE2:
+		return codec.tuple2ToDynamicValue(v)
 	case types.GENMAP:
 		return codec.genMapToDynamicValue(v)
 	case types.MAP:
@@ -203,6 +209,41 @@ func (codec *JsonCodec) unitToDynamicValue(_ types.UNIT) map[string]interface{} 
 
 func (codec *JsonCodec) contractIdToDynamicValue(c types.CONTRACT_ID) string {
 	return string(c)
+}
+
+func (codec *JsonCodec) reltimeToDynamicValue(r types.RELTIME) interface{} {
+	microseconds := int64(time.Duration(r) / time.Microsecond)
+	if codec.EncodeInt64AsString {
+		return fmt.Sprintf("%d", microseconds)
+	}
+	return microseconds
+}
+
+func (codec *JsonCodec) setToDynamicValue(s types.SET) (interface{}, error) {
+	result := make([]interface{}, len(s))
+	for i, v := range s {
+		converted, err := codec.toDynamicValue(v)
+		if err != nil {
+			return nil, err
+		}
+		result[i] = converted
+	}
+	return result, nil
+}
+
+func (codec *JsonCodec) tuple2ToDynamicValue(t types.TUPLE2) (interface{}, error) {
+	first, err := codec.toDynamicValue(t.First)
+	if err != nil {
+		return nil, err
+	}
+	second, err := codec.toDynamicValue(t.Second)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]interface{}{
+		"_1": first,
+		"_2": second,
+	}, nil
 }
 
 func (codec *JsonCodec) genMapToDynamicValue(gm types.GENMAP) (interface{}, error) {
@@ -445,6 +486,15 @@ func (codec *JsonCodec) assignValue(jsonValue interface{}, target reflect.Value)
 		}
 		return fmt.Errorf("expected string for CONTRACT_ID, got %T", jsonValue)
 
+	case reflect.TypeOf(types.RELTIME(0)):
+		return codec.assignReltimeValue(jsonValue, target)
+
+	case reflect.TypeOf(types.SET{}):
+		return codec.assignSetValue(jsonValue, target)
+
+	case reflect.TypeOf(types.TUPLE2{}):
+		return codec.assignTuple2Value(jsonValue, target)
+
 	case reflect.TypeOf(types.GENMAP{}):
 		return codec.assignGenMapValue(jsonValue, target)
 
@@ -676,6 +726,54 @@ func (codec *JsonCodec) assignListValue(jsonValue interface{}, target reflect.Va
 		return nil
 	}
 	return fmt.Errorf("expected array for LIST, got %T", jsonValue)
+}
+
+func (codec *JsonCodec) assignReltimeValue(jsonValue interface{}, target reflect.Value) error {
+	switch v := jsonValue.(type) {
+	case string:
+		if i, err := parseIntFromString(v); err == nil {
+			target.Set(reflect.ValueOf(types.RELTIME(time.Duration(i) * time.Microsecond)))
+			return nil
+		}
+		return fmt.Errorf("invalid string format for RELTIME: %s", v)
+	case float64:
+		target.Set(reflect.ValueOf(types.RELTIME(time.Duration(int64(v)) * time.Microsecond)))
+		return nil
+	case int64:
+		target.Set(reflect.ValueOf(types.RELTIME(time.Duration(v) * time.Microsecond)))
+		return nil
+	default:
+		return fmt.Errorf("expected string or number for RELTIME, got %T", jsonValue)
+	}
+}
+
+func (codec *JsonCodec) assignSetValue(jsonValue interface{}, target reflect.Value) error {
+	if arr, ok := jsonValue.([]interface{}); ok {
+		result := make(types.SET, len(arr))
+		for i, v := range arr {
+			result[i] = v
+		}
+		target.Set(reflect.ValueOf(result))
+		return nil
+	}
+	return fmt.Errorf("expected array for SET, got %T", jsonValue)
+}
+
+func (codec *JsonCodec) assignTuple2Value(jsonValue interface{}, target reflect.Value) error {
+	if m, ok := jsonValue.(map[string]interface{}); ok {
+		first, hasFirst := m["_1"]
+		second, hasSecond := m["_2"]
+		if !hasFirst || !hasSecond {
+			return fmt.Errorf("TUPLE2 missing _1 or _2 fields")
+		}
+		result := types.TUPLE2{
+			First:  first,
+			Second: second,
+		}
+		target.Set(reflect.ValueOf(result))
+		return nil
+	}
+	return fmt.Errorf("expected object for TUPLE2, got %T", jsonValue)
 }
 
 func (codec *JsonCodec) assignSliceValue(jsonValue interface{}, target reflect.Value) error {

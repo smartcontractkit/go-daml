@@ -29,7 +29,7 @@ func TestBind(t *testing.T) {
 		},
 	}
 
-	result, err := Bind("main", "test-package-id", "2.0.0", structs)
+	result, err := Bind("main", "test-package-id", "2.0.0", structs, true)
 	if err != nil {
 		t.Fatalf("Bind failed: %v", err)
 	}
@@ -71,9 +71,12 @@ func TestCapitalize(t *testing.T) {
 	}{
 		{"landlord", "Landlord"},
 		{"rental_proposal", "RentalProposal"},
-		{"TENANT", "Tenant"},
+		{"TENANT", "TENANT"},
 		{"", ""},
 		{"a", "A"},
+		{"FeaturedAppRightCreateActivityMarker", "FeaturedAppRightCreateActivityMarker"},
+		{"FeaturedAppRight_CreateActivityMarker", "FeaturedAppRightCreateActivityMarker"},
+		{"FEATUREDAPPRIGHTCREATACTIVITYMARKER", "FEATUREDAPPRIGHTCREATACTIVITYMARKER"},
 	}
 
 	for _, test := range tests {
@@ -94,6 +97,7 @@ func TestDecapitalize(t *testing.T) {
 		{"TENANT", "tenant"},
 		{"", ""},
 		{"A", "a"},
+		{"FeaturedAppRightCreateActivityMarker", "featuredAppRightCreateActivityMarker"},
 	}
 
 	for _, test := range tests {
