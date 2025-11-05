@@ -149,7 +149,8 @@ func (c *codeGenAst) getName(pkg *daml.Package, id int32) string {
 
 func (c *codeGenAst) getTemplates(
 	pkg *daml.Package, module *daml.Module, moduleName string,
-	interfaces map[string]model.InterfaceMap) (map[string]*model.TmplStruct, error) {
+	interfaces map[string]model.InterfaceMap,
+) (map[string]*model.TmplStruct, error) {
 	structs := make(map[string]*model.TmplStruct, 0)
 
 	for _, template := range module.Templates {

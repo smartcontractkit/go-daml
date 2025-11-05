@@ -161,7 +161,6 @@ func runCodeGen(dar, outputDir, pkgFile string, debugMode bool) error {
 		}
 
 		for key, val := range interfaces {
-			log.Info().Msgf("===> collecting interface %s module %s location %s", key, val.ModuleName, val.Location)
 			equalNames := 0
 			for _, ifcName := range ifcByModule {
 				for ifcKey := range ifcName {
@@ -175,7 +174,6 @@ func runCodeGen(dar, outputDir, pkgFile string, debugMode bool) error {
 			if equalNames > 0 {
 				equalNames++
 				val.Name = fmt.Sprintf("%s%d", key, equalNames)
-				log.Info().Msgf("====>>>>>> found dublicated name %s %s", key, val.Name)
 			}
 
 			m, ok := ifcByModule[val.ModuleName]
@@ -186,6 +184,8 @@ func runCodeGen(dar, outputDir, pkgFile string, debugMode bool) error {
 			m[val.Name] = val
 		}
 	}
+
+	allStructNames := make(map[string]int)
 
 	for _, dalf := range dalfToProcess {
 		dalfFullPath := filepath.Join(unzippedPath, dalf)
@@ -218,6 +218,36 @@ func runCodeGen(dar, outputDir, pkgFile string, debugMode bool) error {
 		}
 
 		renamedStructs := make(map[string]*model.TmplStruct)
+
+		for structName, structDef := range pkg.Structs {
+			if structDef.IsInterface {
+				continue
+			}
+
+			equalNames := 0
+			for existingName := range allStructNames {
+				res, found := strings.CutPrefix(existingName, structName)
+				_, atoiErr := strconv.Atoi(res)
+				if found && (res == "" || atoiErr == nil) {
+					equalNames++
+				}
+			}
+
+			if equalNames > 0 {
+				equalNames++
+				originalName := structName
+				newName := fmt.Sprintf("%s%d", structName, equalNames)
+				structDef.Name = newName
+
+				delete(pkg.Structs, originalName)
+				pkg.Structs[newName] = structDef
+				renamedStructs[originalName] = structDef
+				allStructNames[newName] = equalNames
+			} else {
+				allStructNames[structName] = 0
+			}
+		}
+
 		for _, structDef := range pkg.Structs {
 			for _, field := range structDef.Fields {
 				if renamed, exists := renamedStructs[field.Type]; exists {
