@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/rs/zerolog/log"
@@ -139,142 +138,16 @@ func runCodeGen(dar, outputDir, pkgFile string, debugMode bool) error {
 		Dalfs:      dalfs,
 	}
 
-	ifcByModule := make(map[string]model.InterfaceMap)
-
 	dalfToProcess := make([]string, 0)
 	dalfToProcess = append(dalfToProcess, manifest.MainDalf)
 	dalfToProcess = append(dalfToProcess, dalfs...)
 
-	log.Info().Msg("first pass: collecting interfaces from all DALFs")
-	for _, dalf := range dalfToProcess {
-		dalfFullPath := filepath.Join(unzippedPath, dalf)
-		dalfContent, err := os.ReadFile(dalfFullPath)
-		if err != nil {
-			log.Warn().Err(err).Msgf("failed to read dalf '%s': %s", dalf, err)
-			continue
-		}
-
-		interfaces, err := codegen.GetInterfaces(dalfContent, dalfManifest)
-		if err != nil {
-			log.Warn().Err(err).Msgf("failed to extract interfaces from dalf: %s", dalf)
-			continue
-		}
-
-		for key, val := range interfaces {
-			equalNames := 0
-			for _, ifcName := range ifcByModule {
-				for ifcKey := range ifcName {
-					res, found := strings.CutPrefix(ifcKey, key)
-					_, atoiErr := strconv.Atoi(res)
-					if found && (res == "" || atoiErr == nil) {
-						equalNames++
-					}
-				}
-			}
-			if equalNames > 0 {
-				equalNames++
-				val.Name = fmt.Sprintf("%s%d", key, equalNames)
-			}
-
-			m, ok := ifcByModule[val.ModuleName]
-			if !ok {
-				m = make(model.InterfaceMap)
-				ifcByModule[val.ModuleName] = m
-			}
-			m[val.Name] = val
-		}
+	result, err := codegen.CodegenDalfs(dalfToProcess, unzippedPath, pkgFile, dalfManifest)
+	if err != nil {
+		return err
 	}
 
-	allStructNames := make(map[string]int)
-
-	for _, dalf := range dalfToProcess {
-		dalfFullPath := filepath.Join(unzippedPath, dalf)
-		dalfContent, err := os.ReadFile(dalfFullPath)
-		if err != nil {
-			log.Warn().Err(err).Msgf("failed to read dalf '%s': %s", dalf, err)
-			continue
-		}
-
-		pkg, err := codegen.GetASTWithInterfaces(dalfContent, manifest, ifcByModule)
-		if err != nil {
-			return fmt.Errorf("failed to generate AST: %w", err)
-		}
-
-		currentModules := make(map[string]bool)
-		for _, structDef := range pkg.Structs {
-			if structDef.ModuleName != "" {
-				currentModules[structDef.ModuleName] = true
-			}
-		}
-
-		log.Info().Msgf("adding interfaces for dalf %s from modules: %v", dalf, currentModules)
-		for moduleName := range currentModules {
-			if ifcMap, exists := ifcByModule[moduleName]; exists {
-				for key, val := range ifcMap {
-					log.Info().Msgf("adding interface %s from module %s to output", key, moduleName)
-					pkg.Structs[key] = val
-				}
-			}
-		}
-
-		renamedStructs := make(map[string]*model.TmplStruct)
-
-		for structName, structDef := range pkg.Structs {
-			if structDef.IsInterface {
-				continue
-			}
-
-			equalNames := 0
-			for existingName := range allStructNames {
-				res, found := strings.CutPrefix(existingName, structName)
-				_, atoiErr := strconv.Atoi(res)
-				if found && (res == "" || atoiErr == nil) {
-					equalNames++
-				}
-			}
-
-			if equalNames > 0 {
-				equalNames++
-				originalName := structName
-				newName := fmt.Sprintf("%s%d", structName, equalNames)
-				structDef.Name = newName
-
-				delete(pkg.Structs, originalName)
-				pkg.Structs[newName] = structDef
-				renamedStructs[originalName] = structDef
-				allStructNames[newName] = equalNames
-			} else {
-				allStructNames[structName] = 0
-			}
-		}
-
-		for _, structDef := range pkg.Structs {
-			for _, field := range structDef.Fields {
-				if renamed, exists := renamedStructs[field.Type]; exists {
-					field.Type = renamed.Name
-				}
-				trimmedType := strings.TrimPrefix(field.Type, "*")
-				trimmedType = strings.TrimPrefix(trimmedType, "[]")
-				if renamed, exists := renamedStructs[trimmedType]; exists {
-					field.Type = strings.Replace(field.Type, trimmedType, renamed.Name, 1)
-				}
-			}
-
-			for _, choice := range structDef.Choices {
-				if renamed, exists := renamedStructs[choice.ArgType]; exists {
-					choice.ArgType = renamed.Name
-				}
-				if renamed, exists := renamedStructs[choice.ReturnType]; exists {
-					choice.ReturnType = renamed.Name
-				}
-			}
-		}
-
-		code, err := codegen.Bind(pkgFile, pkg.PackageID, manifest.SdkVersion, pkg.Structs, dalf == manifest.MainDalf)
-		if err != nil {
-			return fmt.Errorf("failed to generate Go code: %w", err)
-		}
-
+	for dalf, code := range result {
 		baseFileName := getFilenameFromDalf(dalf)
 		outputFile := filepath.Join(outputDir, baseFileName+".go")
 

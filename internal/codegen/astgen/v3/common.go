@@ -88,11 +88,7 @@ func (c *codeGenAst) GetInterfaces() (map[string]*model.TmplStruct, error) {
 	return interfaceMap, nil
 }
 
-func (c *codeGenAst) GetTemplateStructs() (map[string]*model.TmplStruct, error) {
-	return c.GetTemplateStructsWithInterfaces(nil)
-}
-
-func (c *codeGenAst) GetTemplateStructsWithInterfaces(ifcByModule map[string]model.InterfaceMap) (map[string]*model.TmplStruct, error) {
+func (c *codeGenAst) GetTemplateStructs(ifcByModule map[string]model.InterfaceMap) (map[string]*model.TmplStruct, error) {
 	structs := make(map[string]*model.TmplStruct)
 
 	var archive daml.Archive
@@ -155,7 +151,7 @@ func (c *codeGenAst) getTemplates(
 
 	for _, template := range module.Templates {
 		templateName := c.getName(pkg, template.TyconInternedDname)
-		log.Info().Msgf("processing template: %s", templateName)
+		log.Debug().Msgf("processing template: %s", templateName)
 
 		var templateDataType *daml.DefDataType
 		for _, dataType := range module.DataTypes {
@@ -305,7 +301,7 @@ func (c *codeGenAst) getInterfaces(pkg *daml.Package, module *daml.Module, modul
 		originalName := c.getName(pkg, iface.TyconInternedDname)
 		interfaceName := "I" + originalName
 		location := c.getName(pkg, iface.Location.Module.GetModuleNameInternedDname())
-		log.Info().Msgf("processing interface: %s, original name %s location %s", interfaceName, originalName, location)
+		log.Debug().Msgf("processing interface: %s, original name %s location %s", interfaceName, originalName, location)
 
 		tmplStruct := model.TmplStruct{
 			Name:        interfaceName,

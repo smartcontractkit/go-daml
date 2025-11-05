@@ -67,11 +67,7 @@ func (c *codeGenAst) GetInterfaces() (map[string]*model.TmplStruct, error) {
 	return interfaceMap, nil
 }
 
-func (c *codeGenAst) GetTemplateStructs() (map[string]*model.TmplStruct, error) {
-	return c.GetTemplateStructsWithInterfaces(nil)
-}
-
-func (c *codeGenAst) GetTemplateStructsWithInterfaces(_ map[string]model.InterfaceMap) (map[string]*model.TmplStruct, error) {
+func (c *codeGenAst) GetTemplateStructs(_ map[string]model.InterfaceMap) (map[string]*model.TmplStruct, error) {
 	structs := make(map[string]*model.TmplStruct)
 
 	var archive daml.Archive
