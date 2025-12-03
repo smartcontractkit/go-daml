@@ -241,11 +241,36 @@ type GetActiveContractsRequest struct {
 }
 
 type GetActiveContractsResponse struct {
-	Offset               int64
-	WorkflowID           string
-	ActiveContracts      []*CreatedEvent
+	WorkflowID    string
+	ContractEntry ContractEntry
+}
+
+type ContractEntry interface {
+	isContractEntry()
+}
+
+type ActiveContractEntry struct {
+	ActiveContract *ActiveContract
+}
+
+func (*ActiveContractEntry) isContractEntry() {}
+
+type IncompleteUnassignedEntry struct {
 	IncompleteUnassigned *IncompleteUnassigned
-	IncompleteAssigned   *IncompleteAssigned
+}
+
+func (*IncompleteUnassignedEntry) isContractEntry() {}
+
+type IncompleteAssignedEntry struct {
+	IncompleteAssigned *IncompleteAssigned
+}
+
+func (*IncompleteAssignedEntry) isContractEntry() {}
+
+type ActiveContract struct {
+	CreatedEvent        *CreatedEvent
+	SynchronizerID      string
+	ReassignmentCounter uint64
 }
 
 type IncompleteUnassigned struct {

@@ -114,6 +114,18 @@ func (c *stateService) GetLatestPrunedOffsets(ctx context.Context, req *model.Ge
 	}, nil
 }
 
+func activeContractFromProto(pb *v2.ActiveContract) *model.ActiveContract {
+	if pb == nil {
+		return nil
+	}
+
+	return &model.ActiveContract{
+		CreatedEvent:        createdEventFromProto(pb.CreatedEvent),
+		SynchronizerID:      pb.SynchronizerId,
+		ReassignmentCounter: pb.ReassignmentCounter,
+	}
+}
+
 func getActiveContractsResponseFromProto(pb *v2.GetActiveContractsResponse) *model.GetActiveContractsResponse {
 	if pb == nil {
 		return nil
@@ -126,24 +138,26 @@ func getActiveContractsResponseFromProto(pb *v2.GetActiveContractsResponse) *mod
 	// Handle the oneof contract_entry field
 	switch entry := pb.ContractEntry.(type) {
 	case *v2.GetActiveContractsResponse_ActiveContract:
-		if entry.ActiveContract != nil && entry.ActiveContract.CreatedEvent != nil {
-			resp.ActiveContracts = append(resp.ActiveContracts, createdEventFromProto(entry.ActiveContract.CreatedEvent))
+		if entry.ActiveContract != nil {
+			resp.ContractEntry = &model.ActiveContractEntry{
+				ActiveContract: activeContractFromProto(entry.ActiveContract),
+			}
 		}
 	case *v2.GetActiveContractsResponse_IncompleteUnassigned:
 		if entry.IncompleteUnassigned != nil {
-			resp.IncompleteUnassigned = &model.IncompleteUnassigned{
-				CreatedEvent:    createdEventFromProto(entry.IncompleteUnassigned.CreatedEvent),
-				UnassignedEvent: unassignedEventFromProto(entry.IncompleteUnassigned.UnassignedEvent),
-			}
-			// Set offset from the unassigned event if available
-			if entry.IncompleteUnassigned.UnassignedEvent != nil && entry.IncompleteUnassigned.UnassignedEvent.Offset > 0 {
-				resp.Offset = entry.IncompleteUnassigned.UnassignedEvent.Offset
+			resp.ContractEntry = &model.IncompleteUnassignedEntry{
+				IncompleteUnassigned: &model.IncompleteUnassigned{
+					CreatedEvent:    createdEventFromProto(entry.IncompleteUnassigned.CreatedEvent),
+					UnassignedEvent: unassignedEventFromProto(entry.IncompleteUnassigned.UnassignedEvent),
+				},
 			}
 		}
 	case *v2.GetActiveContractsResponse_IncompleteAssigned:
 		if entry.IncompleteAssigned != nil {
-			resp.IncompleteAssigned = &model.IncompleteAssigned{
-				AssignedEvent: assignedEventFromProto(entry.IncompleteAssigned.AssignedEvent),
+			resp.ContractEntry = &model.IncompleteAssignedEntry{
+				IncompleteAssigned: &model.IncompleteAssigned{
+					AssignedEvent: assignedEventFromProto(entry.IncompleteAssigned.AssignedEvent),
+				},
 			}
 		}
 	}

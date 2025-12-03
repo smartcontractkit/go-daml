@@ -68,12 +68,23 @@ func RunStateService(cl *client.DamlBindingClient) {
 				log.Info().Int("totalContracts", contractCount).Msg("active contracts stream completed")
 				return
 			}
-			if response != nil && len(response.ActiveContracts) > 0 {
-				contractCount += len(response.ActiveContracts)
-				log.Info().
-					Int("activeContracts", len(response.ActiveContracts)).
-					Int64("offset", response.Offset).
-					Msg("received active contracts batch")
+			if response != nil && response.ContractEntry != nil {
+				switch entry := response.ContractEntry.(type) {
+				case *model.ActiveContractEntry:
+					if entry.ActiveContract != nil {
+						contractCount++
+						log.Info().
+							Str("contractID", entry.ActiveContract.CreatedEvent.ContractID).
+							Str("templateID", entry.ActiveContract.CreatedEvent.TemplateID).
+							Str("synchronizerID", entry.ActiveContract.SynchronizerID).
+							Uint64("reassignmentCounter", entry.ActiveContract.ReassignmentCounter).
+							Msg("received active contract")
+					}
+				case *model.IncompleteUnassignedEntry:
+					log.Info().Msg("received incomplete unassigned contract")
+				case *model.IncompleteAssignedEntry:
+					log.Info().Msg("received incomplete assigned contract")
+				}
 			}
 		case err := <-errCh:
 			if err != nil {
