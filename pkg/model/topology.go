@@ -171,6 +171,8 @@ type PartyToParticipantMapping struct {
 	Participants []HostingParticipant
 }
 
+func (*PartyToParticipantMapping) isTopologyMapping() {}
+
 type HostingParticipant struct {
 	ParticipantUID string
 	Permission     ParticipantPermission
@@ -190,3 +192,57 @@ type BaseResult struct {
 type FilterTargetKeyOrFingerprint struct {
 	Fingerprint string
 }
+
+type SignTransactionsRequest struct {
+	Transactions []*SignedTopologyTransaction
+	SignedBy     []string
+	Store        *StoreID
+	ForceFlags   []ForceFlag
+}
+
+type SignTransactionsResponse struct {
+	Transactions []*SignedTopologyTransaction
+}
+
+type GenerateTransactionsRequest struct {
+	Proposals []*GenerateTransactionProposal
+}
+
+type GenerateTransactionProposal struct {
+	Operation Operation
+	Serial    uint32
+	Mapping   TopologyMapping
+	Store     *StoreID
+}
+
+type GenerateTransactionsResponse struct {
+	GeneratedTransactions []*GeneratedTransaction
+}
+
+type GeneratedTransaction struct {
+	SerializedTransaction []byte
+	TransactionHash       []byte
+}
+
+type CreateTemporaryTopologyStoreRequest struct {
+	Name            string
+	ProtocolVersion uint32
+}
+
+type CreateTemporaryTopologyStoreResponse struct {
+	StoreID *StoreID
+}
+
+type DropTemporaryTopologyStoreRequest struct {
+	StoreID *StoreID
+}
+
+type DropTemporaryTopologyStoreResponse struct{}
+
+type ImportTopologySnapshotRequest struct {
+	TopologySnapshot      []byte
+	Store                 *StoreID
+	WaitToBecomeEffective *time.Duration
+}
+
+type ImportTopologySnapshotResponse struct{}

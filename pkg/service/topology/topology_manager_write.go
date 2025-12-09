@@ -16,6 +16,12 @@ import (
 type TopologyManagerWrite interface {
 	Authorize(ctx context.Context, req *model.AuthorizeRequest) (*model.AuthorizeResponse, error)
 	AddTransactions(ctx context.Context, req *model.AddTransactionsRequest) (*model.AddTransactionsResponse, error)
+	SignTransactions(ctx context.Context, req *model.SignTransactionsRequest) (*model.SignTransactionsResponse, error)
+	GenerateTransactions(ctx context.Context, req *model.GenerateTransactionsRequest) (*model.GenerateTransactionsResponse, error)
+	CreateTemporaryTopologyStore(ctx context.Context, req *model.CreateTemporaryTopologyStoreRequest) (*model.CreateTemporaryTopologyStoreResponse, error)
+	DropTemporaryTopologyStore(ctx context.Context, req *model.DropTemporaryTopologyStoreRequest) (*model.DropTemporaryTopologyStoreResponse, error)
+	PrepareOnboardingTransactions(ctx context.Context, req *PrepareOnboardingTransactionsRequest) (*PrepareOnboardingTransactionsResponse, error)
+	OnboardExternalParty(ctx context.Context, req *OnboardExternalPartyRequest) (*OnboardExternalPartyResponse, error)
 }
 
 type topologyManagerWrite struct {
@@ -251,6 +257,21 @@ func topologyMappingToProto(mapping model.TopologyMapping) *protov30.TopologyMap
 				SigningKeys: keys,
 			},
 		}
+	case *model.PartyToParticipantMapping:
+		participants := make([]*protov30.PartyToParticipant_HostingParticipant, len(m.Participants))
+		for i, p := range m.Participants {
+			participants[i] = &protov30.PartyToParticipant_HostingParticipant{
+				ParticipantUid: p.ParticipantUID,
+				Permission:     participantPermissionToProto(p.Permission),
+			}
+		}
+		pbMapping.Mapping = &protov30.TopologyMapping_PartyToParticipant{
+			PartyToParticipant: &protov30.PartyToParticipant{
+				Party:        m.Party,
+				Threshold:    m.Threshold,
+				Participants: participants,
+			},
+		}
 	}
 
 	return pbMapping
@@ -263,5 +284,130 @@ func signingPublicKeyToProto(key *model.PublicKey) *cryptov30.SigningPublicKey {
 	return &cryptov30.SigningPublicKey{
 		Format:    cryptov30.CryptoKeyFormat(key.Format),
 		PublicKey: key.Key,
+	}
+}
+
+func participantPermissionToProto(permission model.ParticipantPermission) protov30.Enums_ParticipantPermission {
+	switch permission {
+	case model.ParticipantPermissionConfirmation:
+		return protov30.Enums_PARTICIPANT_PERMISSION_CONFIRMATION
+	case model.ParticipantPermissionObservation:
+		return protov30.Enums_PARTICIPANT_PERMISSION_OBSERVATION
+	default:
+		return protov30.Enums_PARTICIPANT_PERMISSION_SUBMISSION
+	}
+}
+
+func (c *topologyManagerWrite) SignTransactions(ctx context.Context, req *model.SignTransactionsRequest) (*model.SignTransactionsResponse, error) {
+	protoReq := signTransactionsRequestToProto(req)
+
+	resp, err := c.client.SignTransactions(ctx, protoReq)
+	if err != nil {
+		return nil, err
+	}
+
+	return signTransactionsResponseFromProto(resp), nil
+}
+
+func (c *topologyManagerWrite) GenerateTransactions(ctx context.Context, req *model.GenerateTransactionsRequest) (*model.GenerateTransactionsResponse, error) {
+	protoReq := generateTransactionsRequestToProto(req)
+
+	resp, err := c.client.GenerateTransactions(ctx, protoReq)
+	if err != nil {
+		return nil, err
+	}
+
+	return generateTransactionsResponseFromProto(resp), nil
+}
+
+func (c *topologyManagerWrite) CreateTemporaryTopologyStore(ctx context.Context, req *model.CreateTemporaryTopologyStoreRequest) (*model.CreateTemporaryTopologyStoreResponse, error) {
+	protoReq := &topov30.CreateTemporaryTopologyStoreRequest{
+		Name:            req.Name,
+		ProtocolVersion: req.ProtocolVersion,
+	}
+
+	resp, err := c.client.CreateTemporaryTopologyStore(ctx, protoReq)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.CreateTemporaryTopologyStoreResponse{
+		StoreID: &model.StoreID{Value: "temporary:" + resp.StoreId.Name},
+	}, nil
+}
+
+func (c *topologyManagerWrite) DropTemporaryTopologyStore(ctx context.Context, req *model.DropTemporaryTopologyStoreRequest) (*model.DropTemporaryTopologyStoreResponse, error) {
+	protoReq := &topov30.DropTemporaryTopologyStoreRequest{
+		StoreId: &topov30.StoreId_Temporary{
+			Name: req.StoreID.Value[10:],
+		},
+	}
+
+	_, err := c.client.DropTemporaryTopologyStore(ctx, protoReq)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.DropTemporaryTopologyStoreResponse{}, nil
+}
+
+func signTransactionsRequestToProto(req *model.SignTransactionsRequest) *topov30.SignTransactionsRequest {
+	if req == nil {
+		return nil
+	}
+
+	return &topov30.SignTransactionsRequest{
+		Transactions: signedTopologyTransactionsToProto(req.Transactions),
+		SignedBy:     req.SignedBy,
+		Store:        storeIDToProto(req.Store),
+		ForceFlags:   forceFlagsToProto(req.ForceFlags),
+	}
+}
+
+func signTransactionsResponseFromProto(pb *topov30.SignTransactionsResponse) *model.SignTransactionsResponse {
+	if pb == nil {
+		return nil
+	}
+
+	return &model.SignTransactionsResponse{
+		Transactions: signedTopologyTransactionsFromProto(pb.Transactions),
+	}
+}
+
+func generateTransactionsRequestToProto(req *model.GenerateTransactionsRequest) *topov30.GenerateTransactionsRequest {
+	if req == nil {
+		return nil
+	}
+
+	proposals := make([]*topov30.GenerateTransactionsRequest_Proposal, len(req.Proposals))
+	for i, p := range req.Proposals {
+		proposals[i] = &topov30.GenerateTransactionsRequest_Proposal{
+			Operation: operationToProto(p.Operation),
+			Serial:    p.Serial,
+			Mapping:   topologyMappingToProto(p.Mapping),
+			Store:     storeIDToProto(p.Store),
+		}
+	}
+
+	return &topov30.GenerateTransactionsRequest{
+		Proposals: proposals,
+	}
+}
+
+func generateTransactionsResponseFromProto(pb *topov30.GenerateTransactionsResponse) *model.GenerateTransactionsResponse {
+	if pb == nil {
+		return nil
+	}
+
+	genTxs := make([]*model.GeneratedTransaction, len(pb.GeneratedTransactions))
+	for i, tx := range pb.GeneratedTransactions {
+		genTxs[i] = &model.GeneratedTransaction{
+			SerializedTransaction: tx.SerializedTransaction,
+			TransactionHash:       tx.TransactionHash,
+		}
+	}
+
+	return &model.GenerateTransactionsResponse{
+		GeneratedTransactions: genTxs,
 	}
 }
