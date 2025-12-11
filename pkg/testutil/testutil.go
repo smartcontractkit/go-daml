@@ -16,7 +16,12 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-const damlSandboxVersion = "3.5.0-snapshot.20251106.0"
+const (
+	damlSandboxVersion   = "3.5.0-snapshot.20251106.0"
+	containerName        = "go-daml-test-canton"
+	containerLabelKey    = "go-daml-test"
+	containerLabelValue  = "canton-sandbox"
+)
 
 var (
 	once       sync.Once
@@ -109,16 +114,105 @@ func Setup(ctx context.Context) error {
 func Teardown() {
 	if dockerPool != nil {
 		if resDaml != nil {
-			if err := dockerPool.Purge(resDaml); err != nil {
-				log.Error().Err(err).Msg("Could not purge postgres resource")
-			}
+			log.Info().Str("container", containerName).Msg("Keeping Canton sandbox container for reuse")
 		}
 	}
+}
+
+func CleanupContainer() {
+	if dockerPool != nil && resDaml != nil {
+		if err := dockerPool.Purge(resDaml); err != nil {
+			log.Error().Err(err).Msg("Could not purge Canton sandbox resource")
+		} else {
+			log.Info().Str("container", containerName).Msg("Removed Canton sandbox container")
+		}
+	}
+}
+
+func findExistingContainer(pool *dockertest.Pool) (*dockertest.Resource, error) {
+	containers, err := pool.Client.ListContainers(docker.ListContainersOptions{
+		All: true,
+		Filters: map[string][]string{
+			"name": {containerName},
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var matchedContainer *docker.APIContainers
+	for i := range containers {
+		for _, name := range containers[i].Names {
+			if name == "/"+containerName || name == containerName {
+				matchedContainer = &containers[i]
+				break
+			}
+		}
+		if matchedContainer != nil {
+			break
+		}
+	}
+
+	if matchedContainer == nil {
+		return nil, fmt.Errorf("no existing container found")
+	}
+
+	if matchedContainer.State != "running" {
+		log.Warn().Str("state", matchedContainer.State).Msg("Found container but it's not running, removing it")
+		err := pool.Client.RemoveContainer(docker.RemoveContainerOptions{
+			ID:    matchedContainer.ID,
+			Force: true,
+		})
+		if err != nil {
+			log.Warn().Err(err).Msg("Failed to remove stopped container")
+		}
+		return nil, fmt.Errorf("container not running, removed")
+	}
+
+	portMap := make(map[docker.Port][]docker.PortBinding)
+	for _, p := range matchedContainer.Ports {
+		port := docker.Port(fmt.Sprintf("%d/%s", p.PrivatePort, p.Type))
+		portMap[port] = []docker.PortBinding{
+			{
+				HostIP:   p.IP,
+				HostPort: fmt.Sprintf("%d", p.PublicPort),
+			},
+		}
+	}
+
+	resource := &dockertest.Resource{
+		Container: &docker.Container{
+			ID:    matchedContainer.ID,
+			Name:  matchedContainer.Names[0],
+			State: docker.State{Running: true},
+			NetworkSettings: &docker.NetworkSettings{
+				Ports: portMap,
+			},
+		},
+	}
+
+	return resource, nil
 }
 
 func initDamlSandbox(ctx context.Context, dockerPool *dockertest.Pool) (*dockertest.Resource, string) {
 	ledgerAPIPort := "6865"
 	adminAPIPort := "6866"
+
+	existingResource, err := findExistingContainer(dockerPool)
+	if err == nil && existingResource != nil {
+		log.Info().Str("container", containerName).Msg("Reusing existing Canton sandbox container")
+
+		mappedLedgerPort := existingResource.GetPort(ledgerAPIPort + "/tcp")
+		grpcAddr := fmt.Sprintf("127.0.0.1:%s", mappedLedgerPort)
+
+		log.Info().Msgf("Reusing Canton sandbox, Ledger API (gRPC) on %s", grpcAddr)
+
+		if err := waitForPort(ctx, mappedLedgerPort, 30*time.Second); err != nil {
+			log.Warn().Err(err).Msg("Existing container not responsive, creating new one")
+		} else {
+			return existingResource, grpcAddr
+		}
+	}
 
 	cantonConfig := `canton {
   mediators {
@@ -168,6 +262,7 @@ func initDamlSandbox(ctx context.Context, dockerPool *dockertest.Pool) (*dockert
 		Repository: "digitalasset/daml-sdk",
 		Tag:        damlSandboxVersion,
 		Platform:   "linux/amd64",
+		Name:       containerName,
 		Cmd: []string{
 			"daml",
 			"sandbox",
@@ -175,17 +270,31 @@ func initDamlSandbox(ctx context.Context, dockerPool *dockertest.Pool) (*dockert
 		},
 		ExposedPorts: []string{ledgerAPIPort + "/tcp", adminAPIPort + "/tcp"},
 		Mounts:       []string{fmt.Sprintf("%s:/canton/canton.conf:ro", configPath)},
+		Labels: map[string]string{
+			containerLabelKey: containerLabelValue,
+		},
 	}, func(config *docker.HostConfig) {
-		config.AutoRemove = true
+		config.AutoRemove = false
 		config.RestartPolicy = docker.RestartPolicy{
 			Name: "no",
 		}
 	})
 	if err != nil {
+		if strings.Contains(err.Error(), "already exists") || strings.Contains(err.Error(), "is already in use") {
+			log.Warn().Err(err).Msg("Container already exists, attempting to reuse it")
+			existingResource, findErr := findExistingContainer(dockerPool)
+			if findErr == nil && existingResource != nil {
+				mappedLedgerPort := existingResource.GetPort(ledgerAPIPort + "/tcp")
+				grpcAddr := fmt.Sprintf("127.0.0.1:%s", mappedLedgerPort)
+				log.Info().Str("container", containerName).Msg("Successfully attached to existing container")
+				return existingResource, grpcAddr
+			}
+			log.Fatal().Err(err).Msg("Container exists but could not attach to it")
+		}
 		log.Fatal().Err(err).Msg("Could not start DAML sandbox")
 	}
 
-	resource.Expire(300)
+	resource.Expire(600)
 
 	mappedLedgerPort := resource.GetPort(ledgerAPIPort + "/tcp")
 	grpcAddr := fmt.Sprintf("127.0.0.1:%s", mappedLedgerPort)
