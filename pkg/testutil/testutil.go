@@ -76,7 +76,9 @@ func Setup(ctx context.Context) error {
 			log.Info().Msgf("creating user %s", testUser)
 
 			log.Info().Msg("waiting for synchronizer connection before allocating party...")
-			time.Sleep(30 * time.Second)
+			if err := waitForSynchronizerConnection(ctx, cl, 2*time.Minute); err != nil {
+				log.Fatal().Err(err).Msg("synchronizer connection timeout")
+			}
 
 			partyDetails, err := cl.PartyMng.AllocateParty(ctx, "", nil, "")
 			if err != nil {
@@ -289,4 +291,33 @@ func GetAdminAddr() string {
 
 func GetGrpcAddr() string {
 	return grpcAddr
+}
+
+func waitForSynchronizerConnection(ctx context.Context, cl *client.DamlBindingClient, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
+
+	for time.Now().Before(deadline) {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		resp, err := cl.StateService.GetConnectedSynchronizers(ctx, &model.GetConnectedSynchronizersRequest{})
+		if err == nil && resp != nil && len(resp.ConnectedSynchronizers) > 0 {
+			log.Info().
+				Int("count", len(resp.ConnectedSynchronizers)).
+				Str("first_id", resp.ConnectedSynchronizers[0].SynchronizerID).
+				Msg("synchronizer connection established")
+			return nil
+		}
+
+		if err != nil {
+			log.Debug().Err(err).Msg("checking for synchronizer connection")
+		}
+
+		time.Sleep(2 * time.Second)
+	}
+
+	return fmt.Errorf("no synchronizer connection after %v", timeout)
 }
