@@ -335,7 +335,7 @@ func GetAST(payload []byte, manifest *model.Manifest, ifcByModule map[string]mod
 		return nil, fmt.Errorf("could not extract package ID from MainDalf: %s", manifest.MainDalf)
 	}
 
-	packageName := manifest.Name
+	packageName := strings.ToLower(manifest.Name)
 	if packageName == "" {
 		packageName = getPackageName(manifest.MainDalf)
 	}

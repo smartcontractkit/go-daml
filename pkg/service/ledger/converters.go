@@ -19,6 +19,7 @@ import (
 	"github.com/noders-team/go-daml/pkg/model"
 	"github.com/noders-team/go-daml/pkg/types"
 	"github.com/rs/zerolog/log"
+	"github.com/shopspring/decimal"
 )
 
 var defaultJsonCodec = codec.NewJsonCodec()
@@ -404,6 +405,9 @@ func mapToValue(data interface{}) *v2.Value {
 
 	// handle custom pointer types first before dereferencing
 	switch v := data.(type) {
+	case decimal.Decimal:
+		scaled := types.NewNumericFromDecimal(v)
+		return &v2.Value{Sum: &v2.Value_Numeric{Numeric: convertBigIntToNumeric((*big.Int)(scaled), 10).FloatString(10)}}
 	case types.NUMERIC:
 		return &v2.Value{Sum: &v2.Value_Numeric{Numeric: convertBigIntToNumeric((*big.Int)(v), 10).FloatString(10)}}
 	case types.DECIMAL:
@@ -522,15 +526,8 @@ func mapToValue(data interface{}) *v2.Value {
 		}
 	case map[string]interface{}:
 		if typeVal, hasType := v["_type"]; hasType && typeVal == "optional" {
-			if val, hasValue := v["value"]; hasValue {
-				return &v2.Value{
-					Sum: &v2.Value_Optional{
-						Optional: &v2.Optional{
-							Value: mapToValue(val),
-						},
-					},
-				}
-			} else {
+			val, ok := v["value"]
+			if !ok {
 				return &v2.Value{
 					Sum: &v2.Value_Optional{
 						Optional: &v2.Optional{
@@ -538,6 +535,14 @@ func mapToValue(data interface{}) *v2.Value {
 						},
 					},
 				}
+			}
+
+			return &v2.Value{
+				Sum: &v2.Value_Optional{
+					Optional: &v2.Optional{
+						Value: mapToValue(val),
+					},
+				},
 			}
 		}
 
@@ -553,34 +558,84 @@ func mapToValue(data interface{}) *v2.Value {
 
 		if typeStr, ok := v["_type"].(string); ok && typeStr == "genmap" {
 			if mapValue, ok := v["value"].(map[string]interface{}); ok {
-				entries := make([]*v2.GenMap_Entry, 0, len(mapValue))
-				for key, val := range mapValue {
-					entries = append(entries, &v2.GenMap_Entry{
-						Key:   &v2.Value{Sum: &v2.Value_Text{Text: key}},
-						Value: mapToValue(val),
-					})
+				allTextValues := true
+				for _, val := range mapValue {
+					if _, ok := val.(string); !ok {
+						allTextValues = false
+						break
+					}
 				}
-				return &v2.Value{
-					Sum: &v2.Value_GenMap{
-						GenMap: &v2.GenMap{
-							Entries: entries,
+
+				if allTextValues {
+					textMapEntries := make([]*v2.TextMap_Entry, 0, len(mapValue))
+					for key, val := range mapValue {
+						textMapEntries = append(textMapEntries, &v2.TextMap_Entry{
+							Key:   key,
+							Value: mapToValue(val),
+						})
+					}
+					return &v2.Value{
+						Sum: &v2.Value_TextMap{
+							TextMap: &v2.TextMap{
+								Entries: textMapEntries,
+							},
 						},
-					},
+					}
+				} else {
+					entries := make([]*v2.GenMap_Entry, 0, len(mapValue))
+					for key, val := range mapValue {
+						entries = append(entries, &v2.GenMap_Entry{
+							Key:   &v2.Value{Sum: &v2.Value_Text{Text: key}},
+							Value: mapToValue(val),
+						})
+					}
+					return &v2.Value{
+						Sum: &v2.Value_GenMap{
+							GenMap: &v2.GenMap{
+								Entries: entries,
+							},
+						},
+					}
 				}
 			} else if genMapValue, ok := v["value"].(types.GENMAP); ok {
-				entries := make([]*v2.GenMap_Entry, 0, len(genMapValue))
-				for key, val := range genMapValue {
-					entries = append(entries, &v2.GenMap_Entry{
-						Key:   &v2.Value{Sum: &v2.Value_Text{Text: key}},
-						Value: mapToValue(val),
-					})
+				allTextValues := true
+				for _, val := range genMapValue {
+					if _, ok := val.(string); !ok {
+						allTextValues = false
+						break
+					}
 				}
-				return &v2.Value{
-					Sum: &v2.Value_GenMap{
-						GenMap: &v2.GenMap{
-							Entries: entries,
+
+				if allTextValues {
+					textMapEntries := make([]*v2.TextMap_Entry, 0, len(genMapValue))
+					for key, val := range genMapValue {
+						textMapEntries = append(textMapEntries, &v2.TextMap_Entry{
+							Key:   key,
+							Value: mapToValue(val),
+						})
+					}
+					return &v2.Value{
+						Sum: &v2.Value_TextMap{
+							TextMap: &v2.TextMap{
+								Entries: textMapEntries,
+							},
 						},
-					},
+					}
+				} else {
+					entries := make([]*v2.GenMap_Entry, 0, len(genMapValue))
+					for key, val := range genMapValue {
+						entries = append(entries, &v2.GenMap_Entry{
+							Key:   &v2.Value{Sum: &v2.Value_Text{Text: key}},
+							Value: mapToValue(val),
+						})
+					}
+					return &v2.Value{
+						Sum: &v2.Value_GenMap{
+							GenMap: &v2.GenMap{
+								Entries: entries,
+							},
+						},
+					}
 				}
 			}
 		}
@@ -612,6 +667,31 @@ func mapToValue(data interface{}) *v2.Value {
 				},
 			}
 		}
+
+		// Handle generic slices
+		rv := reflect.ValueOf(v)
+		if rv.Kind() == reflect.Slice {
+			elements := make([]*v2.Value, rv.Len())
+			for i := 0; i < rv.Len(); i++ {
+				elements[i] = mapToValue(rv.Index(i).Interface())
+			}
+			return &v2.Value{
+				Sum: &v2.Value_List{
+					List: &v2.List{Elements: elements},
+				},
+			}
+		}
+
+		// Check if the value has a ToMap() method
+		method := reflect.ValueOf(v).MethodByName("ToMap")
+		if method.IsValid() && method.Type().NumIn() == 0 && method.Type().NumOut() == 1 {
+			if result := method.Call(nil); len(result) > 0 {
+				if m, ok := result[0].Interface().(map[string]interface{}); ok {
+					return mapToValue(m)
+				}
+			}
+		}
+
 		return mapToValue(structToMap(v))
 	default:
 		return nil

@@ -3,6 +3,8 @@ package types
 import (
 	"math/big"
 	"time"
+
+	"github.com/shopspring/decimal"
 )
 
 type (
@@ -11,7 +13,6 @@ type (
 	INT64              int64
 	BOOL               bool
 	DECIMAL            *big.Int
-	NUMERIC            *big.Int
 	DATE               time.Time
 	TIMESTAMP          time.Time
 	UNIT               struct{}
@@ -32,6 +33,12 @@ type (
 		Third  T3
 	}
 )
+
+type NUMERIC *big.Int
+
+func NewNumericFromDecimal(d decimal.Decimal) NUMERIC {
+	return NUMERIC(d.Shift(10).BigInt())
+}
 
 // VARIANT represents a DAML variant/union type
 type VARIANT interface {

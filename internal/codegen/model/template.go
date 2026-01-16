@@ -86,9 +86,7 @@ func NormalizeDAMLType(damlType string) string {
 		return "OPTIONAL"
 	case strings.Contains(damlType, "prim:CONTRACT_ID") || damlType == "CONTRACT_ID":
 		return "CONTRACT_ID"
-	case strings.Contains(damlType, "prim:GENMAP") || damlType == "GENMAP":
-		return "GENMAP"
-	case strings.Contains(damlType, "prim:TEXTMAP") || damlType == "TEXTMAP":
+	case strings.Contains(damlType, "prim:GENMAP") || damlType == "GENMAP" || strings.Contains(damlType, "prim:TEXTMAP") || damlType == "TEXTMAP":
 		return "GENMAP"
 	case strings.Contains(damlType, "prim:BIGNUMERIC") || damlType == "BIGNUMERIC":
 		return "BIGNUMERIC"
