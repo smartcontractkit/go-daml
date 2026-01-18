@@ -58,6 +58,12 @@ type Metadata struct {
 }
 
 func NormalizeDAMLType(damlType string) string {
+
+	if strings.HasPrefix(damlType, "[]") {
+		inner := NormalizeDAMLType(strings.TrimPrefix(damlType, "[]"))
+		return "[]" + inner
+	}
+
 	switch {
 	// Handle both v1/v2 format (prim:TYPE) and v3 format (TYPE)
 	case strings.Contains(damlType, "prim:PARTY") || damlType == "PARTY":
