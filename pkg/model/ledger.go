@@ -130,6 +130,12 @@ type SubmitAndWaitResponse struct {
 	CompletionOffset int64
 }
 
+type SubmitAndWaitForTransactionResponse struct {
+	UpdateID         string
+	CompletionOffset int64
+	Transaction      *Transaction
+}
+
 // Event Query Service types
 type GetEventsByContractIDRequest struct {
 	ContractID  string

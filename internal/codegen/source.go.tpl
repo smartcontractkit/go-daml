@@ -301,7 +301,6 @@ func {{capitalise $interfaceName}}InterfaceID(packageID *string) string {
   {{- else if eq .Type "TIMESTAMP" -}}t.{{capitalise .Name}}
   {{- else if eq .Type "UNIT" -}}map[string]interface{}{"_type": "unit"}
 
-  {{/* ✅ Go slices like []BurnMintOutput, []CONTRACT_ID, []PARTY */}}
   {{- else if stringsHasPrefix .Type "[]" -}}
     func() []interface{} {
       res := make([]interface{}, 0, len(t.{{capitalise .Name}}))

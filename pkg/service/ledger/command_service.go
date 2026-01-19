@@ -11,6 +11,8 @@ import (
 
 type CommandService interface {
 	SubmitAndWait(ctx context.Context, req *model.SubmitAndWaitRequest) (*model.SubmitAndWaitResponse, error)
+	// New method added to interface
+	SubmitAndWaitForTransaction(ctx context.Context, req *model.SubmitAndWaitRequest) (*model.SubmitAndWaitForTransactionResponse, error)
 }
 
 type commandService struct {
@@ -37,5 +39,24 @@ func (c *commandService) SubmitAndWait(ctx context.Context, req *model.SubmitAnd
 	return &model.SubmitAndWaitResponse{
 		UpdateID:         resp.UpdateId,
 		CompletionOffset: resp.CompletionOffset,
+	}, nil
+}
+
+// SubmitAndWaitForTransaction implementation
+func (c *commandService) SubmitAndWaitForTransaction(ctx context.Context, req *model.SubmitAndWaitRequest) (*model.SubmitAndWaitForTransactionResponse, error) {
+	// The request structure for both Wait and WaitForTransaction is identical in terms of commands
+	protoReq := &v2.SubmitAndWaitForTransactionRequest{
+		Commands: commandsToProto(req.Commands),
+	}
+
+	resp, err := c.client.SubmitAndWaitForTransaction(ctx, protoReq)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.SubmitAndWaitForTransactionResponse{
+		UpdateID:         resp.Transaction.UpdateId,
+		CompletionOffset: resp.Transaction.Offset,
+		Transaction:      transactionToModel(resp.Transaction),
 	}, nil
 }

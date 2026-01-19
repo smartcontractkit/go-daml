@@ -1080,3 +1080,38 @@ func exercisedEventFromProto(pb *v2.ExercisedEvent) *model.ExercisedEvent {
 
 	return event
 }
+
+func transactionToModel(pb *v2.Transaction) *model.Transaction {
+	if pb == nil {
+		return nil
+	}
+
+	return &model.Transaction{
+		UpdateID:    pb.UpdateId,
+		Offset:      pb.Offset,
+		WorkflowID:  pb.WorkflowId,
+		CommandID:   pb.CommandId,
+		EffectiveAt: protoTimeToPointer(pb.EffectiveAt),
+		Events:      eventsFromProto(pb.Events),
+	}
+}
+
+func protoTimeToPointer(pb *timestamppb.Timestamp) *time.Time {
+	if pb == nil {
+		return nil
+	}
+	t := pb.AsTime()
+	return &t
+}
+
+func eventsFromProto(pb []*v2.Event) []*model.Event {
+	if pb == nil {
+		return nil
+	}
+
+	result := make([]*model.Event, len(pb))
+	for i, event := range pb {
+		result[i] = eventFromProto(event)
+	}
+	return result
+}
