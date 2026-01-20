@@ -1,4 +1,4 @@
-package main
+package codegen_test
 
 import (
 	"errors"
@@ -35,13 +35,13 @@ func argsToMap(args interface{}) map[string]interface{} {
 		return m
 	}
 
-	// Check if the type has a toMap method
+	// Check if the type has a ToMap method
 	type mapper interface {
-		toMap() map[string]interface{}
+		ToMap() map[string]interface{}
 	}
 
 	if mapper, ok := args.(mapper); ok {
-		return mapper.toMap()
+		return mapper.ToMap()
 	}
 
 	return map[string]interface{}{
@@ -53,9 +53,11 @@ func argsToMap(args interface{}) map[string]interface{} {
 type Accept struct {
 }
 
-// toMap converts Accept to a map for DAML arguments
-func (t Accept) toMap() map[string]interface{} {
-	return map[string]interface{}{}
+// ToMap converts Accept to a map for DAML arguments
+func (t Accept) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for Accept using JsonCodec
@@ -121,7 +123,9 @@ func (t MappyContract) CreateCommand() *model.CreateCommand {
 
 	args["operator"] = t.Operator.ToMap()
 
-	args["value"] = t.Value
+	if t.Value != nil && len(t.Value) > 0 {
+		args["value"] = map[string]interface{}{"_type": "textmap", "value": t.Value}
+	}
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateID(),
@@ -159,13 +163,15 @@ type MyPair struct {
 	Right interface{} `json:"right"`
 }
 
-// toMap converts MyPair to a map for DAML arguments
-func (t MyPair) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts MyPair to a map for DAML arguments
+func (t MyPair) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"left":  t.Left,
-		"right": t.Right,
-	}
+	m["left"] = t.Left
+
+	m["right"] = t.Right
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for MyPair using JsonCodec

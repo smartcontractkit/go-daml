@@ -27,6 +27,22 @@ type JsonCodec struct {
 	ExcludeNullValuesInRecords bool
 }
 
+func isTuple2(v reflect.Value) bool {
+	if v.Kind() == reflect.Struct && v.NumField() == 2 {
+		t := v.Type()
+		return t.Field(0).Name == "First" && t.Field(1).Name == "Second"
+	}
+	return false
+}
+
+func isTuple3(v reflect.Value) bool {
+	if v.Kind() == reflect.Struct && v.NumField() == 3 {
+		t := v.Type()
+		return t.Field(0).Name == "First" && t.Field(1).Name == "Second" && t.Field(2).Name == "Third"
+	}
+	return false
+}
+
 // NewJsonCodec creates a new JsonCodec with default settings following transcode patterns
 func NewJsonCodec() *JsonCodec {
 	return &JsonCodec{
@@ -95,10 +111,10 @@ func (codec *JsonCodec) toDynamicValue(value interface{}) (interface{}, error) {
 		return codec.reltimeToDynamicValue(v), nil
 	case types.SET:
 		return codec.setToDynamicValue(v)
-	case types.TUPLE2:
-		return codec.tuple2ToDynamicValue(v)
 	case types.GENMAP:
 		return codec.genMapToDynamicValue(v)
+	case types.TEXTMAP:
+		return codec.textMapToDynamicValue(v)
 	case types.MAP:
 		return codec.mapToDynamicValue(v)
 	case types.LIST:
@@ -123,6 +139,13 @@ func (codec *JsonCodec) toDynamicValue(value interface{}) (interface{}, error) {
 
 	if rv.Kind() == reflect.Slice || rv.Kind() == reflect.Array {
 		return codec.listToDynamicValueFromReflect(rv)
+	}
+
+	if isTuple2(rv) {
+		return codec.tuple2ToDynamicValueFromReflect(rv)
+	}
+	if isTuple3(rv) {
+		return codec.tuple3ToDynamicValueFromReflect(rv)
 	}
 
 	if rv.Kind() == reflect.Struct {
@@ -231,12 +254,12 @@ func (codec *JsonCodec) setToDynamicValue(s types.SET) (interface{}, error) {
 	return result, nil
 }
 
-func (codec *JsonCodec) tuple2ToDynamicValue(t types.TUPLE2) (interface{}, error) {
-	first, err := codec.toDynamicValue(t.First)
+func (codec *JsonCodec) tuple2ToDynamicValueFromReflect(rv reflect.Value) (interface{}, error) {
+	first, err := codec.toDynamicValue(rv.Field(0).Interface())
 	if err != nil {
 		return nil, err
 	}
-	second, err := codec.toDynamicValue(t.Second)
+	second, err := codec.toDynamicValue(rv.Field(1).Interface())
 	if err != nil {
 		return nil, err
 	}
@@ -246,8 +269,36 @@ func (codec *JsonCodec) tuple2ToDynamicValue(t types.TUPLE2) (interface{}, error
 	}, nil
 }
 
+func (codec *JsonCodec) tuple3ToDynamicValueFromReflect(rv reflect.Value) (interface{}, error) {
+	first, err := codec.toDynamicValue(rv.Field(0).Interface())
+	if err != nil {
+		return nil, err
+	}
+	second, err := codec.toDynamicValue(rv.Field(1).Interface())
+	if err != nil {
+		return nil, err
+	}
+	third, err := codec.toDynamicValue(rv.Field(2).Interface())
+	if err != nil {
+		return nil, err
+	}
+	return map[string]interface{}{
+		"_1": first,
+		"_2": second,
+		"_3": third,
+	}, nil
+}
+
 func (codec *JsonCodec) genMapToDynamicValue(gm types.GENMAP) (interface{}, error) {
 	return codec.mapToDynamicValueGeneric(gm)
+}
+
+func (codec *JsonCodec) textMapToDynamicValue(tm types.TEXTMAP) (interface{}, error) {
+	result := make(map[string]string)
+	for k, v := range tm {
+		result[k] = v
+	}
+	return result, nil
 }
 
 func (codec *JsonCodec) mapToDynamicValue(m types.MAP) (interface{}, error) {
@@ -492,11 +543,11 @@ func (codec *JsonCodec) assignValue(jsonValue interface{}, target reflect.Value)
 	case reflect.TypeOf(types.SET{}):
 		return codec.assignSetValue(jsonValue, target)
 
-	case reflect.TypeOf(types.TUPLE2{}):
-		return codec.assignTuple2Value(jsonValue, target)
-
 	case reflect.TypeOf(types.GENMAP{}):
 		return codec.assignGenMapValue(jsonValue, target)
+
+	case reflect.TypeOf(types.TEXTMAP{}):
+		return codec.assignTextMapValue(jsonValue, target)
 
 	case reflect.TypeOf(types.MAP{}):
 		return codec.assignMapValue(jsonValue, target)
@@ -520,6 +571,13 @@ func (codec *JsonCodec) assignValue(jsonValue interface{}, target reflect.Value)
 
 	if target.Kind() == reflect.Slice {
 		return codec.assignSliceValue(jsonValue, target)
+	}
+
+	if isTuple2(target) {
+		return codec.assignTuple2Value(jsonValue, target)
+	}
+	if isTuple3(target) {
+		return codec.assignTuple3Value(jsonValue, target)
 	}
 
 	if target.Kind() == reflect.Struct {
@@ -700,6 +758,22 @@ func (codec *JsonCodec) assignGenMapValue(jsonValue interface{}, target reflect.
 	return fmt.Errorf("expected object for GENMAP, got %T", jsonValue)
 }
 
+func (codec *JsonCodec) assignTextMapValue(jsonValue interface{}, target reflect.Value) error {
+	if m, ok := jsonValue.(map[string]interface{}); ok {
+		result := make(types.TEXTMAP)
+		for k, v := range m {
+			if str, ok := v.(string); ok {
+				result[k] = str
+			} else {
+				result[k] = fmt.Sprintf("%v", v)
+			}
+		}
+		target.Set(reflect.ValueOf(result))
+		return nil
+	}
+	return fmt.Errorf("expected object for TEXTMAP, got %T", jsonValue)
+}
+
 func (codec *JsonCodec) assignMapValue(jsonValue interface{}, target reflect.Value) error {
 	if m, ok := jsonValue.(map[string]interface{}); ok {
 		result := make(types.MAP)
@@ -766,14 +840,37 @@ func (codec *JsonCodec) assignTuple2Value(jsonValue interface{}, target reflect.
 		if !hasFirst || !hasSecond {
 			return fmt.Errorf("TUPLE2 missing _1 or _2 fields")
 		}
-		result := types.TUPLE2{
-			First:  first,
-			Second: second,
+		if err := codec.assignValue(first, target.Field(0)); err != nil {
+			return fmt.Errorf("failed to assign TUPLE2 first field: %w", err)
 		}
-		target.Set(reflect.ValueOf(result))
+		if err := codec.assignValue(second, target.Field(1)); err != nil {
+			return fmt.Errorf("failed to assign TUPLE2 second field: %w", err)
+		}
 		return nil
 	}
 	return fmt.Errorf("expected object for TUPLE2, got %T", jsonValue)
+}
+
+func (codec *JsonCodec) assignTuple3Value(jsonValue interface{}, target reflect.Value) error {
+	if m, ok := jsonValue.(map[string]interface{}); ok {
+		first, hasFirst := m["_1"]
+		second, hasSecond := m["_2"]
+		third, hasThird := m["_3"]
+		if !hasFirst || !hasSecond || !hasThird {
+			return fmt.Errorf("TUPLE3 missing _1, _2, or _3 fields")
+		}
+		if err := codec.assignValue(first, target.Field(0)); err != nil {
+			return fmt.Errorf("failed to assign TUPLE3 first field: %w", err)
+		}
+		if err := codec.assignValue(second, target.Field(1)); err != nil {
+			return fmt.Errorf("failed to assign TUPLE3 second field: %w", err)
+		}
+		if err := codec.assignValue(third, target.Field(2)); err != nil {
+			return fmt.Errorf("failed to assign TUPLE3 third field: %w", err)
+		}
+		return nil
+	}
+	return fmt.Errorf("expected object for TUPLE3, got %T", jsonValue)
 }
 
 func (codec *JsonCodec) assignSliceValue(jsonValue interface{}, target reflect.Value) error {

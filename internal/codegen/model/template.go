@@ -106,8 +106,20 @@ func NormalizeDAMLType(damlType string) string {
 		return "RELTIME"
 	case strings.Contains(damlType, "Set") && !strings.Contains(damlType, "Settle") && !strings.Contains(damlType, "Setup"):
 		return "SET"
+	case strings.HasPrefix(damlType, "TUPLE2["):
+		return damlType
+	case strings.HasPrefix(damlType, "TUPLE3["):
+		return damlType
+	case strings.HasPrefix(damlType, "[]TUPLE2[") || strings.HasPrefix(damlType, "[]TUPLE3["):
+		return damlType
+	case strings.HasPrefix(damlType, "*TUPLE2[") || strings.HasPrefix(damlType, "*TUPLE3["):
+		return damlType
+	case strings.HasPrefix(damlType, "*[]TUPLE2[") || strings.HasPrefix(damlType, "*[]TUPLE3["):
+		return damlType
 	case strings.Contains(damlType, "Tuple2") || strings.Contains(damlType, "TUPLE2"):
 		return "TUPLE2"
+	case strings.Contains(damlType, "Tuple3") || strings.Contains(damlType, "TUPLE3"):
+		return "TUPLE3"
 	case damlType == "enum":
 		return "string"
 	case damlType == "19":

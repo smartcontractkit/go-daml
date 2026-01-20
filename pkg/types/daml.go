@@ -3,6 +3,8 @@ package types
 import (
 	"math/big"
 	"time"
+
+	"github.com/shopspring/decimal"
 )
 
 type (
@@ -28,6 +30,10 @@ type (
 		Second interface{}
 	}
 )
+
+func NewNumericFromDecimal(d decimal.Decimal) NUMERIC {
+	return NUMERIC(d.Shift(10).BigInt())
+}
 
 // VARIANT represents a DAML variant/union type
 type VARIANT interface {

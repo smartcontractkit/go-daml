@@ -35,13 +35,13 @@ func argsToMap(args interface{}) map[string]interface{} {
 		return m
 	}
 
-	// Check if the type has a toMap method
+	// Check if the type has a ToMap method
 	type mapper interface {
-		toMap() map[string]interface{}
+		ToMap() map[string]interface{}
 	}
 
 	if mapper, ok := args.(mapper); ok {
-		return mapper.toMap()
+		return mapper.ToMap()
 	}
 
 	return map[string]interface{}{
@@ -55,13 +55,15 @@ type Accept struct {
 	Bar INT64 `json:"bar"`
 }
 
-// toMap converts Accept to a map for DAML arguments
-func (t Accept) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts Accept to a map for DAML arguments
+func (t Accept) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"foo": string(t.Foo),
-		"bar": int64(t.Bar),
-	}
+	m["foo"] = string(t.Foo)
+
+	m["bar"] = int64(t.Bar)
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for Accept using JsonCodec

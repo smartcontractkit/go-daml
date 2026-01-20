@@ -17,10 +17,9 @@ var (
 	_ = strings.NewReader
 )
 
-const (
-	PackageID  = "ddf0d6396a862eaa7f8d647e39d090a6b04c4a3fd6736aa1730ebc9fca6be664"
-	SDKVersion = "3.3.0-snapshot.20250507.0"
-)
+const SDKVersion = "3.3.0-snapshot.20250507.0"
+
+const packageName = "all-kinds-of-1_0_0"
 
 type Template interface {
 	CreateCommand() *model.CreateCommand
@@ -36,13 +35,13 @@ func argsToMap(args interface{}) map[string]interface{} {
 		return m
 	}
 
-	// Check if the type has a toMap method
+	// Check if the type has a ToMap method
 	type mapper interface {
-		toMap() map[string]interface{}
+		ToMap() map[string]interface{}
 	}
 
 	if mapper, ok := args.(mapper); ok {
-		return mapper.toMap()
+		return mapper.ToMap()
 	}
 
 	return map[string]interface{}{
@@ -53,9 +52,11 @@ func argsToMap(args interface{}) map[string]interface{} {
 // Accept is a Record type
 type Accept struct{}
 
-// toMap converts Accept to a map for DAML arguments
-func (t Accept) toMap() map[string]interface{} {
-	return map[string]interface{}{}
+// ToMap converts Accept to a map for DAML arguments
+func (t Accept) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for Accept using JsonCodec
@@ -86,7 +87,7 @@ func (e Color) GetEnumConstructor() string {
 
 // GetEnumTypeID implements types.ENUM interface
 func (e Color) GetEnumTypeID() string {
-	return fmt.Sprintf("%s:%s:%s", PackageID, "AllKindsOf", "Color")
+	return fmt.Sprintf("#%s:%s:%s", packageName, "AllKindsOf", "Color")
 }
 
 // MarshalJSON implements custom JSON marshaling for Color using JsonCodec
@@ -106,13 +107,13 @@ var _ ENUM = Color("")
 
 // MappyContract is a Template type
 type MappyContract struct {
-	Operator PARTY  `json:"operator"`
-	Value    GENMAP `json:"value"`
+	Operator PARTY   `json:"operator"`
+	Value    TEXTMAP `json:"value"`
 }
 
 // GetTemplateID returns the template ID for this template
 func (t MappyContract) GetTemplateID() string {
-	return fmt.Sprintf("%s:%s:%s", PackageID, "AllKindsOf", "MappyContract")
+	return fmt.Sprintf("#%s:%s:%s", packageName, "AllKindsOf", "MappyContract")
 }
 
 // CreateCommand returns a CreateCommand for this template
@@ -122,7 +123,7 @@ func (t MappyContract) CreateCommand() *model.CreateCommand {
 	args["operator"] = t.Operator.ToMap()
 
 	if t.Value != nil && len(t.Value) > 0 {
-		args["value"] = map[string]interface{}{"_type": "genmap", "value": t.Value}
+		args["value"] = map[string]interface{}{"_type": "textmap", "value": t.Value}
 	}
 
 	return &model.CreateCommand{
@@ -148,7 +149,7 @@ func (t *MappyContract) UnmarshalJSON(data []byte) error {
 // Archive exercises the Archive choice on this MappyContract contract
 func (t MappyContract) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("%s:%s:%s", PackageID, "AllKindsOf", "MappyContract"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageName, "AllKindsOf", "MappyContract"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]interface{}{},
@@ -161,12 +162,15 @@ type MyPair struct {
 	Right interface{} `json:"right"`
 }
 
-// toMap converts MyPair to a map for DAML arguments
-func (t MyPair) toMap() map[string]interface{} {
-	return map[string]interface{}{
-		"left":  t.Left,
-		"right": t.Right,
-	}
+// ToMap converts MyPair to a map for DAML arguments
+func (t MyPair) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
+
+	m["left"] = t.Left
+
+	m["right"] = t.Right
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for MyPair using JsonCodec
@@ -203,7 +207,7 @@ type OneOfEverything struct {
 
 // GetTemplateID returns the template ID for this template
 func (t OneOfEverything) GetTemplateID() string {
-	return fmt.Sprintf("%s:%s:%s", PackageID, "AllKindsOf", "OneOfEverything")
+	return fmt.Sprintf("#%s:%s:%s", packageName, "AllKindsOf", "OneOfEverything")
 }
 
 // CreateCommand returns a CreateCommand for this template
@@ -289,7 +293,7 @@ func (t *OneOfEverything) UnmarshalJSON(data []byte) error {
 // Archive exercises the Archive choice on this OneOfEverything contract
 func (t OneOfEverything) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("%s:%s:%s", PackageID, "AllKindsOf", "OneOfEverything"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageName, "AllKindsOf", "OneOfEverything"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]interface{}{},
@@ -299,7 +303,7 @@ func (t OneOfEverything) Archive(contractID string) *model.ExerciseCommand {
 // Accept exercises the Accept choice on this OneOfEverything contract
 func (t OneOfEverything) Accept(contractID string, args Accept) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("%s:%s:%s", PackageID, "AllKindsOf", "OneOfEverything"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageName, "AllKindsOf", "OneOfEverything"),
 		ContractID: contractID,
 		Choice:     "Accept",
 		Arguments:  argsToMap(args),

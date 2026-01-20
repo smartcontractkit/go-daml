@@ -50,13 +50,13 @@ func argsToMap(args interface{}) map[string]interface{} {
 		return m
 	}
 
-	// Check if the type has a toMap method
+	// Check if the type has a ToMap method
 	type mapper interface {
-		toMap() map[string]interface{}
+		ToMap() map[string]interface{}
 	}
 
 	if mapper, ok := args.(mapper); ok {
-		return mapper.toMap()
+		return mapper.ToMap()
 	}
 
 	return map[string]interface{}{
@@ -150,12 +150,26 @@ func argsToMap(args interface{}) map[string]interface{} {
 	}
 	{{if and (eq .RawType "Record") (not .IsTemplate) (not .IsInterface)}}
 
-	// toMap converts {{capitalise .Name}} to a map for DAML arguments
-	func (t {{capitalise .Name}}) toMap() map[string]interface{} {
-		return map[string]interface{}{
-			{{range $field := .Fields}}
-			"{{$field.Name}}": {{template "fieldToDAMLValue" $field}},{{end}}
+	// ToMap converts {{capitalise .Name}} to a map for DAML arguments
+	func (t {{capitalise .Name}}) ToMap() map[string]interface{} {
+		m := make(map[string]interface{})
+		{{range $field := .Fields}}
+		{{if $field.IsOptional}}
+		if t.{{capitalise $field.Name}} != nil {
+			m["{{$field.Name}}"] = map[string]interface{}{
+				"_type": "optional",
+				"value": {{template "fieldToDAMLValue" $field}},
+			}
+		} else {
+			m["{{$field.Name}}"] = map[string]interface{}{
+				"_type": "optional",
+			}
 		}
+		{{else}}
+		m["{{$field.Name}}"] = {{template "fieldToDAMLValue" $field}}
+		{{end}}
+		{{end}}
+		return m
 	}
 
 	// MarshalJSON implements custom JSON marshaling for {{capitalise .Name}} using JsonCodec

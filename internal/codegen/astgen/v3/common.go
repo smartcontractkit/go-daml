@@ -565,6 +565,48 @@ func (c *codeGenAst) handleBuiltinType(pkg *daml.Package, b *daml.Type_Builtin) 
 	}
 }
 
+func (c *codeGenAst) handleConType(pkg *daml.Package, conType *daml.Type_Con) string {
+	if conType == nil || conType.Tycon == nil {
+		return "con_without_tycon"
+	}
+
+	tyconName := c.getName(pkg, conType.Tycon.GetNameInternedDname())
+
+	switch tyconName {
+	case "Optional":
+		if len(conType.Args) > 0 {
+			elementType := c.extractType(pkg, conType.Args[0])
+			normalizedElementType := model.NormalizeDAMLType(elementType)
+			return "*" + normalizedElementType
+		}
+		return RawTypeOptional
+	case "List":
+		if len(conType.Args) > 0 {
+			elementType := c.extractType(pkg, conType.Args[0])
+			normalizedElementType := model.NormalizeDAMLType(elementType)
+			return "[]" + normalizedElementType
+		}
+		return RawTypeList
+	case "Tuple2":
+		if len(conType.Args) >= 2 {
+			arg1Type := c.extractType(pkg, conType.Args[0])
+			arg2Type := c.extractType(pkg, conType.Args[1])
+			return "TUPLE2[" + model.NormalizeDAMLType(arg1Type) + "," + model.NormalizeDAMLType(arg2Type) + "]"
+		}
+		return "TUPLE2"
+	case "Tuple3":
+		if len(conType.Args) >= 3 {
+			arg1Type := c.extractType(pkg, conType.Args[0])
+			arg2Type := c.extractType(pkg, conType.Args[1])
+			arg3Type := c.extractType(pkg, conType.Args[2])
+			return "TUPLE3[" + model.NormalizeDAMLType(arg1Type) + "," + model.NormalizeDAMLType(arg2Type) + "," + model.NormalizeDAMLType(arg3Type) + "]"
+		}
+		return "TUPLE3"
+	default:
+		return tyconName
+	}
+}
+
 func (c *codeGenAst) extractField(pkg *daml.Package, field *daml.FieldWithType) (string, string, error) {
 	if field == nil {
 		return "", "", fmt.Errorf("field is nil")

@@ -280,7 +280,7 @@ func TestGetMainDalfV3(t *testing.T) {
 	require.Equal(t, colorStruct.Fields[1].Name, "Green")
 	require.Equal(t, colorStruct.Fields[2].Name, "Blue")
 
-	res, err := Bind("main", ast.Name, manifest.SdkVersion, ast.Structs, true)
+	res, err := Bind("codegen_test", ast.Name, manifest.SdkVersion, ast.Structs, true)
 	require.NoError(t, err)
 	require.NotEmpty(t, res)
 

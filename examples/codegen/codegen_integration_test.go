@@ -39,10 +39,11 @@ func TestCodegenIntegration(t *testing.T) {
 	}
 
 	uploadedPackageName := "all-kinds-of"
-	err = packageUpload(ctx, uploadedPackageName, cl)
+	packageID, err := packageUpload(ctx, uploadedPackageName, darFilePath, cl)
 	if err != nil {
 		log.Panic().Msgf("error: %v", err)
 	}
+	log.Info().Str("packageID", packageID).Msg("using package ID for template construction")
 
 	party := ""
 
@@ -87,17 +88,13 @@ func TestCodegenIntegration(t *testing.T) {
 
 	mappyContract := MappyContract{
 		Operator: PARTY(party),
-		Value: GENMAP{
+		Value: TEXTMAP{
 			"key1": "value1",
 			"key2": "value2",
 		},
 	}
 
-	marshalled, err := mappyContract.MarshalJSON()
-	require.NoError(t, err)
-	log.Info().Msgf("marshalled: %s", string(marshalled))
-
-	contractIDs, err := createContract(ctx, party, cl, mappyContract)
+	contractIDs, err := createContract(ctx, party, packageID, cl, mappyContract)
 	if err != nil {
 		log.Fatal().Err(err).Msgf("failed to create contract")
 	}
@@ -113,7 +110,7 @@ func TestCodegenIntegration(t *testing.T) {
 		firstContractID = contractIDs[0]
 	}
 	log.Info().Str("contractID", firstContractID).Msg("Using contract ID from creation for Archive command")
-	archiveCmd := mappyContract.Archive(firstContractID)
+	archiveCmd := correctExerciseCommandPackageID(mappyContract.Archive(firstContractID), packageID)
 
 	commandID := "archive-" + time.Now().Format("20060102150405")
 	submissionReq := &model.SubmitAndWaitRequest{
@@ -132,7 +129,7 @@ func TestCodegenIntegration(t *testing.T) {
 
 	response, err := cl.CommandService.SubmitAndWait(ctx, submissionReq)
 	if err != nil {
-		log.Fatal().Err(err).Str("packageId", PackageID).Msg("failed to submit and wait")
+		log.Fatal().Err(err).Msg("failed to submit and wait")
 	}
 	log.Info().Msgf("response.UpdateID: %s", response.UpdateID)
 
@@ -146,7 +143,7 @@ func TestCodegenIntegration(t *testing.T) {
 		},
 	})
 	if err != nil {
-		log.Fatal().Err(err).Str("packageId", PackageID).Msg("failed to GetUpdateById")
+		log.Fatal().Err(err).Msg("failed to GetUpdateById")
 	}
 	require.NotNil(t, respUpd.Transaction, "expected transaction")
 	if respUpd.Transaction != nil {
@@ -161,7 +158,7 @@ func TestCodegenIntegration(t *testing.T) {
 		}
 	}
 
-	createUpdateID, err := getUpdateIDFromContractCreate(ctx, party, cl, mappyContract)
+	createUpdateID, err := getUpdateIDFromContractCreate(ctx, party, packageID, cl, mappyContract)
 	require.NoError(t, err)
 	require.NotEmpty(t, createUpdateID, "should have a valid create updateID")
 
@@ -204,7 +201,7 @@ func TestCodegenIntegrationAllFieldsContract(t *testing.T) {
 	zerolog.SetGlobalLevel(zerolog.DebugLevel)
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
-	log.Info().Str("generatedPackageID", PackageID).Msg("Using package ID from generated code")
+	log.Info().Msg("Using package ID from generated code")
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -214,10 +211,11 @@ func TestCodegenIntegrationAllFieldsContract(t *testing.T) {
 	}
 
 	uploadedPackageName := "all-kinds-of"
-	err = packageUpload(ctx, uploadedPackageName, cl)
+	packageID, err := packageUpload(ctx, uploadedPackageName, darFilePath, cl)
 	if err != nil {
 		log.Panic().Msgf("error: %v", err)
 	}
+	log.Info().Str("packageID", packageID).Msg("using package ID for template construction")
 
 	party := ""
 
@@ -332,7 +330,7 @@ func TestCodegenIntegrationAllFieldsContract(t *testing.T) {
 		SomeEnum: ColorRed,
 	}
 
-	contractIDs, err := createContract(ctx, party, cl, mappyContract)
+	contractIDs, err := createContract(ctx, party, packageID, cl, mappyContract)
 	if err != nil {
 		damlErr := errors.AsDamlError(err)
 		if strings.EqualFold(damlErr.ErrorCode, "COMMAND_PREPROCESSING_FAILED") {
@@ -352,7 +350,7 @@ func TestCodegenIntegrationAllFieldsContract(t *testing.T) {
 		firstContractID = contractIDs[0]
 	}
 	log.Info().Str("contractID", firstContractID).Msg("Using contract ID from creation for Archive command")
-	archiveCmd := mappyContract.Archive(firstContractID)
+	archiveCmd := correctExerciseCommandPackageID(mappyContract.Archive(firstContractID), packageID)
 
 	// Submit the Archive command
 	commandID := "archive-" + time.Now().Format("20060102150405")
@@ -372,7 +370,7 @@ func TestCodegenIntegrationAllFieldsContract(t *testing.T) {
 
 	response, err := cl.CommandService.SubmitAndWait(ctx, submissionReq)
 	if err != nil {
-		log.Fatal().Err(err).Str("packageId", PackageID).Msg("failed to submit and wait")
+		log.Fatal().Err(err).Msg("failed to submit and wait")
 	}
 	log.Info().Msgf("response.UpdateID: %s", response.UpdateID)
 
@@ -386,7 +384,7 @@ func TestCodegenIntegrationAllFieldsContract(t *testing.T) {
 		},
 	})
 	if err != nil {
-		log.Fatal().Err(err).Str("packageId", PackageID).Msg("failed to GetUpdateById")
+		log.Fatal().Err(err).Msg("failed to GetUpdateById")
 	}
 	require.NotNil(t, respUpd.Transaction, "expected transaction")
 	if respUpd.Transaction != nil {
@@ -401,7 +399,7 @@ func TestCodegenIntegrationAllFieldsContract(t *testing.T) {
 		}
 	}
 
-	createUpdateID, err := getUpdateIDFromContractCreate(ctx, party, cl, mappyContract)
+	createUpdateID, err := getUpdateIDFromContractCreate(ctx, party, packageID, cl, mappyContract)
 	require.NoError(t, err)
 	require.NotEmpty(t, createUpdateID, "should have a valid create updateID")
 
@@ -464,10 +462,11 @@ func TestAmuletsTransfer(t *testing.T) {
 	}
 
 	uploadedPackageName := "amulets-interface-test"
-	err = packageUploadWithPath(ctx, uploadedPackageName, interfaceDarPath, interfaces.PackageID, cl)
+	packageID, err := packageUpload(ctx, uploadedPackageName, interfaceDarPath, cl)
 	if err != nil {
 		log.Panic().Msgf("error: %v", err)
 	}
+	log.Info().Str("packageID", packageID).Msg("using package ID for interface template construction")
 
 	party := ""
 	users, err := cl.UserMng.ListUsers(ctx)
@@ -560,7 +559,7 @@ func TestAmuletsTransfer(t *testing.T) {
 		Value: INT64(100),
 	}
 
-	contractIDs, createUpdateID, err := createContractWithUpdateID(ctx, party, cl, assetContract)
+	contractIDs, createUpdateID, err := createContractWithUpdateID(ctx, party, packageID, cl, assetContract)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to create Asset contract")
 	}
@@ -571,7 +570,7 @@ func TestAmuletsTransfer(t *testing.T) {
 	log.Info().Str("createUpdateID", createUpdateID).Msg("asset creation update ID - interface views visible in stream")
 
 	transferArgs := interfaces.Transfer{NewOwner: PARTY(party)}
-	transferCmd := assetContract.Transfer(assetContractID, transferArgs)
+	transferCmd := correctExerciseCommandPackageID(assetContract.Transfer(assetContractID, transferArgs), packageID)
 
 	transferSubmissionReq := &model.SubmitAndWaitRequest{
 		Commands: &model.Commands{
@@ -596,7 +595,7 @@ func TestAmuletsTransfer(t *testing.T) {
 	require.Greater(t, len(newContractIDs), 0, "transfer should create at least one contract")
 
 	newAssetContractID := newContractIDs[0]
-	archiveCmd := assetContract.Archive(newAssetContractID)
+	archiveCmd := correctExerciseCommandPackageID(assetContract.Archive(newAssetContractID), packageID)
 
 	archiveSubmissionReq := &model.SubmitAndWaitRequest{
 		Commands: &model.Commands{
@@ -617,14 +616,10 @@ func TestAmuletsTransfer(t *testing.T) {
 	log.Info().Str("updateID", archiveResponse.UpdateID).Msg("archive executed successfully")
 }
 
-func packageUpload(ctx context.Context, uploadedPackageName string, cl *client.DamlBindingClient) error {
-	return packageUploadWithPath(ctx, uploadedPackageName, darFilePath, PackageID, cl)
-}
-
-func packageUploadWithPath(ctx context.Context, uploadedPackageName, darPath, packageID string, cl *client.DamlBindingClient) error {
+func packageUpload(ctx context.Context, uploadedPackageName, darPath string, cl *client.DamlBindingClient) (string, error) {
 	darContent, err := os.ReadFile(darPath)
 	if err != nil {
-		return fmt.Errorf("error reading dar file %s: %v", darPath, err)
+		return "", fmt.Errorf("error reading dar file %s: %v", darPath, err)
 	}
 
 	if !packageExists(uploadedPackageName, cl) {
@@ -635,7 +630,7 @@ func packageUploadWithPath(ctx context.Context, uploadedPackageName, darPath, pa
 
 		err = cl.PackageMng.ValidateDarFile(ctx, darContent, submissionID)
 		if err != nil {
-			return fmt.Errorf("DAR validation failed for %s %v", darPath, err)
+			return "", fmt.Errorf("DAR validation failed for %s %v", darPath, err)
 		}
 
 		uploadSubmissionID := "upload-" + time.Now().Format("20060102150405")
@@ -643,21 +638,32 @@ func packageUploadWithPath(ctx context.Context, uploadedPackageName, darPath, pa
 
 		err = cl.PackageMng.UploadDarFile(ctx, darContent, uploadSubmissionID)
 		if err != nil {
-			return fmt.Errorf("DAR upload failed %v", err)
+			return "", fmt.Errorf("DAR upload failed %v", err)
 		}
 
 		if !packageExists(uploadedPackageName, cl) {
-			return fmt.Errorf("package not found")
+			return "", fmt.Errorf("package not found")
 		}
 	}
-	status, err := cl.PackageService.GetPackageStatus(ctx,
-		&model.GetPackageStatusRequest{PackageID: packageID})
-	if err != nil {
-		return fmt.Errorf("failed to get package status %v", err)
-	}
-	log.Info().Msgf("package status: %v", status.PackageStatus)
 
-	return nil
+	var packageID string
+	packages, err := cl.PackageMng.ListKnownPackages(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to list known packages: %w", err)
+	}
+	for _, pkg := range packages {
+		if strings.EqualFold(pkg.Name, uploadedPackageName) {
+			packageID = pkg.PackageID
+			log.Info().Str("packageName", pkg.Name).Str("packageID", packageID).Msg("found uploaded package")
+			break
+		}
+	}
+
+	if packageID == "" {
+		return "", fmt.Errorf("package %s not found after upload", uploadedPackageName)
+	}
+
+	return packageID, nil
 }
 
 func packageExists(pkgName string, cl *client.DamlBindingClient) bool {
@@ -684,12 +690,33 @@ func packageExists(pkgName string, cl *client.DamlBindingClient) bool {
 	return false
 }
 
-func createContract(ctx context.Context, party string, cl *client.DamlBindingClient, template Template) ([]string, error) {
+func createCommandWithPackageID(template Template, packageID string) *model.CreateCommand {
+	cmd := template.CreateCommand()
+	parts := strings.Split(cmd.TemplateID, ":")
+	if len(parts) >= 3 {
+		parts[0] = packageID
+		cmd.TemplateID = strings.Join(parts, ":")
+		log.Info().Str("originalTemplateID", template.GetTemplateID()).Str("correctedTemplateID", cmd.TemplateID).Msg("corrected template ID with real package ID")
+	}
+	return cmd
+}
+
+func correctExerciseCommandPackageID(cmd *model.ExerciseCommand, packageID string) *model.ExerciseCommand {
+	parts := strings.Split(cmd.TemplateID, ":")
+	if len(parts) >= 3 {
+		parts[0] = packageID
+		cmd.TemplateID = strings.Join(parts, ":")
+		log.Info().Str("correctedTemplateID", cmd.TemplateID).Msg("corrected exercise template ID with real package ID")
+	}
+	return cmd
+}
+
+func createContract(ctx context.Context, party, packageID string, cl *client.DamlBindingClient, template Template) ([]string, error) {
 	log.Info().Msg("creating sample contracts...")
 
 	createCommands := []*model.Command{
 		{
-			Command: template.CreateCommand(),
+			Command: createCommandWithPackageID(template, packageID),
 		},
 	}
 
@@ -707,7 +734,7 @@ func createContract(ctx context.Context, party string, cl *client.DamlBindingCli
 		},
 	}
 
-	log.Info().Msg("submitting contract creation commands...")
+	log.Info().Msgf("submitting contract creation commands...")
 	createResponse, err := cl.CommandService.SubmitAndWait(context.Background(), createSubmissionReq)
 	if err != nil {
 		log.Err(err).Msg("failed to create contracts")
@@ -757,12 +784,12 @@ func getContractIDsFromUpdate(ctx context.Context, party, updateID string, cl *c
 	return contractIDs, nil
 }
 
-func createContractWithUpdateID(ctx context.Context, party string, cl *client.DamlBindingClient, template Template) ([]string, string, error) {
+func createContractWithUpdateID(ctx context.Context, party, packageID string, cl *client.DamlBindingClient, template Template) ([]string, string, error) {
 	log.Info().Msg("creating sample contracts...")
 
 	createCommands := []*model.Command{
 		{
-			Command: template.CreateCommand(),
+			Command: createCommandWithPackageID(template, packageID),
 		},
 	}
 
@@ -799,10 +826,10 @@ func createContractWithUpdateID(ctx context.Context, party string, cl *client.Da
 	return contractIDs, createResponse.UpdateID, nil
 }
 
-func getUpdateIDFromContractCreate(ctx context.Context, party string, cl *client.DamlBindingClient, template Template) (string, error) {
+func getUpdateIDFromContractCreate(ctx context.Context, party, packageID string, cl *client.DamlBindingClient, template Template) (string, error) {
 	createCommands := []*model.Command{
 		{
-			Command: template.CreateCommand(),
+			Command: createCommandWithPackageID(template, packageID),
 		},
 	}
 

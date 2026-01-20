@@ -19,7 +19,7 @@ var (
 
 const SDKVersion = "2.9.1"
 
-const packageName = "Test-1.0.0"
+const packageName = "test-1.0.0"
 
 type Template interface {
 	CreateCommand() *model.CreateCommand
@@ -35,13 +35,13 @@ func argsToMap(args interface{}) map[string]interface{} {
 		return m
 	}
 
-	// Check if the type has a toMap method
+	// Check if the type has a ToMap method
 	type mapper interface {
-		toMap() map[string]interface{}
+		ToMap() map[string]interface{}
 	}
 
 	if mapper, ok := args.(mapper); ok {
-		return mapper.toMap()
+		return mapper.ToMap()
 	}
 
 	return map[string]interface{}{
@@ -268,9 +268,11 @@ func (t OptionalFields) OptionalFieldsCleanUp(contractID string, args OptionalFi
 type OptionalFieldsCleanUp struct {
 }
 
-// toMap converts OptionalFieldsCleanUp to a map for DAML arguments
-func (t OptionalFieldsCleanUp) toMap() map[string]interface{} {
-	return map[string]interface{}{}
+// ToMap converts OptionalFieldsCleanUp to a map for DAML arguments
+func (t OptionalFieldsCleanUp) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for OptionalFieldsCleanUp using JsonCodec
@@ -414,9 +416,11 @@ func (t SimpleFields) Archive(contractID string) *model.ExerciseCommand {
 type SimpleFieldsCleanUp struct {
 }
 
-// toMap converts SimpleFieldsCleanUp to a map for DAML arguments
-func (t SimpleFieldsCleanUp) toMap() map[string]interface{} {
-	return map[string]interface{}{}
+// ToMap converts SimpleFieldsCleanUp to a map for DAML arguments
+func (t SimpleFieldsCleanUp) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for SimpleFieldsCleanUp using JsonCodec
@@ -440,16 +444,21 @@ type UKAddress struct {
 	Postcode TEXT     `json:"postcode"`
 }
 
-// toMap converts UKAddress to a map for DAML arguments
-func (t UKAddress) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts UKAddress to a map for DAML arguments
+func (t UKAddress) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"address":  t.Address,
-		"locality": t.Locality,
-		"city":     string(t.City),
-		"state":    string(t.State),
-		"postcode": string(t.Postcode),
-	}
+	m["address"] = t.Address
+
+	m["locality"] = t.Locality
+
+	m["city"] = string(t.City)
+
+	m["state"] = string(t.State)
+
+	m["postcode"] = string(t.Postcode)
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for UKAddress using JsonCodec
@@ -472,15 +481,19 @@ type USAddress struct {
 	Zip     INT64 `json:"zip"`
 }
 
-// toMap converts USAddress to a map for DAML arguments
-func (t USAddress) toMap() map[string]interface{} {
-	return map[string]interface{}{
+// ToMap converts USAddress to a map for DAML arguments
+func (t USAddress) ToMap() map[string]interface{} {
+	m := make(map[string]interface{})
 
-		"address": t.Address,
-		"city":    string(t.City),
-		"state":   string(t.State),
-		"zip":     int64(t.Zip),
-	}
+	m["address"] = t.Address
+
+	m["city"] = string(t.City)
+
+	m["state"] = string(t.State)
+
+	m["zip"] = int64(t.Zip)
+
+	return m
 }
 
 // MarshalJSON implements custom JSON marshaling for USAddress using JsonCodec

@@ -511,7 +511,6 @@ The SDK's JSON codec (`pkg/codec/json_codec.go`) provides comprehensive support 
 | `ContractId` | `CONTRACT_ID` (string) | String | Contract identifiers |
 | `Optional T` | `OPTIONAL` (*interface{}) | Null or value | Optional values with custom unmarshaling |
 | `[T]` | `LIST` ([]interface{}) | Array | Lists with element validation |
-| `TextMap T` | `TEXT_MAP` (map[string]interface{}) | Object | Text-keyed maps |
 | `GenMap K V` | `GEN_MAP` ([]MapEntry) | Array of {key, value} | Generic maps |
 | Records | Go `struct` | Object | Standard Go structs with field mapping |
 | Variants | Go `struct` with optional fields | Object with constructor tag | Union types with JSON marshaling |
