@@ -156,7 +156,7 @@ func GetManifest(srcPath string) (*model.Manifest, error) {
 }
 
 func CodegenDalfs(dalfToProcess []string, unzippedPath string, pkgFile string, dalfManifest *model.Manifest) (map[string]string, error) {
-	// ✅ ensure stable processing order across runs
+	//  ensure stable processing order across runs
 	sort.Strings(dalfToProcess)
 
 	ifcByModule := make(map[string]model.InterfaceMap)
@@ -177,7 +177,7 @@ func CodegenDalfs(dalfToProcess []string, unzippedPath string, pkgFile string, d
 			continue
 		}
 
-		// ✅ iterate interfaces deterministically
+		//  iterate interfaces deterministically
 		keys := make([]string, 0, len(interfaces))
 		for k := range interfaces {
 			keys = append(keys, k)
@@ -237,7 +237,7 @@ func CodegenDalfs(dalfToProcess []string, unzippedPath string, pkgFile string, d
 
 		log.Info().Msgf("adding interfaces for dalf %s from modules: %v", dalf, currentModules)
 
-		// ✅ iterate modules deterministically
+		//  iterate modules deterministically
 		moduleNames := make([]string, 0, len(currentModules))
 		for m := range currentModules {
 			moduleNames = append(moduleNames, m)
@@ -246,7 +246,7 @@ func CodegenDalfs(dalfToProcess []string, unzippedPath string, pkgFile string, d
 
 		for _, moduleName := range moduleNames {
 			if ifcMap, exists := ifcByModule[moduleName]; exists {
-				// ✅ iterate interfaces deterministically
+				//  iterate interfaces deterministically
 				ifcKeys := make([]string, 0, len(ifcMap))
 				for k := range ifcMap {
 					ifcKeys = append(ifcKeys, k)
@@ -261,7 +261,7 @@ func CodegenDalfs(dalfToProcess []string, unzippedPath string, pkgFile string, d
 			}
 		}
 
-		// ✅ deterministic renaming (plan + apply)
+		//  deterministic renaming (plan + apply)
 		type rename struct {
 			orig string
 			new  string
@@ -270,7 +270,7 @@ func CodegenDalfs(dalfToProcess []string, unzippedPath string, pkgFile string, d
 		planned := make([]rename, 0)
 		renamedStructs := make(map[string]*model.TmplStruct)
 
-		// ✅ iterate struct keys deterministically
+		//  iterate struct keys deterministically
 		structKeys := make([]string, 0, len(pkg.Structs))
 		for k := range pkg.Structs {
 			structKeys = append(structKeys, k)
