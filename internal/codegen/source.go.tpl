@@ -358,10 +358,16 @@ func (t *{{capitalise .Name}}) UnmarshalJSON(data []byte) error {
 {{if and .IsTemplate .Choices}}
 {{$templateName := .Name}}
 {{$moduleName := .ModuleName}}
-// Choice methods for {{capitalise .Name}}
+
+// Choice methods for {{capitalise $templateName}}
 {{range $choice := .Choices}}
+{{$argType := $choice.ArgType}}
+{{- if eq $argType "SET" -}}
+  {{$argType = capitalise $choice.Name}}
+{{- end -}}
+
 // {{capitalise $choice.Name}} exercises the {{$choice.Name}} choice on this {{capitalise $templateName}} contract{{if ne $choice.InterfaceName ""}} via the {{capitalise $choice.InterfaceName}} interface{{end}}
-func (t {{capitalise $templateName}}) {{capitalise $choice.Name}}(contractID string{{if and (ne $choice.ArgType "UNIT") (ne $choice.ArgType "")}}, args {{$choice.ArgType}}{{end}}) *model.ExerciseCommand {
+func (t {{capitalise $templateName}}) {{capitalise $choice.Name}}(contractID string{{if and (ne $argType "UNIT") (ne $argType "")}}, args {{$argType}}{{end}}) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		{{if ne $choice.InterfaceName ""}}
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageID, "{{$moduleName}}", "{{capitalise $choice.InterfaceDAMLName}}"),
@@ -370,7 +376,7 @@ func (t {{capitalise $templateName}}) {{capitalise $choice.Name}}(contractID str
 		{{end}}
 		ContractID: contractID,
 		Choice:     "{{$choice.Name}}",
-		{{if and (ne $choice.ArgType "UNIT") (ne $choice.ArgType "")}}
+		{{if and (ne $argType "UNIT") (ne $argType "")}}
 		Arguments: argsToMap(args),
 		{{else}}
 		Arguments: map[string]interface{}{},
@@ -379,6 +385,7 @@ func (t {{capitalise $templateName}}) {{capitalise $choice.Name}}(contractID str
 }
 {{end}}
 {{end}}
+
 
 {{if and .IsTemplate .Implements}}
 {{$templateName2 := .Name}}
