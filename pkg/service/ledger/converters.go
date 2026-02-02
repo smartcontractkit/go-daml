@@ -24,6 +24,15 @@ import (
 
 var defaultJsonCodec = codec.NewJsonCodec()
 
+func ConvertToRecord(data any) *v2.Record {
+	return convertToRecord(data)
+}
+
+// MapToValue exposes the internal any->Value conversion (useful for choice args later).
+func MapToValue(v interface{}) *v2.Value {
+	return mapToValue(v)
+}
+
 func isTuple2(v reflect.Value) bool {
 	if v.Kind() == reflect.Struct && v.NumField() == 2 {
 		t := v.Type()
@@ -698,12 +707,23 @@ func structToMap(v interface{}) map[string]interface{} {
 
 	val := reflect.ValueOf(v)
 	if val.Kind() == reflect.Ptr {
+		if val.IsNil() {
+			return result
+		}
 		val = val.Elem()
+	}
+
+	// Optional: if structToMap is ever called directly with a GENMAP/TEXTMAP
+	switch x := v.(type) {
+	case types.GENMAP:
+		return map[string]interface{}{"_type": "genmap", "value": x}
+	case types.TEXTMAP:
+		return map[string]interface{}{"_type": "textmap", "value": x}
 	}
 
 	if val.Kind() != reflect.Struct {
 		b, _ := json.Marshal(v)
-		json.Unmarshal(b, &result)
+		_ = json.Unmarshal(b, &result)
 		return result
 	}
 
@@ -734,16 +754,23 @@ func structToMap(v interface{}) map[string]interface{} {
 		}
 
 		actualValue := fieldValue.Interface()
+
 		if hasOmitEmpty && actualValue == nil {
 			continue
 		}
-
 		if hasOmitEmpty && fieldValue.Kind() == reflect.Ptr && fieldValue.IsNil() {
 			continue
 		}
-
 		if hasOmitEmpty && fieldValue.IsZero() && fieldValue.Kind() != reflect.Ptr {
 			continue
+		}
+
+		//  Preserve wrapper types *per field*
+		switch x := actualValue.(type) {
+		case types.GENMAP:
+			actualValue = map[string]interface{}{"_type": "genmap", "value": x}
+		case types.TEXTMAP:
+			actualValue = map[string]interface{}{"_type": "textmap", "value": x}
 		}
 
 		result[tagName] = actualValue
@@ -760,7 +787,37 @@ func mapValues(values []string) []*v2.Value {
 	return result
 }
 
-func convertToRecord(data map[string]interface{}) *v2.Record {
+func convertToRecord(data any) *v2.Record {
+	if data == nil {
+		return nil
+	}
+
+	// If it's already a map, keep existing behavior
+	if m, ok := data.(map[string]interface{}); ok {
+		return mapToRecord(m)
+	}
+
+	// If it's a pointer, deref
+	rv := reflect.ValueOf(data)
+	if rv.Kind() == reflect.Ptr {
+		if rv.IsNil() {
+			return nil
+		}
+		data = rv.Elem().Interface()
+		rv = reflect.ValueOf(data)
+	}
+
+	// If it's a struct, convert it to map using json tags (existing helper)
+	if rv.Kind() == reflect.Struct {
+		return mapToRecord(structToMap(data))
+	}
+
+	// If it's some other type but can still be mapped by structToMap fallback
+	// (structToMap already does json marshal/unmarshal for non-struct)
+	return mapToRecord(structToMap(data))
+}
+
+func mapToRecord(data map[string]interface{}) *v2.Record {
 	if data == nil {
 		return nil
 	}
