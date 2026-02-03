@@ -50,14 +50,33 @@ func isTuple3(v reflect.Value) bool {
 }
 
 func parseTemplateID(templateID string) (packageID, moduleName, entityName string) {
+	// Template ID format: #package-name:module:entity or #package-hash:module:entity
 	trimmed := strings.TrimPrefix(templateID, "#")
 	parts := strings.Split(trimmed, ":")
 	if len(parts) == 3 {
-		return parts[0], parts[1], parts[2]
+		pkgID := parts[0]
+		// If it's a package name (not a 64-char hex hash), add # prefix as it's part of the identifier
+		if !isPackageHash(pkgID) {
+			pkgID = "#" + pkgID
+		}
+		return pkgID, parts[1], parts[2]
 	} else if len(parts) == 2 {
 		return "", parts[0], parts[1]
 	}
 	return "", "", templateID
+}
+
+// isPackageHash checks if a string is a 64-character hexadecimal hash (package ID)
+func isPackageHash(s string) bool {
+	if len(s) != 64 {
+		return false
+	}
+	for _, ch := range s {
+		if !((ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F')) {
+			return false
+		}
+	}
+	return true
 }
 
 func commandsToProto(cmd *model.Commands) *v2.Commands {
@@ -403,6 +422,15 @@ func valueFromProto(pb *v2.Value) interface{} {
 			}
 		}
 		return nil
+	case *v2.Value_GenMap:
+		// GenMap as map for DAML codec
+		result := make(map[string]interface{})
+		for _, entry := range v.GenMap.Entries {
+			// Convert key to string for map key
+			keyStr := fmt.Sprintf("%v", valueFromProto(entry.Key))
+			result[keyStr] = valueFromProto(entry.Value)
+		}
+		return result
 	default:
 		return nil
 	}

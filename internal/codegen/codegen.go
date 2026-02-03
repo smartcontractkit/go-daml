@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -333,7 +334,7 @@ func CodegenDalfs(dalfToProcess []string, unzippedPath string, pkgFile string, d
 			}
 		}
 
-		code, err := Bind(pkgFile, pkg.PackageID, dalfManifest.SdkVersion, pkg.Structs, dalf == dalfManifest.MainDalf)
+		code, err := Bind(pkgFile, pkg.Name, dalfManifest.SdkVersion, pkg.Structs, dalf == dalfManifest.MainDalf)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate Go code: %w", err)
 		}
@@ -386,7 +387,15 @@ func GetAST(payload []byte, manifest *model.Manifest, ifcByModule map[string]mod
 		return nil, fmt.Errorf("could not extract package ID from MainDalf: %s", manifest.MainDalf)
 	}
 
+	packageName := manifest.Name
+	if packageName == "" {
+		packageName = getPackageName(manifest.MainDalf)
+	}
+	// Always strip version from package name, regardless of source
+	packageName = stripVersionFromPackageName(packageName)
+
 	return &model.Package{
+		Name:      packageName,
 		PackageID: packageID,
 		Structs:   structs,
 	}, nil
@@ -404,9 +413,19 @@ func getPackageID(mainDalf string) string {
 	return ""
 }
 
+func stripVersionFromPackageName(name string) string {
+	// Strip version pattern like "-1.0.0", "-2.9.1", etc.
+	// Pattern: hyphen followed by digits and dots (version number)
+	versionPattern := regexp.MustCompile(`-\d+(\.\d+)*$`)
+	return versionPattern.ReplaceAllString(name, "")
+}
+
 func getPackageName(mainDalf string) string {
 	parts := strings.Split(mainDalf, "/")
 	filename := strings.TrimSuffix(parts[len(parts)-1], ".dalf")
+
+	// Strip version pattern like "-1.0.0", "-2.9.1", etc.
+	filename = stripVersionFromPackageName(filename)
 
 	lastHyphen := strings.LastIndex(filename, "-")
 	if lastHyphen == -1 {
