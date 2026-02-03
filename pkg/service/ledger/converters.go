@@ -403,6 +403,15 @@ func valueFromProto(pb *v2.Value) interface{} {
 			}
 		}
 		return nil
+	case *v2.Value_GenMap:
+		// GenMap as map for DAML codec
+		result := make(map[string]interface{})
+		for _, entry := range v.GenMap.Entries {
+			// Convert key to string for map key
+			keyStr := fmt.Sprintf("%v", valueFromProto(entry.Key))
+			result[keyStr] = valueFromProto(entry.Value)
+		}
+		return result
 	default:
 		return nil
 	}
