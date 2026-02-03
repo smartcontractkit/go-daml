@@ -121,7 +121,7 @@ var (
 
 func TestConvertToRecordBasic(t *testing.T) {
 	t.Run("Numeric", func(t *testing.T) {
-		decimalValue := types.NUMERIC(big.NewInt(200))
+		decimalValue := types.NUMERIC("0.0000000200")
 		data := make(map[string]interface{})
 		data["someNumeric"] = decimalValue
 
@@ -728,8 +728,8 @@ func TestConvertToRecordIntegration(t *testing.T) {
 			Operator:        types.PARTY("test-party"),
 			SomeBoolean:     true,
 			SomeInteger:     190,
-			SomeDecimal:     types.NUMERIC(big.NewInt(200)),
-			SomeMeasurement: types.NUMERIC(big.NewInt(300)),
+			SomeDecimal:     types.NUMERIC("0.0000000200"),
+			SomeMeasurement: types.NUMERIC("0.0000000300"),
 			SomeDate:        types.DATE(time.Now().UTC()),
 			SomeDatetime:    types.TIMESTAMP(time.Now().UTC()),
 			SomeSimpleList:  someListInt,
@@ -1817,7 +1817,7 @@ func TestConvertToRecordGENMAP(t *testing.T) {
 				"int":     types.INT64(100),
 				"text":    types.TEXT("test"),
 				"bool":    types.BOOL(false),
-				"numeric": types.NUMERIC(big.NewInt(500)),
+				"numeric": types.NUMERIC("0.0000000500"),
 			},
 		}
 

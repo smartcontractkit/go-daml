@@ -25,7 +25,7 @@ var (
   {{- else if eq $baseType "TEXT" -}}string(*t.{{capitalise .Name}})
   {{- else if eq $baseType "BOOL" -}}bool(*t.{{capitalise .Name}})
   {{- else if eq $baseType "PARTY" -}}(*t.{{capitalise .Name}}).ToMap()
-  {{- else if eq $baseType "NUMERIC" -}}(*big.Int)(*t.{{capitalise .Name}})
+  {{- else if eq $baseType "NUMERIC" -}}string(*t.{{capitalise .Name}})
   {{- else if eq $baseType "DECIMAL" -}}(*big.Int)(*t.{{capitalise .Name}})
   {{- else if eq $baseType "DATE" -}}*t.{{capitalise .Name}}
   {{- else if eq $baseType "TIMESTAMP" -}}*t.{{capitalise .Name}}
@@ -37,7 +37,7 @@ var (
   {{- else if eq .Type "TEXT" -}}string(t.{{capitalise .Name}})
   {{- else if eq .Type "INT64" -}}int64(t.{{capitalise .Name}})
   {{- else if eq .Type "BOOL" -}}bool(t.{{capitalise .Name}})
-  {{- else if eq .Type "NUMERIC" -}}(*big.Int)(t.{{capitalise .Name}})
+  {{- else if eq .Type "NUMERIC" -}}string(t.{{capitalise .Name}})
   {{- else if eq .Type "DECIMAL" -}}(*big.Int)(t.{{capitalise .Name}})
   {{- else if eq .Type "DATE" -}}t.{{capitalise .Name}}
   {{- else if eq .Type "TIMESTAMP" -}}t.{{capitalise .Name}}
@@ -58,7 +58,9 @@ var (
           res = append(res, bool(e))
         {{- else if eq $elem "CONTRACT_ID" -}}
           res = append(res, e)
-        {{- else if or (eq $elem "NUMERIC") (eq $elem "DECIMAL") -}}
+        {{- else if eq $elem "NUMERIC" -}}
+          res = append(res, string(e))
+        {{- else if eq $elem "DECIMAL" -}}
           res = append(res, (*big.Int)(e))
         {{- else -}}
           type mapper interface{ toMap() map[string]interface{} }
@@ -102,7 +104,7 @@ var (
 {{- else if eq .Type "TEXT" -}}t.{{capitalise .Name}} != ""
 {{- else if eq .Type "INT64" -}}t.{{capitalise .Name}} != 0
 {{- else if eq .Type "BOOL" -}}true
-{{- else if eq .Type "NUMERIC" -}}t.{{capitalise .Name}} != nil
+{{- else if eq .Type "NUMERIC" -}}t.{{capitalise .Name}} != ""
 {{- else if eq .Type "DECIMAL" -}}t.{{capitalise .Name}} != nil
 {{- else if eq .Type "DATE" -}}!t.{{capitalise .Name}}.IsZero()
 {{- else if eq .Type "TIMESTAMP" -}}!t.{{capitalise .Name}}.IsZero()

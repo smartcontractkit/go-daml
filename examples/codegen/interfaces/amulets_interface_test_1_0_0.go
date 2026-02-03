@@ -179,8 +179,8 @@ func (t Token) CreateCommand() *model.CreateCommand {
 
 	args["owner"] = t.Owner.ToMap()
 
-	if t.Amount != nil {
-		args["amount"] = (*big.Int)(t.Amount)
+	if t.Amount != "" {
+		args["amount"] = string(t.Amount)
 	}
 
 	return &model.CreateCommand{

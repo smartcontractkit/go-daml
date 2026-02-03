@@ -461,19 +461,21 @@ func mapToValue(data interface{}) *v2.Value {
 
 	// handle custom pointer types first before dereferencing
 	switch v := data.(type) {
-	case types.NUMERIC_STR:
+	case decimal.Decimal:
+		scaled := types.NewNumericFromDecimal(v)
+		s, ok := normalizeLedgerNumericLiteral(string(scaled))
+		if !ok {
+			log.Warn().Msgf("invalid NumericLiteral from decimal %q", string(scaled))
+			return nil
+		}
+		return &v2.Value{Sum: &v2.Value_Numeric{Numeric: s}}
+	case types.NUMERIC:
 		s, ok := normalizeLedgerNumericLiteral(string(v))
 		if !ok {
 			log.Warn().Msgf("invalid NumericLiteral %q", string(v))
 			return nil
 		}
 		return &v2.Value{Sum: &v2.Value_Numeric{Numeric: s}}
-
-	case decimal.Decimal:
-		scaled := types.NewNumericFromDecimal(v)
-		return &v2.Value{Sum: &v2.Value_Numeric{Numeric: convertBigIntToNumeric((*big.Int)(scaled), 10).FloatString(10)}}
-	case types.NUMERIC:
-		return &v2.Value{Sum: &v2.Value_Numeric{Numeric: convertBigIntToNumeric((*big.Int)(v), 10).FloatString(10)}}
 	case types.DECIMAL:
 		return &v2.Value{Sum: &v2.Value_Numeric{Numeric: convertBigIntToNumeric((*big.Int)(v), 10).FloatString(10)}}
 	case *big.Int:
