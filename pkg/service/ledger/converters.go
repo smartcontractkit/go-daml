@@ -50,10 +50,14 @@ func isTuple3(v reflect.Value) bool {
 }
 
 func parseTemplateID(templateID string) (packageID, moduleName, entityName string) {
+	// Template ID format: #package-name:module:entity or #package-hash:module:entity
+	// The # is always part of the identifier and must be included in PackageId field
+	// for both package names and package hashes
 	trimmed := strings.TrimPrefix(templateID, "#")
 	parts := strings.Split(trimmed, ":")
 	if len(parts) == 3 {
-		return parts[0], parts[1], parts[2]
+		pkgID := "#" + parts[0]
+		return pkgID, parts[1], parts[2]
 	} else if len(parts) == 2 {
 		return "", parts[0], parts[1]
 	}

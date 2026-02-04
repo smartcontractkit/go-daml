@@ -12,23 +12,23 @@ import (
 )
 
 type tmplData struct {
-	Package    string
-	PackageID  string
-	SdkVersion string
-	Structs    map[string]*model.TmplStruct
-	IsMainDalf bool
+	Package     string
+	PackageName string
+	SdkVersion  string
+	Structs     map[string]*model.TmplStruct
+	IsMainDalf  bool
 }
 
 //go:embed source.go.tpl
 var tmplSource string
 
-func Bind(pkg string, packageID string, sdkVersion string, structs map[string]*model.TmplStruct, isMainDalf bool) (string, error) {
+func Bind(pkg string, packageName string, sdkVersion string, structs map[string]*model.TmplStruct, isMainDalf bool) (string, error) {
 	data := &tmplData{
-		Package:    pkg,
-		PackageID:  packageID,
-		SdkVersion: sdkVersion,
-		Structs:    structs,
-		IsMainDalf: isMainDalf,
+		Package:     pkg,
+		PackageName: packageName,
+		SdkVersion:  sdkVersion,
+		Structs:     structs,
+		IsMainDalf:  isMainDalf,
 	}
 	buffer := new(bytes.Buffer)
 
