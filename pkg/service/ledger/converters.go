@@ -50,14 +50,33 @@ func isTuple3(v reflect.Value) bool {
 }
 
 func parseTemplateID(templateID string) (packageID, moduleName, entityName string) {
+	// Template ID format: #package-name:module:entity or #package-hash:module:entity
 	trimmed := strings.TrimPrefix(templateID, "#")
 	parts := strings.Split(trimmed, ":")
 	if len(parts) == 3 {
-		return parts[0], parts[1], parts[2]
+		pkgID := parts[0]
+		// If it's a package name (not a 64-char hex hash), add # prefix as it's part of the identifier
+		if !isPackageHash(pkgID) {
+			pkgID = "#" + pkgID
+		}
+		return pkgID, parts[1], parts[2]
 	} else if len(parts) == 2 {
 		return "", parts[0], parts[1]
 	}
 	return "", "", templateID
+}
+
+// isPackageHash checks if a string is a 64-character hexadecimal hash (package ID)
+func isPackageHash(s string) bool {
+	if len(s) != 64 {
+		return false
+	}
+	for _, ch := range s {
+		if !((ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F')) {
+			return false
+		}
+	}
+	return true
 }
 
 func commandsToProto(cmd *model.Commands) *v2.Commands {
@@ -403,9 +422,64 @@ func valueFromProto(pb *v2.Value) interface{} {
 			}
 		}
 		return nil
+	case *v2.Value_GenMap:
+		// GenMap as map for DAML codec
+		result := make(map[string]interface{})
+		for _, entry := range v.GenMap.Entries {
+			// Convert key to string for map key
+			keyStr := fmt.Sprintf("%v", valueFromProto(entry.Key))
+			result[keyStr] = valueFromProto(entry.Value)
+		}
+		return result
 	default:
 		return nil
 	}
+}
+
+func normalizeLedgerNumericLiteral(s string) (string, bool) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return "", false
+	}
+	// allow printers that emit "123."
+	if strings.HasSuffix(s, ".") {
+		s = strings.TrimSuffix(s, ".")
+		if s == "" || s == "-" {
+			return "", false
+		}
+	}
+
+	dot := false
+	for i, ch := range s {
+		if ch == '-' {
+			if i != 0 {
+				return "", false
+			}
+			continue
+		}
+		if ch == '.' {
+			if dot {
+				return "", false
+			}
+			dot = true
+			continue
+		}
+		if ch < '0' || ch > '9' {
+			return "", false
+		}
+	}
+
+	// Clean: strip ".0000..." => integer
+	if dot {
+		parts := strings.SplitN(s, ".", 2)
+		frac := strings.TrimRight(parts[1], "0")
+		if frac == "" {
+			return parts[0], true
+		}
+		return parts[0] + "." + frac, true
+	}
+
+	return s, true
 }
 
 func mapToValue(data interface{}) *v2.Value {
@@ -417,9 +491,19 @@ func mapToValue(data interface{}) *v2.Value {
 	switch v := data.(type) {
 	case decimal.Decimal:
 		scaled := types.NewNumericFromDecimal(v)
-		return &v2.Value{Sum: &v2.Value_Numeric{Numeric: convertBigIntToNumeric((*big.Int)(scaled), 10).FloatString(10)}}
+		s, ok := normalizeLedgerNumericLiteral(string(scaled))
+		if !ok {
+			log.Warn().Msgf("invalid NumericLiteral from decimal %q", string(scaled))
+			return nil
+		}
+		return &v2.Value{Sum: &v2.Value_Numeric{Numeric: s}}
 	case types.NUMERIC:
-		return &v2.Value{Sum: &v2.Value_Numeric{Numeric: convertBigIntToNumeric((*big.Int)(v), 10).FloatString(10)}}
+		s, ok := normalizeLedgerNumericLiteral(string(v))
+		if !ok {
+			log.Warn().Msgf("invalid NumericLiteral %q", string(v))
+			return nil
+		}
+		return &v2.Value{Sum: &v2.Value_Numeric{Numeric: s}}
 	case types.DECIMAL:
 		return &v2.Value{Sum: &v2.Value_Numeric{Numeric: convertBigIntToNumeric((*big.Int)(v), 10).FloatString(10)}}
 	case *big.Int:

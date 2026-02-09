@@ -13,7 +13,7 @@ type (
 	INT64       int64
 	BOOL        bool
 	DECIMAL     *big.Int
-	NUMERIC     *big.Int
+	NUMERIC     string
 	DATE        time.Time
 	TIMESTAMP   time.Time
 	UNIT        struct{}
@@ -32,7 +32,9 @@ type (
 )
 
 func NewNumericFromDecimal(d decimal.Decimal) NUMERIC {
-	return NUMERIC(d.Shift(10).BigInt())
+	// Convert decimal to string with 10 decimal places precision
+	scaled := d.Shift(10)
+	return NUMERIC(scaled.String())
 }
 
 // VARIANT represents a DAML variant/union type

@@ -9,6 +9,7 @@ import (
 	"github.com/noders-team/go-daml/pkg/model"
 	"github.com/noders-team/go-daml/pkg/types"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 // VPair struct for variant tests (needs to be at package level for interface implementation)
@@ -121,7 +122,7 @@ var (
 
 func TestConvertToRecordBasic(t *testing.T) {
 	t.Run("Numeric", func(t *testing.T) {
-		decimalValue := types.NUMERIC(big.NewInt(200))
+		decimalValue := types.NUMERIC("0.0000000200")
 		data := make(map[string]interface{})
 		data["someNumeric"] = decimalValue
 
@@ -728,8 +729,8 @@ func TestConvertToRecordIntegration(t *testing.T) {
 			Operator:        types.PARTY("test-party"),
 			SomeBoolean:     true,
 			SomeInteger:     190,
-			SomeDecimal:     types.NUMERIC(big.NewInt(200)),
-			SomeMeasurement: types.NUMERIC(big.NewInt(300)),
+			SomeDecimal:     types.NUMERIC("0.0000000200"),
+			SomeMeasurement: types.NUMERIC("0.0000000300"),
 			SomeDate:        types.DATE(time.Now().UTC()),
 			SomeDatetime:    types.TIMESTAMP(time.Now().UTC()),
 			SomeSimpleList:  someListInt,
@@ -1817,7 +1818,7 @@ func TestConvertToRecordGENMAP(t *testing.T) {
 				"int":     types.INT64(100),
 				"text":    types.TEXT("test"),
 				"bool":    types.BOOL(false),
-				"numeric": types.NUMERIC(big.NewInt(500)),
+				"numeric": types.NUMERIC("0.0000000500"),
 			},
 		}
 
@@ -2280,5 +2281,347 @@ func TestConvertToRecordNestedMaps(t *testing.T) {
 			innerEntries[key] = entry.Value
 		}
 		require.Equal(t, "value", innerEntries["key"].GetText())
+	})
+}
+func TestValueFromProto(t *testing.T) {
+	t.Run("Unit value", func(t *testing.T) {
+		pb := &v2.Value{
+			Sum: &v2.Value_Unit{Unit: &emptypb.Empty{}},
+		}
+
+		result := valueFromProto(pb)
+
+		resultMap, ok := result.(map[string]interface{})
+		require.True(t, ok)
+		require.Equal(t, "unit", resultMap["_type"])
+	})
+
+	t.Run("Bool value", func(t *testing.T) {
+		pb := &v2.Value{
+			Sum: &v2.Value_Bool{Bool: true},
+		}
+
+		result := valueFromProto(pb)
+
+		require.Equal(t, true, result)
+	})
+
+	t.Run("Int64 value", func(t *testing.T) {
+		pb := &v2.Value{
+			Sum: &v2.Value_Int64{Int64: 42},
+		}
+
+		result := valueFromProto(pb)
+
+		require.Equal(t, int64(42), result)
+	})
+
+	t.Run("Text value", func(t *testing.T) {
+		pb := &v2.Value{
+			Sum: &v2.Value_Text{Text: "hello world"},
+		}
+
+		result := valueFromProto(pb)
+
+		require.Equal(t, "hello world", result)
+	})
+
+	t.Run("Numeric value", func(t *testing.T) {
+		pb := &v2.Value{
+			Sum: &v2.Value_Numeric{Numeric: "123.456"},
+		}
+
+		result := valueFromProto(pb)
+
+		require.Equal(t, "123.456", result)
+	})
+
+	t.Run("Party value", func(t *testing.T) {
+		pb := &v2.Value{
+			Sum: &v2.Value_Party{Party: "alice"},
+		}
+
+		result := valueFromProto(pb)
+
+		require.Equal(t, "alice", result)
+	})
+
+	t.Run("ContractId value", func(t *testing.T) {
+		pb := &v2.Value{
+			Sum: &v2.Value_ContractId{ContractId: "00000123456789abcdef"},
+		}
+
+		result := valueFromProto(pb)
+
+		require.Equal(t, "00000123456789abcdef", result)
+	})
+
+	t.Run("Date value", func(t *testing.T) {
+		pb := &v2.Value{
+			Sum: &v2.Value_Date{Date: 19000},
+		}
+
+		result := valueFromProto(pb)
+
+		require.Equal(t, int32(19000), result)
+	})
+
+	t.Run("Timestamp value", func(t *testing.T) {
+		pb := &v2.Value{
+			Sum: &v2.Value_Timestamp{Timestamp: 1609459200},
+		}
+
+		result := valueFromProto(pb)
+
+		require.Equal(t, int64(1609459200), result)
+	})
+
+	t.Run("Optional with value", func(t *testing.T) {
+		pb := &v2.Value{
+			Sum: &v2.Value_Optional{
+				Optional: &v2.Optional{
+					Value: &v2.Value{
+						Sum: &v2.Value_Text{Text: "optional value"},
+					},
+				},
+			},
+		}
+
+		result := valueFromProto(pb)
+
+		require.Equal(t, "optional value", result)
+	})
+
+	t.Run("Optional without value (None)", func(t *testing.T) {
+		pb := &v2.Value{
+			Sum: &v2.Value_Optional{
+				Optional: &v2.Optional{
+					Value: nil,
+				},
+			},
+		}
+
+		result := valueFromProto(pb)
+
+		require.Nil(t, result)
+	})
+
+	t.Run("List value", func(t *testing.T) {
+		pb := &v2.Value{
+			Sum: &v2.Value_List{
+				List: &v2.List{
+					Elements: []*v2.Value{
+						{Sum: &v2.Value_Int64{Int64: 1}},
+						{Sum: &v2.Value_Int64{Int64: 2}},
+						{Sum: &v2.Value_Int64{Int64: 3}},
+					},
+				},
+			},
+		}
+
+		result := valueFromProto(pb)
+
+		resultList, ok := result.([]interface{})
+		require.True(t, ok)
+		require.Len(t, resultList, 3)
+		require.Equal(t, int64(1), resultList[0])
+		require.Equal(t, int64(2), resultList[1])
+		require.Equal(t, int64(3), resultList[2])
+	})
+
+	t.Run("Record value", func(t *testing.T) {
+		pb := &v2.Value{
+			Sum: &v2.Value_Record{
+				Record: &v2.Record{
+					Fields: []*v2.RecordField{
+						{
+							Label: "name",
+							Value: &v2.Value{Sum: &v2.Value_Text{Text: "Alice"}},
+						},
+						{
+							Label: "age",
+							Value: &v2.Value{Sum: &v2.Value_Int64{Int64: 30}},
+						},
+					},
+				},
+			},
+		}
+
+		result := valueFromProto(pb)
+
+		resultMap, ok := result.(map[string]interface{})
+		require.True(t, ok)
+		require.Equal(t, "Alice", resultMap["name"])
+		require.Equal(t, int64(30), resultMap["age"])
+	})
+
+	t.Run("TextMap value", func(t *testing.T) {
+		pb := &v2.Value{
+			Sum: &v2.Value_TextMap{
+				TextMap: &v2.TextMap{
+					Entries: []*v2.TextMap_Entry{
+						{
+							Key:   "key1",
+							Value: &v2.Value{Sum: &v2.Value_Text{Text: "value1"}},
+						},
+						{
+							Key:   "key2",
+							Value: &v2.Value{Sum: &v2.Value_Int64{Int64: 42}},
+						},
+					},
+				},
+			},
+		}
+
+		result := valueFromProto(pb)
+
+		resultMap, ok := result.(map[string]interface{})
+		require.True(t, ok)
+		require.Equal(t, "value1", resultMap["key1"])
+		require.Equal(t, int64(42), resultMap["key2"])
+	})
+
+	t.Run("Enum value", func(t *testing.T) {
+		pb := &v2.Value{
+			Sum: &v2.Value_Enum{
+				Enum: &v2.Enum{
+					Constructor: "Red",
+				},
+			},
+		}
+
+		result := valueFromProto(pb)
+
+		require.Equal(t, "Red", result)
+	})
+
+	t.Run("Variant value", func(t *testing.T) {
+		pb := &v2.Value{
+			Sum: &v2.Value_Variant{
+				Variant: &v2.Variant{
+					Constructor: "Left",
+					Value:       &v2.Value{Sum: &v2.Value_Text{Text: "variant value"}},
+				},
+			},
+		}
+
+		result := valueFromProto(pb)
+
+		resultMap, ok := result.(map[string]interface{})
+		require.True(t, ok)
+		require.Equal(t, "Left", resultMap["tag"])
+		require.Equal(t, "variant value", resultMap["value"])
+	})
+
+	t.Run("GenMap value with string keys", func(t *testing.T) {
+		pb := &v2.Value{
+			Sum: &v2.Value_GenMap{
+				GenMap: &v2.GenMap{
+					Entries: []*v2.GenMap_Entry{
+						{
+							Key:   &v2.Value{Sum: &v2.Value_Text{Text: "key1"}},
+							Value: &v2.Value{Sum: &v2.Value_Text{Text: "value1"}},
+						},
+						{
+							Key:   &v2.Value{Sum: &v2.Value_Text{Text: "key2"}},
+							Value: &v2.Value{Sum: &v2.Value_Int64{Int64: 100}},
+						},
+					},
+				},
+			},
+		}
+
+		result := valueFromProto(pb)
+
+		resultMap, ok := result.(map[string]interface{})
+		require.True(t, ok)
+		require.Equal(t, "value1", resultMap["key1"])
+		require.Equal(t, int64(100), resultMap["key2"])
+	})
+
+	t.Run("GenMap value with non-string keys", func(t *testing.T) {
+		pb := &v2.Value{
+			Sum: &v2.Value_GenMap{
+				GenMap: &v2.GenMap{
+					Entries: []*v2.GenMap_Entry{
+						{
+							Key:   &v2.Value{Sum: &v2.Value_Int64{Int64: 1}},
+							Value: &v2.Value{Sum: &v2.Value_Text{Text: "first"}},
+						},
+						{
+							Key:   &v2.Value{Sum: &v2.Value_Int64{Int64: 2}},
+							Value: &v2.Value{Sum: &v2.Value_Text{Text: "second"}},
+						},
+					},
+				},
+			},
+		}
+
+		result := valueFromProto(pb)
+
+		resultMap, ok := result.(map[string]interface{})
+		require.True(t, ok)
+		require.Equal(t, "first", resultMap["1"])
+		require.Equal(t, "second", resultMap["2"])
+	})
+
+	t.Run("Nil value", func(t *testing.T) {
+		result := valueFromProto(nil)
+
+		require.Nil(t, result)
+	})
+
+	t.Run("Nested structures", func(t *testing.T) {
+		pb := &v2.Value{
+			Sum: &v2.Value_Record{
+				Record: &v2.Record{
+					Fields: []*v2.RecordField{
+						{
+							Label: "user",
+							Value: &v2.Value{
+								Sum: &v2.Value_Record{
+									Record: &v2.Record{
+										Fields: []*v2.RecordField{
+											{
+												Label: "name",
+												Value: &v2.Value{Sum: &v2.Value_Text{Text: "Bob"}},
+											},
+											{
+												Label: "scores",
+												Value: &v2.Value{
+													Sum: &v2.Value_List{
+														List: &v2.List{
+															Elements: []*v2.Value{
+																{Sum: &v2.Value_Int64{Int64: 90}},
+																{Sum: &v2.Value_Int64{Int64: 85}},
+															},
+														},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		result := valueFromProto(pb)
+
+		resultMap, ok := result.(map[string]interface{})
+		require.True(t, ok)
+
+		userMap, ok := resultMap["user"].(map[string]interface{})
+		require.True(t, ok)
+		require.Equal(t, "Bob", userMap["name"])
+
+		scoresList, ok := userMap["scores"].([]interface{})
+		require.True(t, ok)
+		require.Len(t, scoresList, 2)
+		require.Equal(t, int64(90), scoresList[0])
+		require.Equal(t, int64(85), scoresList[1])
 	})
 }

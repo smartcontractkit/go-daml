@@ -3,7 +3,6 @@ package codegen_test
 import (
 	"context"
 	"fmt"
-	"math/big"
 	"os"
 	"strings"
 	"testing"
@@ -303,8 +302,8 @@ func TestCodegenIntegrationAllFieldsContract(t *testing.T) {
 		Operator:        PARTY(party),
 		SomeBoolean:     true,
 		SomeInteger:     190,
-		SomeDecimal:     NUMERIC(big.NewInt(200)),
-		SomeMeasurement: NUMERIC(big.NewInt(300)),
+		SomeDecimal:     NUMERIC("0.0000000200"),
+		SomeMeasurement: NUMERIC("0.0000000300"),
 		SomeMaybe:       &someMaybe,
 		SomeMaybeNot:    nil, // Testing optional None case
 		SomeDate:        DATE(time.Now().UTC()),

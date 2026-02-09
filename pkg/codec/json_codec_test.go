@@ -42,7 +42,7 @@ func TestJsonCodec_Marshall_BasicTypes(t *testing.T) {
 		},
 		{
 			name:     "NUMERIC as string (default)",
-			input:    NUMERIC(big.NewInt(123456789)),
+			input:    NUMERIC("123456789"),
 			expected: `"123456789"`,
 		},
 		{
@@ -96,7 +96,7 @@ func TestJsonCodec_Marshall_NumericAsNumber(t *testing.T) {
 		},
 		{
 			name:     "NUMERIC as number",
-			input:    NUMERIC(big.NewInt(123)),
+			input:    NUMERIC("123"),
 			expected: `123`,
 		},
 	}
@@ -163,7 +163,7 @@ func TestJsonCodec_Marshall_Records(t *testing.T) {
 		Name:     TEXT("Alice"),
 		Age:      INT64(30),
 		Active:   BOOL(true),
-		Balance:  NUMERIC(big.NewInt(1000)),
+		Balance:  NUMERIC("1000"),
 		Optional: &optionalValue,
 	}
 
@@ -188,7 +188,7 @@ func TestJsonCodec_Marshall_RecordWithNilOptional(t *testing.T) {
 		Name:     TEXT("Bob"),
 		Age:      INT64(25),
 		Active:   BOOL(false),
-		Balance:  NUMERIC(big.NewInt(500)),
+		Balance:  NUMERIC("500"),
 		Optional: nil, // nil optional
 	}
 
@@ -213,7 +213,7 @@ func TestJsonCodec_Marshall_ExcludeNullValues(t *testing.T) {
 		Name:     TEXT("Charlie"),
 		Age:      INT64(35),
 		Active:   BOOL(true),
-		Balance:  NUMERIC(big.NewInt(750)),
+		Balance:  NUMERIC("750"),
 		Optional: nil, // nil optional
 	}
 
@@ -282,7 +282,7 @@ func TestJsonCodec_Marshall_ComplexNested(t *testing.T) {
 			Name:     TEXT("Nested"),
 			Age:      INT64(40),
 			Active:   BOOL(true),
-			Balance:  NUMERIC(big.NewInt(2000)),
+			Balance:  NUMERIC("2000"),
 			Optional: &optionalText,
 		},
 	}
@@ -354,13 +354,13 @@ func TestJsonCodec_Unmarshall_BasicTypes(t *testing.T) {
 			name:     "NUMERIC from string",
 			json:     `"123456789"`,
 			target:   new(NUMERIC),
-			expected: NUMERIC(big.NewInt(123456789)),
+			expected: NUMERIC("123456789"),
 		},
 		{
 			name:     "NUMERIC from number",
 			json:     `123`,
 			target:   new(NUMERIC),
-			expected: NUMERIC(big.NewInt(123)),
+			expected: NUMERIC("123"),
 		},
 		{
 			name:     "TIMESTAMP from ISO string",
@@ -466,7 +466,7 @@ func TestJsonCodec_Unmarshall_Records(t *testing.T) {
 	assert.Equal(t, TEXT("Alice"), result.Name)
 	assert.Equal(t, INT64(30), result.Age)
 	assert.Equal(t, BOOL(true), result.Active)
-	assert.Equal(t, NUMERIC(big.NewInt(1000)), result.Balance)
+	assert.Equal(t, NUMERIC("1000"), result.Balance)
 	require.NotNil(t, result.Optional)
 	assert.Equal(t, TEXT("present"), *result.Optional)
 }
@@ -488,7 +488,7 @@ func TestJsonCodec_Unmarshall_RecordWithNilOptional(t *testing.T) {
 	assert.Equal(t, TEXT("Bob"), result.Name)
 	assert.Equal(t, INT64(25), result.Age)
 	assert.Equal(t, BOOL(false), result.Active)
-	assert.Equal(t, NUMERIC(big.NewInt(500)), result.Balance)
+	assert.Equal(t, NUMERIC("500"), result.Balance)
 	assert.Nil(t, result.Optional)
 }
 
@@ -500,7 +500,7 @@ func TestJsonCodec_RoundTrip_Marshall_Unmarshall(t *testing.T) {
 		Name:     TEXT("Alice"),
 		Age:      INT64(30),
 		Active:   BOOL(true),
-		Balance:  NUMERIC(big.NewInt(1000)),
+		Balance:  NUMERIC("1000"),
 		Optional: &optionalValue,
 	}
 
@@ -514,7 +514,7 @@ func TestJsonCodec_RoundTrip_Marshall_Unmarshall(t *testing.T) {
 	assert.Equal(t, original.Age, result.Age)
 	assert.Equal(t, original.Active, result.Active)
 
-	assert.Equal(t, (*big.Int)(original.Balance).String(), (*big.Int)(result.Balance).String())
+	assert.Equal(t, string(original.Balance), string(result.Balance))
 	require.NotNil(t, result.Optional)
 	assert.Equal(t, *original.Optional, *result.Optional)
 }
@@ -526,7 +526,7 @@ func TestJsonCodec_RoundTrip_WithNumericAsNumber(t *testing.T) {
 		Name:     TEXT("Bob"),
 		Age:      INT64(25),
 		Active:   BOOL(false),
-		Balance:  NUMERIC(big.NewInt(500)),
+		Balance:  NUMERIC("500"),
 		Optional: nil,
 	}
 
@@ -540,7 +540,7 @@ func TestJsonCodec_RoundTrip_WithNumericAsNumber(t *testing.T) {
 	assert.Equal(t, original.Name, result.Name)
 	assert.Equal(t, original.Age, result.Age)
 	assert.Equal(t, original.Active, result.Active)
-	assert.Equal(t, (*big.Int)(original.Balance).String(), (*big.Int)(result.Balance).String())
+	assert.Equal(t, string(original.Balance), string(result.Balance))
 	assert.Nil(t, result.Optional)
 }
 

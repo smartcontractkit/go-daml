@@ -220,8 +220,8 @@ func (t OneOfEverything) CreateCommand() *model.CreateCommand {
 
 	args["someInteger"] = int64(t.SomeInteger)
 
-	if t.SomeDecimal != nil {
-		args["someDecimal"] = (*big.Int)(t.SomeDecimal)
+	if t.SomeDecimal != "" {
+		args["someDecimal"] = string(t.SomeDecimal)
 	}
 
 	if t.SomeMaybe != nil {
@@ -260,8 +260,8 @@ func (t OneOfEverything) CreateCommand() *model.CreateCommand {
 
 	args["someUglyNesting"] = t.SomeUglyNesting
 
-	if t.SomeMeasurement != nil {
-		args["someMeasurement"] = (*big.Int)(t.SomeMeasurement)
+	if t.SomeMeasurement != "" {
+		args["someMeasurement"] = string(t.SomeMeasurement)
 	}
 
 	if t.SomeEnum != "" {

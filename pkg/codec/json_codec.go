@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 
@@ -200,7 +201,18 @@ func (codec *JsonCodec) boolToDynamicValue(b types.BOOL) bool {
 }
 
 func (codec *JsonCodec) numericToDynamicValue(n types.NUMERIC) interface{} {
-	return codec.bigIntToDynamicValue((*big.Int)(n))
+	if string(n) == "" {
+		return nil
+	}
+	if codec.EncodeNumericAsString {
+		return string(n)
+	}
+	// Parse string as float for numeric encoding
+	if f, err := strconv.ParseFloat(string(n), 64); err == nil {
+		return f
+	}
+	// Fallback to string if parsing fails
+	return string(n)
 }
 
 func (codec *JsonCodec) decimalToDynamicValue(d types.DECIMAL) interface{} {
@@ -518,7 +530,7 @@ func (codec *JsonCodec) assignValue(jsonValue interface{}, target reflect.Value)
 		}
 		return fmt.Errorf("expected bool for BOOL, got %T", jsonValue)
 
-	case reflect.TypeOf(types.NUMERIC(nil)):
+	case reflect.TypeOf(types.NUMERIC("")):
 		return codec.assignNumericValue(jsonValue, target)
 
 	case reflect.TypeOf(types.DECIMAL(nil)):
@@ -653,9 +665,22 @@ func (codec *JsonCodec) assignInt64Value(jsonValue interface{}, target reflect.V
 }
 
 func (codec *JsonCodec) assignNumericValue(jsonValue interface{}, target reflect.Value) error {
-	return codec.assignBigIntValue(jsonValue, target, "NUMERIC", func(bi *big.Int) reflect.Value {
-		return reflect.ValueOf(types.NUMERIC(bi))
-	})
+	switch v := jsonValue.(type) {
+	case string:
+		// NUMERIC is now a string, so we can assign it directly
+		target.Set(reflect.ValueOf(types.NUMERIC(v)))
+		return nil
+	case float64:
+		// Convert float to string representation
+		target.Set(reflect.ValueOf(types.NUMERIC(strconv.FormatFloat(v, 'f', -1, 64))))
+		return nil
+	case int64:
+		// Convert int to string representation
+		target.Set(reflect.ValueOf(types.NUMERIC(strconv.FormatInt(v, 10))))
+		return nil
+	default:
+		return fmt.Errorf("expected string or number for NUMERIC, got %T", jsonValue)
+	}
 }
 
 func (codec *JsonCodec) assignDecimalValue(jsonValue interface{}, target reflect.Value) error {
