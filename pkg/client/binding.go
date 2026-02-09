@@ -3,11 +3,11 @@ package client
 import (
 	"context"
 
-	"github.com/noders-team/go-daml/pkg/model"
-	"github.com/noders-team/go-daml/pkg/service/admin"
-	"github.com/noders-team/go-daml/pkg/service/ledger"
-	"github.com/noders-team/go-daml/pkg/service/testing"
-	"github.com/noders-team/go-daml/pkg/service/topology"
+	"github.com/smartcontractkit/go-daml/pkg/model"
+	"github.com/smartcontractkit/go-daml/pkg/service/admin"
+	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
+	"github.com/smartcontractkit/go-daml/pkg/service/testing"
+	"github.com/smartcontractkit/go-daml/pkg/service/topology"
 	"google.golang.org/grpc"
 )
 

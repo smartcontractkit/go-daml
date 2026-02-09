@@ -4,9 +4,9 @@ import (
 	"context"
 	"os"
 
-	"github.com/noders-team/go-daml/pkg/client"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	"github.com/smartcontractkit/go-daml/pkg/client"
 )
 
 func main() {

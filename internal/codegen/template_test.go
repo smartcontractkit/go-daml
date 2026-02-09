@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/noders-team/go-daml/internal/codegen/model"
+	"github.com/smartcontractkit/go-daml/internal/codegen/model"
 )
 
 func TestBind(t *testing.T) {

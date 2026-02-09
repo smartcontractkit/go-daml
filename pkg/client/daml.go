@@ -3,7 +3,7 @@ package client
 import (
 	"context"
 
-	"github.com/noders-team/go-daml/pkg/auth"
+	"github.com/smartcontractkit/go-daml/pkg/auth"
 )
 
 type DamlClient struct {

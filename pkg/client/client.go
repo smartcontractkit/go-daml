@@ -9,7 +9,7 @@ import (
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 
-	"github.com/noders-team/go-daml/pkg/auth"
+	"github.com/smartcontractkit/go-daml/pkg/auth"
 )
 
 type Client struct {

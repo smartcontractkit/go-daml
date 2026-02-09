@@ -1,7 +1,7 @@
 package client
 
 import (
-	"github.com/noders-team/go-daml/pkg/auth"
+	"github.com/smartcontractkit/go-daml/pkg/auth"
 )
 
 type Config struct {

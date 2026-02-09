@@ -9,11 +9,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/noders-team/go-daml/pkg/client"
-	"github.com/noders-team/go-daml/pkg/model"
 	"github.com/ory/dockertest/v3"
 	"github.com/ory/dockertest/v3/docker"
 	"github.com/rs/zerolog/log"
+	"github.com/smartcontractkit/go-daml/pkg/client"
+	"github.com/smartcontractkit/go-daml/pkg/model"
 )
 
 const (

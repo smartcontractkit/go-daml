@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/noders-team/go-daml/pkg/client"
-	"github.com/noders-team/go-daml/pkg/testutil"
 	"github.com/rs/zerolog/log"
+	"github.com/smartcontractkit/go-daml/pkg/client"
+	"github.com/smartcontractkit/go-daml/pkg/testutil"
 )
 
 var cl *client.DamlBindingClient

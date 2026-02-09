@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	. "github.com/noders-team/go-daml/pkg/types"
+	. "github.com/smartcontractkit/go-daml/pkg/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

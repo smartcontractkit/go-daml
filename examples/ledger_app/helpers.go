@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 
-	"github.com/noders-team/go-daml/pkg/client"
 	"github.com/rs/zerolog/log"
+	"github.com/smartcontractkit/go-daml/pkg/client"
 )
 
 func getAvailableUser(cl *client.DamlBindingClient) string {

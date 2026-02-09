@@ -8,8 +8,8 @@ import (
 
 	"github.com/rs/zerolog/log"
 
-	"github.com/noders-team/go-daml/internal/codegen"
-	"github.com/noders-team/go-daml/internal/codegen/model"
+	"github.com/smartcontractkit/go-daml/internal/codegen"
+	"github.com/smartcontractkit/go-daml/internal/codegen/model"
 	"github.com/spf13/cobra"
 )
 

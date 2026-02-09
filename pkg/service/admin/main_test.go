@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/noders-team/go-daml/pkg/testutil"
+	"github.com/smartcontractkit/go-daml/pkg/testutil"
 )
 
 func TestMain(m *testing.M) {

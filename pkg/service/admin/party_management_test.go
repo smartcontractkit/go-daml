@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/noders-team/go-daml/pkg/client"
-	"github.com/noders-team/go-daml/pkg/model"
-	"github.com/noders-team/go-daml/pkg/testutil"
+	"github.com/smartcontractkit/go-daml/pkg/client"
+	"github.com/smartcontractkit/go-daml/pkg/model"
+	"github.com/smartcontractkit/go-daml/pkg/testutil"
 	"github.com/stretchr/testify/require"
 )
 
