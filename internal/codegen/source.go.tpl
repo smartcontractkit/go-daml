@@ -6,9 +6,9 @@ import (
 	"strings"
 	"errors"
 
-	"github.com/noders-team/go-daml/pkg/model"
-	. "github.com/noders-team/go-daml/pkg/types"
-	"github.com/noders-team/go-daml/pkg/codec"
+	"github.com/smartcontractkit/go-daml/pkg/model"
+	. "github.com/smartcontractkit/go-daml/pkg/types"
+	"github.com/smartcontractkit/go-daml/pkg/codec"
 )
 
 var (

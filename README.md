@@ -40,7 +40,7 @@ The public SDK components are located under `pkg/`, which includes the client, s
 #### Option 1: Build from Source
 ```bash
 # Clone the repository
-git clone https://github.com/noders-team/go-daml.git
+git clone https://github.com/smartcontractkit/go-daml.git
 cd go-daml
 
 # Build the CLI tool
@@ -57,7 +57,7 @@ make install
 
 #### Option 3: Use as Go Module
 ```bash
-go get github.com/noders-team/go-daml
+go get github.com/smartcontractkit/go-daml
 ```
 
 ### SDK Usage
@@ -65,7 +65,7 @@ go get github.com/noders-team/go-daml
 ```go
 import (
     "context"
-    "github.com/noders-team/go-daml/pkg/client"
+    "github.com/smartcontractkit/go-daml/pkg/client"
     "github.com/rs/zerolog/log"
 )
 
@@ -234,7 +234,7 @@ package main
 import (
     "context"
     "os"
-    "github.com/noders-team/go-daml/pkg/client"
+    "github.com/smartcontractkit/go-daml/pkg/client"
     "github.com/rs/zerolog/log"
 )
 
@@ -281,8 +281,8 @@ package main
 
 import (
     "context"
-    "github.com/noders-team/go-daml/pkg/client"
-    "github.com/noders-team/go-daml/pkg/model"
+    "github.com/smartcontractkit/go-daml/pkg/client"
+    "github.com/smartcontractkit/go-daml/pkg/model"
     "github.com/rs/zerolog/log"
 )
 
@@ -326,8 +326,8 @@ package main
 import (
     "context"
     "os"
-    "github.com/noders-team/go-daml/pkg/client"
-    "github.com/noders-team/go-daml/pkg/model"
+    "github.com/smartcontractkit/go-daml/pkg/client"
+    "github.com/smartcontractkit/go-daml/pkg/model"
     "github.com/rs/zerolog/log"
 )
 
@@ -388,8 +388,8 @@ package main
 import (
     "context"
     "os"
-    "github.com/noders-team/go-daml/pkg/client"
-    "github.com/noders-team/go-daml/pkg/model"
+    "github.com/smartcontractkit/go-daml/pkg/client"
+    "github.com/smartcontractkit/go-daml/pkg/model"
     "github.com/rs/zerolog/log"
 )
 

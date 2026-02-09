@@ -8,7 +8,7 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/noders-team/go-daml/internal/codegen/model"
+	"github.com/smartcontractkit/go-daml/internal/codegen/model"
 )
 
 type tmplData struct {

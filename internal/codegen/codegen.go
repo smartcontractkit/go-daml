@@ -12,9 +12,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/noders-team/go-daml/internal/codegen/astgen"
-	"github.com/noders-team/go-daml/internal/codegen/model"
 	"github.com/rs/zerolog/log"
+	"github.com/smartcontractkit/go-daml/internal/codegen/astgen"
+	"github.com/smartcontractkit/go-daml/internal/codegen/model"
 )
 
 func generateRandomID() (string, error) {

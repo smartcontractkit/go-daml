@@ -8,14 +8,14 @@ import (
 	"testing"
 	"time"
 
-	interfaces "github.com/noders-team/go-daml/examples/codegen/interfaces"
-	"github.com/noders-team/go-daml/pkg/client"
-	"github.com/noders-team/go-daml/pkg/errors"
-	"github.com/noders-team/go-daml/pkg/model"
-	"github.com/noders-team/go-daml/pkg/service/ledger"
-	. "github.com/noders-team/go-daml/pkg/types"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+	interfaces "github.com/smartcontractkit/go-daml/examples/codegen/interfaces"
+	"github.com/smartcontractkit/go-daml/pkg/client"
+	"github.com/smartcontractkit/go-daml/pkg/errors"
+	"github.com/smartcontractkit/go-daml/pkg/model"
+	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
+	. "github.com/smartcontractkit/go-daml/pkg/types"
 	"github.com/stretchr/testify/require"
 )
 

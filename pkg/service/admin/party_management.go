@@ -8,7 +8,7 @@ import (
 
 	v2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2"
 	adminv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/admin"
-	"github.com/noders-team/go-daml/pkg/model"
+	"github.com/smartcontractkit/go-daml/pkg/model"
 )
 
 type PartyManagement interface {

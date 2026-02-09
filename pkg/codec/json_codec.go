@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/noders-team/go-daml/pkg/types"
+	"github.com/smartcontractkit/go-daml/pkg/types"
 )
 
 // JsonCodec follows the transcode JsonCodec pattern for encoding DAML values to JSON

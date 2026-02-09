@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	daml "github.com/digital-asset/dazl-client/v8/go/api/com/daml/daml_lf_1_17"
-	"github.com/noders-team/go-daml/internal/codegen/model"
 	"github.com/rs/zerolog/log"
+	"github.com/smartcontractkit/go-daml/internal/codegen/model"
 	"google.golang.org/protobuf/proto"
 )
 

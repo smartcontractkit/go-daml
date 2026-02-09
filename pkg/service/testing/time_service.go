@@ -8,7 +8,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	testingv2 "github.com/digital-asset/dazl-client/v8/go/api/com/daml/ledger/api/v2/testing"
-	"github.com/noders-team/go-daml/pkg/model"
+	"github.com/smartcontractkit/go-daml/pkg/model"
 )
 
 type TimeService interface {

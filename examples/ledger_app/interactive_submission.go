@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/noders-team/go-daml/pkg/client"
-	damlError "github.com/noders-team/go-daml/pkg/errors"
-	"github.com/noders-team/go-daml/pkg/model"
 	"github.com/rs/zerolog/log"
+	"github.com/smartcontractkit/go-daml/pkg/client"
+	damlError "github.com/smartcontractkit/go-daml/pkg/errors"
+	"github.com/smartcontractkit/go-daml/pkg/model"
 )
 
 func RunInteractiveSubmission(cl *client.DamlBindingClient) {

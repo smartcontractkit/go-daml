@@ -1,4 +1,4 @@
-module github.com/noders-team/go-daml
+module github.com/smartcontractkit/go-daml
 
 go 1.23.0
 

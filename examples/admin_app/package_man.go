@@ -5,8 +5,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/noders-team/go-daml/pkg/client"
 	"github.com/rs/zerolog/log"
+	"github.com/smartcontractkit/go-daml/pkg/client"
 )
 
 func RunPackageManagement(cl *client.DamlBindingClient) {
