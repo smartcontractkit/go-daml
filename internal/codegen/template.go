@@ -12,23 +12,45 @@ import (
 )
 
 type tmplData struct {
-	Package     string
-	PackageName string
-	SdkVersion  string
-	Structs     map[string]*model.TmplStruct
-	IsMainDalf  bool
+	Package          string
+	PackageName      string
+	SdkVersion       string
+	Structs          map[string]*model.TmplStruct
+	IsMainDalf       bool
+	GenerateHexCodec bool
+	ChoiceArgTypes   map[string]bool // Types used as choice arguments (for Encode functions)
 }
 
 //go:embed source.go.tpl
 var tmplSource string
 
-func Bind(pkg string, packageName string, sdkVersion string, structs map[string]*model.TmplStruct, isMainDalf bool) (string, error) {
+func Bind(pkg string, packageName string, sdkVersion string, structs map[string]*model.TmplStruct, isMainDalf bool, generateHexCodec bool) (string, error) {
+	// Collect all types used as choice arguments
+	choiceArgTypes := make(map[string]bool)
+	for _, tmpl := range structs {
+		if tmpl.IsTemplate {
+			for _, choice := range tmpl.Choices {
+				if choice.ArgType != "" && choice.ArgType != "UNIT" {
+					argType := choice.ArgType
+					// Special case: SET type uses the choice name as the struct name
+					// This matches the transformation done in the template for choice methods
+					if argType == "SET" {
+						argType = capitalize(choice.Name)
+					}
+					choiceArgTypes[argType] = true
+				}
+			}
+		}
+	}
+
 	data := &tmplData{
-		Package:     pkg,
-		PackageName: packageName,
-		SdkVersion:  sdkVersion,
-		Structs:     structs,
-		IsMainDalf:  isMainDalf,
+		Package:          pkg,
+		PackageName:      packageName,
+		SdkVersion:       sdkVersion,
+		Structs:          structs,
+		IsMainDalf:       isMainDalf,
+		GenerateHexCodec: generateHexCodec,
+		ChoiceArgTypes:   choiceArgTypes,
 	}
 	buffer := new(bytes.Buffer)
 
@@ -37,6 +59,8 @@ func Bind(pkg string, packageName string, sdkVersion string, structs map[string]
 		"decapitalize":      decapitalize,
 		"stringsHasPrefix":  strings.HasPrefix,
 		"stringsTrimPrefix": strings.TrimPrefix,
+		"stringsHasSuffix":  strings.HasSuffix,
+		"stringsTrimSuffix": strings.TrimSuffix,
 	}
 	tmpl := template.Must(template.New("").Funcs(funcs).Parse(tmplSource))
 	if err := tmpl.Execute(buffer, data); err != nil {
