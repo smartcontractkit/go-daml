@@ -156,7 +156,7 @@ func GetManifest(srcPath string) (*model.Manifest, error) {
 	return manifest, nil
 }
 
-func CodegenDalfs(dalfToProcess []string, unzippedPath string, pkgFile string, dalfManifest *model.Manifest) (map[string]string, error) {
+func CodegenDalfs(dalfToProcess []string, unzippedPath string, pkgFile string, dalfManifest *model.Manifest, generateHexCodec bool) (map[string]string, error) {
 	//  ensure stable processing order across runs
 	sort.Strings(dalfToProcess)
 
@@ -334,7 +334,7 @@ func CodegenDalfs(dalfToProcess []string, unzippedPath string, pkgFile string, d
 			}
 		}
 
-		code, err := Bind(pkgFile, pkg.Name, dalfManifest.SdkVersion, pkg.Structs, dalf == dalfManifest.MainDalf)
+		code, err := Bind(pkgFile, pkg.Name, dalfManifest.SdkVersion, pkg.Structs, dalf == dalfManifest.MainDalf, generateHexCodec)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate Go code: %w", err)
 		}

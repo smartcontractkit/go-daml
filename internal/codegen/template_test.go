@@ -29,7 +29,7 @@ func TestBind(t *testing.T) {
 		},
 	}
 
-	result, err := Bind("main", "test-package-name", "2.0.0", structs, true)
+	result, err := Bind("main", "test-package-name", "2.0.0", structs, true, false)
 	if err != nil {
 		t.Fatalf("Bind failed: %v", err)
 	}

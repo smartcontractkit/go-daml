@@ -14,10 +14,11 @@ import (
 )
 
 var (
-	dar    string
-	output string
-	debug  bool
-	pkg    string
+	dar        string
+	output     string
+	debug      bool
+	pkg        string
+	hexEncoder bool
 )
 
 func main() {
@@ -40,7 +41,7 @@ This tool extracts DAML definitions from .dar archives and generates correspondi
 				return fmt.Errorf("--go_package parameter is required")
 			}
 
-			return runCodeGen(dar, output, pkg, debug)
+			return runCodeGen(dar, output, pkg, debug, hexEncoder)
 		},
 	}
 
@@ -48,6 +49,7 @@ This tool extracts DAML definitions from .dar archives and generates correspondi
 	rootCmd.Flags().StringVar(&output, "output", "", "output directory where generated Go files will be saved (required)")
 	rootCmd.Flags().StringVar(&pkg, "go_package", "", "Go package name for generated code (required)")
 	rootCmd.Flags().BoolVar(&debug, "debug", false, "enable debug logging")
+	rootCmd.Flags().BoolVar(&hexEncoder, "hex-encoder", false, "generate MarshalHex/UnmarshalHex methods for Canton MCMS codec")
 
 	rootCmd.MarkFlagRequired("dar")
 	rootCmd.MarkFlagRequired("output")
@@ -97,7 +99,7 @@ func getFilenameFromDalf(dalfRelPath string) string {
 	return sanitizedFileName
 }
 
-func runCodeGen(dar, outputDir, pkgFile string, debugMode bool) error {
+func runCodeGen(dar, outputDir, pkgFile string, debugMode bool, generateHexCodec bool) error {
 	if debugMode {
 		log.Info().Msg("debug mode enabled")
 	}
@@ -142,7 +144,7 @@ func runCodeGen(dar, outputDir, pkgFile string, debugMode bool) error {
 	dalfToProcess = append(dalfToProcess, manifest.MainDalf)
 	dalfToProcess = append(dalfToProcess, dalfs...)
 
-	result, err := codegen.CodegenDalfs(dalfToProcess, unzippedPath, pkgFile, dalfManifest)
+	result, err := codegen.CodegenDalfs(dalfToProcess, unzippedPath, pkgFile, dalfManifest, generateHexCodec)
 	if err != nil {
 		return err
 	}

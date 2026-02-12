@@ -6,6 +6,7 @@ import (
 	"strings"
 	"errors"
 
+	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/model"
 	. "github.com/smartcontractkit/go-daml/pkg/types"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
@@ -17,6 +18,7 @@ var (
 	_ = big.NewInt
 	_ = strings.NewReader
 	_ = model.Command{}
+	_ bind.BoundTemplate
 )
 
 
@@ -204,6 +206,20 @@ func (v *{{capitalise .Name}}) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, v)
 }
 
+{{if $.GenerateHexCodec}}
+// MarshalHex encodes {{capitalise .Name}} to hex string (Canton MCMS format)
+func (v {{capitalise .Name}}) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(v)
+}
+
+// UnmarshalHex decodes {{capitalise .Name}} from hex string (Canton MCMS format)
+func (v *{{capitalise .Name}}) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, v)
+}
+{{end}}
+
 // GetVariantTag implements types.VARIANT interface
 func (v {{capitalise .Name}}) GetVariantTag() string {
 	{{range $field := .Fields}}
@@ -257,6 +273,20 @@ func (e *{{capitalise .Name}}) UnmarshalJSON(data []byte) error {
 	return jsonCodec.Unmarshall(data, e)
 }
 
+{{if $.GenerateHexCodec}}
+// MarshalHex encodes {{capitalise .Name}} to hex string (Canton MCMS format)
+func (e {{capitalise .Name}}) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(e)
+}
+
+// UnmarshalHex decodes {{capitalise .Name}} from hex string (Canton MCMS format)
+func (e *{{capitalise .Name}}) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, e)
+}
+{{end}}
+
 var _ ENUM = {{capitalise .Name}}("")
 
 {{else}}
@@ -299,6 +329,20 @@ func (t *{{capitalise .Name}}) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
 }
+
+{{if $.GenerateHexCodec}}
+// MarshalHex encodes {{capitalise .Name}} to hex string (Canton MCMS format)
+func (t {{capitalise .Name}}) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes {{capitalise .Name}} from hex string (Canton MCMS format)
+func (t *{{capitalise .Name}}) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+{{end}}
 {{end}}
 
 {{if .IsTemplate}}
@@ -396,6 +440,20 @@ func (t *{{capitalise .Name}}) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
 }
+
+{{if $.GenerateHexCodec}}
+// MarshalHex encodes {{capitalise .Name}} to hex string (Canton MCMS format)
+func (t {{capitalise .Name}}) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes {{capitalise .Name}} from hex string (Canton MCMS format)
+func (t *{{capitalise .Name}}) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+{{end}}
 {{end}}
 
 {{if and .IsTemplate .Choices}}
@@ -482,4 +540,82 @@ func {{capitalise $interfaceName}}InterfaceIDWithPackageID(packageID string) str
 	return fmt.Sprintf("%s:%s:%s", packageID, "{{$moduleName}}", "{{capitalise $damlName}}")
 }
 {{end}}
+{{end}}
+
+{{/* ---------------------------------------------------------
+   Encoder generation for choice argument types
+   --------------------------------------------------------- */}}
+
+{{if and .IsMainDalf .GenerateHexCodec}}
+{{$structs4 := .Structs}}
+{{$choiceArgTypes := .ChoiceArgTypes}}
+// MCMSEncoder interface for typed encoding methods.
+// Implemented by Encoder for method-based encoding.
+type MCMSEncoder interface {
+{{- range $structs4}}
+{{- $isChoiceArgType := index $choiceArgTypes .Name}}
+{{- $isParamsType := stringsHasSuffix .Name "Params"}}
+{{- $baseNameForParams := stringsTrimSuffix .Name "Params"}}
+{{- $hasCorrespondingChoiceArgType := and $isParamsType (index $choiceArgTypes $baseNameForParams)}}
+{{- if and (not .IsInterface) (not .IsTemplate) (eq .RawType "Record") (or $isChoiceArgType $isParamsType)}}
+{{- if not $hasCorrespondingChoiceArgType}}
+{{- $hasParamsSuffix := stringsHasSuffix .Name "Params"}}
+{{- $methodName := .Name}}
+{{- if $hasParamsSuffix}}{{$methodName = stringsTrimSuffix (capitalise .Name) "Params"}}{{else}}{{$methodName = capitalise .Name}}{{end}}
+	{{$methodName}}(args {{capitalise .Name}}) (*bind.EncodedChoice, error)
+{{- end}}
+{{- end}}
+{{- end}}
+}
+
+// encoder provides typed encoding methods for choice parameters (unexported).
+// It wraps bind.BoundTemplate to encode parameters to hex-encoded operation data.
+type encoder struct {
+	*bind.BoundTemplate
+}
+
+// Contract wraps template operations with Sui-style API access.
+// Use NewContract to create instances, then call Encoder() for encoding methods.
+type Contract struct {
+	enc *encoder
+}
+
+// NewContract creates a Contract with encoder for the given template.
+// This provides Sui-style API: contract.Encoder().Method(args)
+func NewContract(packageID, moduleName, templateName string) *Contract {
+	return &Contract{
+		enc: &encoder{
+			BoundTemplate: bind.NewBoundTemplate(packageID, moduleName, templateName),
+		},
+	}
+}
+
+// Encoder returns the encoder for Sui-style contract.Encoder().Method() usage.
+func (c *Contract) Encoder() MCMSEncoder {
+	return c.enc
+}
+
+{{range $structs4}}
+{{- /* Only generate encoder methods, no standalone Encode functions */}}
+{{- $isChoiceArgType := index $choiceArgTypes .Name}}
+{{- $isParamsType := stringsHasSuffix .Name "Params"}}
+{{- $baseNameForParams := stringsTrimSuffix .Name "Params"}}
+{{- $hasCorrespondingChoiceArgType := and $isParamsType (index $choiceArgTypes $baseNameForParams)}}
+{{- if and (not .IsInterface) (not .IsTemplate) (eq .RawType "Record") (or $isChoiceArgType $isParamsType)}}
+{{- if not $hasCorrespondingChoiceArgType}}
+{{- $hasParamsSuffix := stringsHasSuffix .Name "Params"}}
+{{- $methodName := .Name}}
+{{- if $hasParamsSuffix}}{{$methodName = stringsTrimSuffix (capitalise .Name) "Params"}}{{else}}{{$methodName = capitalise .Name}}{{end}}
+{{- $choiceName := $methodName}}
+
+// {{$methodName}} encodes parameters for the {{$choiceName}} choice.
+func (e *encoder) {{$methodName}}(args {{capitalise .Name}}) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("{{$choiceName}}", args)
+}
+{{- end}}
+{{- end}}
+{{- end}}
+
+// Verify MCMSEncoder interface implementation
+var _ MCMSEncoder = (*encoder)(nil)
 {{end}}
