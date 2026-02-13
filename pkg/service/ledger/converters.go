@@ -626,7 +626,7 @@ func mapToValue(data interface{}) *v2.Value {
 	case types.DATE:
 		return &v2.Value{Sum: &v2.Value_Date{Date: int32((time.Time)(v).Unix() / 86400)}}
 	case types.TIMESTAMP:
-		return &v2.Value{Sum: &v2.Value_Timestamp{Timestamp: int64((time.Time)(v).Unix())}}
+		return &v2.Value{Sum: &v2.Value_Timestamp{Timestamp: (time.Time)(v).UnixMicro()}}
 	case bool:
 		return &v2.Value{Sum: &v2.Value_Bool{Bool: v}}
 	case int64:
