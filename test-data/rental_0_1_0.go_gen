@@ -6,20 +6,23 @@ import (
 	"math/big"
 	"strings"
 
+	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
 	. "github.com/smartcontractkit/go-daml/pkg/types"
 )
 
 var (
+	_ = fmt.Sprintf
 	_ = errors.New
 	_ = big.NewInt
 	_ = strings.NewReader
+	_ = model.Command{}
+	_ bind.BoundTemplate
 )
 
+const PackageName = "rental"
 const SDKVersion = "1.18.1"
-
-const packageName = "rental-0.1.0"
 
 type Template interface {
 	CreateCommand() *model.CreateCommand
@@ -35,18 +38,14 @@ func argsToMap(args interface{}) map[string]interface{} {
 		return m
 	}
 
-	// Check if the type has a ToMap method
 	type mapper interface {
 		ToMap() map[string]interface{}
 	}
-
 	if mapper, ok := args.(mapper); ok {
 		return mapper.ToMap()
 	}
 
-	return map[string]interface{}{
-		"args": args,
-	}
+	return map[string]interface{}{"args": args}
 }
 
 // Accept is a Record type
@@ -66,13 +65,11 @@ func (t Accept) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for Accept using JsonCodec
 func (t Accept) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for Accept using JsonCodec
 func (t *Accept) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -85,19 +82,27 @@ type RentalAgreement struct {
 	Terms    TEXT  `json:"terms"`
 }
 
-// GetTemplateID returns the template ID for this template
+// GetTemplateID returns the template ID for this template using the package name
 func (t RentalAgreement) GetTemplateID() string {
-	return fmt.Sprintf("#%s:%s:%s", packageName, "Rental", "RentalAgreement")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "Rental", "RentalAgreement")
 }
 
-// CreateCommand returns a CreateCommand for this template
+// GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
+func (t RentalAgreement) GetTemplateIDWithPackageID(packageID string) string {
+	return fmt.Sprintf("%s:%s:%s", packageID, "Rental", "RentalAgreement")
+}
+
+// CreateCommand returns a CreateCommand for this template using the package name
 func (t RentalAgreement) CreateCommand() *model.CreateCommand {
 	args := make(map[string]interface{})
 
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["landlord"] = t.Landlord.ToMap()
 
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["tenant"] = t.Tenant.ToMap()
 
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["terms"] = string(t.Terms)
 
 	return &model.CreateCommand{
@@ -106,13 +111,30 @@ func (t RentalAgreement) CreateCommand() *model.CreateCommand {
 	}
 }
 
-// MarshalJSON implements custom JSON marshaling for RentalAgreement using JsonCodec
+// CreateCommandWithPackageID returns a CreateCommand using the provided package ID instead of package name
+func (t RentalAgreement) CreateCommandWithPackageID(packageID string) *model.CreateCommand {
+	args := make(map[string]interface{})
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["landlord"] = t.Landlord.ToMap()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["tenant"] = t.Tenant.ToMap()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["terms"] = string(t.Terms)
+
+	return &model.CreateCommand{
+		TemplateID: t.GetTemplateIDWithPackageID(packageID),
+		Arguments:  args,
+	}
+}
+
 func (t RentalAgreement) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for RentalAgreement using JsonCodec
 func (t *RentalAgreement) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -121,9 +143,20 @@ func (t *RentalAgreement) UnmarshalJSON(data []byte) error {
 // Choice methods for RentalAgreement
 
 // Archive exercises the Archive choice on this RentalAgreement contract
+// This method uses the package name in the template ID
 func (t RentalAgreement) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageName, "Rental", "RentalAgreement"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "Rental", "RentalAgreement"),
+		ContractID: contractID,
+		Choice:     "Archive",
+		Arguments:  map[string]interface{}{},
+	}
+}
+
+// ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
+func (t RentalAgreement) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "Rental", "RentalAgreement"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]interface{}{},
@@ -137,19 +170,27 @@ type RentalProposal struct {
 	Terms    TEXT  `json:"terms"`
 }
 
-// GetTemplateID returns the template ID for this template
+// GetTemplateID returns the template ID for this template using the package name
 func (t RentalProposal) GetTemplateID() string {
-	return fmt.Sprintf("#%s:%s:%s", packageName, "Rental", "RentalProposal")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "Rental", "RentalProposal")
 }
 
-// CreateCommand returns a CreateCommand for this template
+// GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
+func (t RentalProposal) GetTemplateIDWithPackageID(packageID string) string {
+	return fmt.Sprintf("%s:%s:%s", packageID, "Rental", "RentalProposal")
+}
+
+// CreateCommand returns a CreateCommand for this template using the package name
 func (t RentalProposal) CreateCommand() *model.CreateCommand {
 	args := make(map[string]interface{})
 
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["landlord"] = t.Landlord.ToMap()
 
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["tenant"] = t.Tenant.ToMap()
 
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["terms"] = string(t.Terms)
 
 	return &model.CreateCommand{
@@ -158,13 +199,30 @@ func (t RentalProposal) CreateCommand() *model.CreateCommand {
 	}
 }
 
-// MarshalJSON implements custom JSON marshaling for RentalProposal using JsonCodec
+// CreateCommandWithPackageID returns a CreateCommand using the provided package ID instead of package name
+func (t RentalProposal) CreateCommandWithPackageID(packageID string) *model.CreateCommand {
+	args := make(map[string]interface{})
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["landlord"] = t.Landlord.ToMap()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["tenant"] = t.Tenant.ToMap()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["terms"] = string(t.Terms)
+
+	return &model.CreateCommand{
+		TemplateID: t.GetTemplateIDWithPackageID(packageID),
+		Arguments:  args,
+	}
+}
+
 func (t RentalProposal) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for RentalProposal using JsonCodec
 func (t *RentalProposal) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -173,9 +231,20 @@ func (t *RentalProposal) UnmarshalJSON(data []byte) error {
 // Choice methods for RentalProposal
 
 // Archive exercises the Archive choice on this RentalProposal contract
+// This method uses the package name in the template ID
 func (t RentalProposal) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageName, "Rental", "RentalProposal"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "Rental", "RentalProposal"),
+		ContractID: contractID,
+		Choice:     "Archive",
+		Arguments:  map[string]interface{}{},
+	}
+}
+
+// ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
+func (t RentalProposal) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "Rental", "RentalProposal"),
 		ContractID: contractID,
 		Choice:     "Archive",
 		Arguments:  map[string]interface{}{},
@@ -183,9 +252,20 @@ func (t RentalProposal) Archive(contractID string) *model.ExerciseCommand {
 }
 
 // Accept exercises the Accept choice on this RentalProposal contract
+// This method uses the package name in the template ID
 func (t RentalProposal) Accept(contractID string, args Accept) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageName, "Rental", "RentalProposal"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "Rental", "RentalProposal"),
+		ContractID: contractID,
+		Choice:     "Accept",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// AcceptWithPackageID exercises the Accept choice using the provided package ID instead of package name
+func (t RentalProposal) AcceptWithPackageID(contractID string, packageID string, args Accept) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "Rental", "RentalProposal"),
 		ContractID: contractID,
 		Choice:     "Accept",
 		Arguments:  argsToMap(args),

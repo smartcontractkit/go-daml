@@ -200,7 +200,7 @@ func (v {{capitalise .Name}}) MarshalJSON() ([]byte, error) {
 	return jsonCodec.Marshall(v)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for {{capitalise .Name}}
+// UnmarshalJSON implements custom JSON unmarshalling for {{capitalise .Name}}
 func (v *{{capitalise .Name}}) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, v)

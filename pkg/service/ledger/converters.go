@@ -509,7 +509,6 @@ func mapToValue(data interface{}) *v2.Value {
 	case *big.Int:
 		return &v2.Value{Sum: &v2.Value_Numeric{Numeric: convertBigIntToNumeric(v, 10).FloatString(10)}}
 	case types.RELTIME:
-		microseconds := int64(time.Duration(v) / time.Microsecond)
 		return &v2.Value{
 			Sum: &v2.Value_Record{
 				Record: &v2.Record{
@@ -517,7 +516,7 @@ func mapToValue(data interface{}) *v2.Value {
 						{
 							Label: "microseconds",
 							Value: &v2.Value{
-								Sum: &v2.Value_Int64{Int64: microseconds},
+								Sum: &v2.Value_Int64{Int64: time.Duration(v).Microseconds()},
 							},
 						},
 					},

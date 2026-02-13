@@ -134,7 +134,7 @@ func TestConvertToRecordBasic(t *testing.T) {
 		numericStr := record.Fields[0].Value.GetNumeric()
 		require.NotEmpty(t, numericStr)
 
-		require.Equal(t, "0.0000000200", numericStr)
+		require.Equal(t, "0.00000002", numericStr)
 	})
 
 	t.Run("Decimal", func(t *testing.T) {
@@ -758,8 +758,8 @@ func TestConvertToRecordIntegration(t *testing.T) {
 		require.IsType(t, &v2.Value_Numeric{}, fieldMap["someDecimal"].Value.Sum)
 		require.IsType(t, &v2.Value_Numeric{}, fieldMap["someMeasurement"].Value.Sum)
 
-		require.Equal(t, "0.0000000200", fieldMap["someDecimal"].Value.GetNumeric())
-		require.Equal(t, "0.0000000300", fieldMap["someMeasurement"].Value.GetNumeric())
+		require.Equal(t, "0.00000002", fieldMap["someDecimal"].Value.GetNumeric())
+		require.Equal(t, "0.00000003", fieldMap["someMeasurement"].Value.GetNumeric())
 	})
 }
 
@@ -1121,8 +1121,9 @@ func TestConvertToRecordRELTIME(t *testing.T) {
 		require.NotNil(t, record)
 		require.Len(t, record.Fields, 1)
 		require.Equal(t, "duration", record.Fields[0].Label)
+		require.Equal(t, "microseconds", record.Fields[0].Value.GetRecord().GetFields()[0].GetLabel())
 
-		int64Value := record.Fields[0].Value.GetInt64()
+		int64Value := record.GetFields()[0].GetValue().GetRecord().GetFields()[0].GetValue().GetInt64()
 		require.Equal(t, int64(1000000), int64Value)
 	})
 
@@ -1137,8 +1138,9 @@ func TestConvertToRecordRELTIME(t *testing.T) {
 		require.NotNil(t, record)
 		require.Len(t, record.Fields, 1)
 		require.Equal(t, "duration", record.Fields[0].Label)
+		require.Equal(t, "microseconds", record.Fields[0].Value.GetRecord().GetFields()[0].GetLabel())
 
-		int64Value := record.Fields[0].Value.GetInt64()
+		int64Value := record.GetFields()[0].GetValue().GetRecord().GetFields()[0].GetValue().GetInt64()
 		require.Equal(t, int64(300000000), int64Value)
 	})
 
@@ -1153,8 +1155,9 @@ func TestConvertToRecordRELTIME(t *testing.T) {
 		require.NotNil(t, record)
 		require.Len(t, record.Fields, 1)
 		require.Equal(t, "duration", record.Fields[0].Label)
+		require.Equal(t, "microseconds", record.Fields[0].Value.GetRecord().GetFields()[0].GetLabel())
 
-		int64Value := record.Fields[0].Value.GetInt64()
+		int64Value := record.GetFields()[0].GetValue().GetRecord().GetFields()[0].GetValue().GetInt64()
 		require.Equal(t, int64(100), int64Value)
 	})
 
@@ -1192,8 +1195,10 @@ func TestConvertToRecordRELTIME(t *testing.T) {
 
 		require.Equal(t, "alice", fieldMap["owner"].Value.GetParty())
 		require.Equal(t, "test reltime", fieldMap["name"].Value.GetText())
-		require.Equal(t, int64(30000000), fieldMap["duration"].Value.GetInt64())
-		require.Equal(t, int64(3600000000), fieldMap["maxDuration"].Value.GetInt64())
+		require.Equal(t, "microseconds", fieldMap["duration"].GetValue().GetRecord().GetFields()[0].GetLabel())
+		require.Equal(t, int64(30000000), fieldMap["duration"].GetValue().GetRecord().GetFields()[0].GetValue().GetInt64())
+		require.Equal(t, "microseconds", fieldMap["maxDuration"].GetValue().GetRecord().GetFields()[0].GetLabel())
+		require.Equal(t, int64(3600000000), fieldMap["maxDuration"].GetValue().GetRecord().GetFields()[0].GetValue().GetInt64())
 	})
 }
 
@@ -1390,8 +1395,10 @@ func TestConvertToRecordRELTIMEAndSETIntegration(t *testing.T) {
 		require.Equal(t, "alice", fieldMap["owner"].Value.GetParty())
 		require.Equal(t, "integration test", fieldMap["name"].Value.GetText())
 
-		require.Equal(t, int64(10000000), fieldMap["tickDuration"].Value.GetInt64())
-		require.Equal(t, int64(300000000), fieldMap["maxProcessingTime"].Value.GetInt64())
+		require.Equal(t, "microseconds", fieldMap["tickDuration"].Value.GetRecord().GetFields()[0].GetLabel())
+		require.Equal(t, int64(10000000), fieldMap["tickDuration"].Value.GetRecord().GetFields()[0].GetValue().GetInt64())
+		require.Equal(t, "microseconds", fieldMap["maxProcessingTime"].Value.GetRecord().GetFields()[0].GetLabel())
+		require.Equal(t, int64(300000000), fieldMap["maxProcessingTime"].Value.GetRecord().GetFields()[0].GetValue().GetInt64())
 
 		partiesSet := fieldMap["requiredParties"].Value.GetList()
 		require.NotNil(t, partiesSet)
@@ -1845,7 +1852,7 @@ func TestConvertToRecordGENMAP(t *testing.T) {
 		require.Equal(t, int64(100), entriesMap["int"].GetInt64())
 		require.Equal(t, "test", entriesMap["text"].GetText())
 		require.Equal(t, false, entriesMap["bool"].GetBool())
-		require.Equal(t, "0.0000000500", entriesMap["numeric"].GetNumeric())
+		require.Equal(t, "0.00000005", entriesMap["numeric"].GetNumeric())
 	})
 
 	t.Run("GENMAP with empty map", func(t *testing.T) {

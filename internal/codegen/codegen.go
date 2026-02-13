@@ -424,9 +424,6 @@ func getPackageName(mainDalf string) string {
 	parts := strings.Split(mainDalf, "/")
 	filename := strings.TrimSuffix(parts[len(parts)-1], ".dalf")
 
-	// Strip version pattern like "-1.0.0", "-2.9.1", etc.
-	filename = stripVersionFromPackageName(filename)
-
 	lastHyphen := strings.LastIndex(filename, "-")
 	if lastHyphen == -1 {
 		return strings.ToLower(filename)
@@ -442,9 +439,12 @@ func getPackageName(mainDalf string) string {
 			}
 		}
 		if allHex {
-			return strings.ToLower(filename[:lastHyphen])
+			filename = filename[:lastHyphen]
 		}
 	}
+
+	// Strip version pattern like "-1.0.0", "-2.9.1", etc.
+	filename = stripVersionFromPackageName(filename)
 
 	return strings.ToLower(filename)
 }

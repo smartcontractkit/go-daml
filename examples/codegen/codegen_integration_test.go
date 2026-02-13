@@ -10,7 +10,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-	interfaces "github.com/smartcontractkit/go-daml/examples/codegen/interfaces"
+	"github.com/smartcontractkit/go-daml/examples/codegen/interfaces"
 	"github.com/smartcontractkit/go-daml/pkg/client"
 	"github.com/smartcontractkit/go-daml/pkg/errors"
 	"github.com/smartcontractkit/go-daml/pkg/model"
@@ -29,8 +29,7 @@ func TestCodegenIntegration(t *testing.T) {
 	zerolog.SetGlobalLevel(zerolog.InfoLevel)
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
+	ctx := t.Context()
 
 	var err error
 	if err = cl.ValidateSDKVersion(ctx, SDKVersion); err != nil {
@@ -67,15 +66,15 @@ func TestCodegenIntegration(t *testing.T) {
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to list user rights")
 	}
-	rightsGranded := false
+	rightsGranted := false
 	for _, r := range rights {
 		canAct, ok := r.Type.(model.RightType).(model.CanActAs)
 		if ok && canAct.Party == party {
-			rightsGranded = true
+			rightsGranted = true
 		}
 	}
 
-	if !rightsGranded {
+	if !rightsGranted {
 		log.Info().Msg("grant rights")
 		newRights := make([]*model.Right, 0)
 		newRights = append(newRights, &model.Right{Type: model.CanReadAs{Party: party}})
