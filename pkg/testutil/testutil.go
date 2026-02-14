@@ -295,7 +295,7 @@ func initDamlSandbox(ctx context.Context, dockerPool *dockertest.Pool) (*dockert
 				log.Info().Str("container", containerName).Msg("Successfully attached to existing container")
 				return existingResource, grpcAddr, adminAddr
 			}
-			log.Fatal().Err(err).Msg("Container exists but could not attach to it")
+			log.Fatal().Err(findErr).Msg("Container exists but could not attach to it")
 		}
 		log.Fatal().Err(err).Msg("Could not start DAML sandbox")
 	}
