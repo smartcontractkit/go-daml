@@ -6,47 +6,46 @@ import (
 	"math/big"
 	"strings"
 
+	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
 	. "github.com/smartcontractkit/go-daml/pkg/types"
 )
 
 var (
+	_ = fmt.Sprintf
 	_ = errors.New
 	_ = big.NewInt
 	_ = strings.NewReader
+	_ = model.Command{}
+	_ bind.BoundTemplate
 )
 
+const PackageName = "test"
 const SDKVersion = "2.9.1"
-
-const packageName = "test-1.0.0"
 
 type Template interface {
 	CreateCommand() *model.CreateCommand
 	GetTemplateID() string
 }
 
-func argsToMap(args interface{}) map[string]interface{} {
+func argsToMap(args any) map[string]any {
 	if args == nil {
-		return map[string]interface{}{}
+		return map[string]any{}
 	}
 
-	if m, ok := args.(map[string]interface{}); ok {
+	if m, ok := args.(map[string]any); ok {
 		return m
 	}
 
-	// Check if the type has a ToMap method
 	type mapper interface {
-		ToMap() map[string]interface{}
+		ToMap() map[string]any
 	}
-
 	if mapper, ok := args.(mapper); ok {
 		return mapper.ToMap()
 	}
 
-	return map[string]interface{}{
-		"args": args,
-	}
+	return map[string]any{"args": args}
 }
 
 // Address is a variant/union type
@@ -61,7 +60,7 @@ func (v Address) MarshalJSON() ([]byte, error) {
 	return jsonCodec.Marshall(v)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for Address
+// UnmarshalJSON implements custom JSON unmarshalling for Address
 func (v *Address) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, v)
@@ -82,7 +81,7 @@ func (v Address) GetVariantTag() string {
 }
 
 // GetVariantValue implements types.VARIANT interface
-func (v Address) GetVariantValue() interface{} {
+func (v Address) GetVariantValue() any {
 
 	if v.US != nil {
 		return v.US
@@ -95,7 +94,6 @@ func (v Address) GetVariantValue() interface{} {
 	return nil
 }
 
-// Verify interface implementation
 var _ VARIANT = (*Address)(nil)
 
 // American is a Template type
@@ -104,18 +102,31 @@ type American struct {
 	Address USAddress `json:"address"`
 }
 
-// GetTemplateID returns the template ID for this template
+// GetTemplateID returns the template ID for this template using the package name
 func (t American) GetTemplateID() string {
-	return fmt.Sprintf("#%s:%s:%s", packageName, "Address", "American")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "Address", "American")
 }
 
-// CreateCommand returns a CreateCommand for this template
-func (t American) CreateCommand() *model.CreateCommand {
-	args := make(map[string]interface{})
+// GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
+func (t American) GetTemplateIDWithPackageID(packageID string) string {
+	return fmt.Sprintf("%s:%s:%s", packageID, "Address", "American")
+}
 
+// CreateCommand returns a CreateCommand for this template using the package name
+func (t American) CreateCommand() *model.CreateCommand {
+	args := make(map[string]any)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["person"] = t.Person.ToMap()
 
-	args["address"] = t.Address
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["address"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Address).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Address
+	}()
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateID(),
@@ -123,13 +134,33 @@ func (t American) CreateCommand() *model.CreateCommand {
 	}
 }
 
-// MarshalJSON implements custom JSON marshaling for American using JsonCodec
+// CreateCommandWithPackageID returns a CreateCommand using the provided package ID instead of package name
+func (t American) CreateCommandWithPackageID(packageID string) *model.CreateCommand {
+	args := make(map[string]any)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["person"] = t.Person.ToMap()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["address"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Address).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Address
+	}()
+
+	return &model.CreateCommand{
+		TemplateID: t.GetTemplateIDWithPackageID(packageID),
+		Arguments:  args,
+	}
+}
+
 func (t American) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for American using JsonCodec
 func (t *American) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -138,12 +169,23 @@ func (t *American) UnmarshalJSON(data []byte) error {
 // Choice methods for American
 
 // Archive exercises the Archive choice on this American contract
+// This method uses the package name in the template ID
 func (t American) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageName, "Address", "American"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "Address", "American"),
 		ContractID: contractID,
 		Choice:     "Archive",
-		Arguments:  map[string]interface{}{},
+		Arguments:  map[string]any{},
+	}
+}
+
+// ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
+func (t American) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "Address", "American"),
+		ContractID: contractID,
+		Choice:     "Archive",
+		Arguments:  map[string]any{},
 	}
 }
 
@@ -153,18 +195,31 @@ type Briton struct {
 	Address UKAddress `json:"address"`
 }
 
-// GetTemplateID returns the template ID for this template
+// GetTemplateID returns the template ID for this template using the package name
 func (t Briton) GetTemplateID() string {
-	return fmt.Sprintf("#%s:%s:%s", packageName, "Address", "Briton")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "Address", "Briton")
 }
 
-// CreateCommand returns a CreateCommand for this template
-func (t Briton) CreateCommand() *model.CreateCommand {
-	args := make(map[string]interface{})
+// GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
+func (t Briton) GetTemplateIDWithPackageID(packageID string) string {
+	return fmt.Sprintf("%s:%s:%s", packageID, "Address", "Briton")
+}
 
+// CreateCommand returns a CreateCommand for this template using the package name
+func (t Briton) CreateCommand() *model.CreateCommand {
+	args := make(map[string]any)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["person"] = t.Person.ToMap()
 
-	args["address"] = t.Address
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["address"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Address).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Address
+	}()
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateID(),
@@ -172,13 +227,33 @@ func (t Briton) CreateCommand() *model.CreateCommand {
 	}
 }
 
-// MarshalJSON implements custom JSON marshaling for Briton using JsonCodec
+// CreateCommandWithPackageID returns a CreateCommand using the provided package ID instead of package name
+func (t Briton) CreateCommandWithPackageID(packageID string) *model.CreateCommand {
+	args := make(map[string]any)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["person"] = t.Person.ToMap()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["address"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Address).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Address
+	}()
+
+	return &model.CreateCommand{
+		TemplateID: t.GetTemplateIDWithPackageID(packageID),
+		Arguments:  args,
+	}
+}
+
 func (t Briton) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for Briton using JsonCodec
 func (t *Briton) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -187,12 +262,23 @@ func (t *Briton) UnmarshalJSON(data []byte) error {
 // Choice methods for Briton
 
 // Archive exercises the Archive choice on this Briton contract
+// This method uses the package name in the template ID
 func (t Briton) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageName, "Address", "Briton"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "Address", "Briton"),
 		ContractID: contractID,
 		Choice:     "Archive",
-		Arguments:  map[string]interface{}{},
+		Arguments:  map[string]any{},
+	}
+}
+
+// ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
+func (t Briton) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "Address", "Briton"),
+		ContractID: contractID,
+		Choice:     "Archive",
+		Arguments:  map[string]any{},
 	}
 }
 
@@ -202,24 +288,30 @@ type OptionalFields struct {
 	AMaybe OPTIONAL `json:"aMaybe"`
 }
 
-// GetTemplateID returns the template ID for this template
+// GetTemplateID returns the template ID for this template using the package name
 func (t OptionalFields) GetTemplateID() string {
-	return fmt.Sprintf("#%s:%s:%s", packageName, "Primitives", "OptionalFields")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "Primitives", "OptionalFields")
 }
 
-// CreateCommand returns a CreateCommand for this template
-func (t OptionalFields) CreateCommand() *model.CreateCommand {
-	args := make(map[string]interface{})
+// GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
+func (t OptionalFields) GetTemplateIDWithPackageID(packageID string) string {
+	return fmt.Sprintf("%s:%s:%s", packageID, "Primitives", "OptionalFields")
+}
 
+// CreateCommand returns a CreateCommand for this template using the package name
+func (t OptionalFields) CreateCommand() *model.CreateCommand {
+	args := make(map[string]any)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["party"] = t.Party.ToMap()
 
 	if t.AMaybe != nil {
-		args["aMaybe"] = map[string]interface{}{
+		args["aMaybe"] = map[string]any{
 			"_type": "optional",
 			"value": *t.AMaybe,
 		}
 	} else {
-		args["aMaybe"] = map[string]interface{}{
+		args["aMaybe"] = map[string]any{
 			"_type": "optional",
 		}
 	}
@@ -230,13 +322,35 @@ func (t OptionalFields) CreateCommand() *model.CreateCommand {
 	}
 }
 
-// MarshalJSON implements custom JSON marshaling for OptionalFields using JsonCodec
+// CreateCommandWithPackageID returns a CreateCommand using the provided package ID instead of package name
+func (t OptionalFields) CreateCommandWithPackageID(packageID string) *model.CreateCommand {
+	args := make(map[string]any)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["party"] = t.Party.ToMap()
+
+	if t.AMaybe != nil {
+		args["aMaybe"] = map[string]any{
+			"_type": "optional",
+			"value": *t.AMaybe,
+		}
+	} else {
+		args["aMaybe"] = map[string]any{
+			"_type": "optional",
+		}
+	}
+
+	return &model.CreateCommand{
+		TemplateID: t.GetTemplateIDWithPackageID(packageID),
+		Arguments:  args,
+	}
+}
+
 func (t OptionalFields) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for OptionalFields using JsonCodec
 func (t *OptionalFields) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -245,19 +359,41 @@ func (t *OptionalFields) UnmarshalJSON(data []byte) error {
 // Choice methods for OptionalFields
 
 // Archive exercises the Archive choice on this OptionalFields contract
+// This method uses the package name in the template ID
 func (t OptionalFields) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageName, "Primitives", "OptionalFields"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "Primitives", "OptionalFields"),
 		ContractID: contractID,
 		Choice:     "Archive",
-		Arguments:  map[string]interface{}{},
+		Arguments:  map[string]any{},
+	}
+}
+
+// ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
+func (t OptionalFields) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "Primitives", "OptionalFields"),
+		ContractID: contractID,
+		Choice:     "Archive",
+		Arguments:  map[string]any{},
 	}
 }
 
 // OptionalFieldsCleanUp exercises the OptionalFieldsCleanUp choice on this OptionalFields contract
+// This method uses the package name in the template ID
 func (t OptionalFields) OptionalFieldsCleanUp(contractID string, args OptionalFieldsCleanUp) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageName, "Primitives", "OptionalFields"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "Primitives", "OptionalFields"),
+		ContractID: contractID,
+		Choice:     "OptionalFieldsCleanUp",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// OptionalFieldsCleanUpWithPackageID exercises the OptionalFieldsCleanUp choice using the provided package ID instead of package name
+func (t OptionalFields) OptionalFieldsCleanUpWithPackageID(contractID string, packageID string, args OptionalFieldsCleanUp) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "Primitives", "OptionalFields"),
 		ContractID: contractID,
 		Choice:     "OptionalFieldsCleanUp",
 		Arguments:  argsToMap(args),
@@ -269,19 +405,16 @@ type OptionalFieldsCleanUp struct {
 }
 
 // ToMap converts OptionalFieldsCleanUp to a map for DAML arguments
-func (t OptionalFieldsCleanUp) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
-
+func (t OptionalFieldsCleanUp) ToMap() map[string]any {
+	m := make(map[string]any)
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for OptionalFieldsCleanUp using JsonCodec
 func (t OptionalFieldsCleanUp) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for OptionalFieldsCleanUp using JsonCodec
 func (t *OptionalFieldsCleanUp) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -293,18 +426,31 @@ type Person struct {
 	Address Address `json:"address"`
 }
 
-// GetTemplateID returns the template ID for this template
+// GetTemplateID returns the template ID for this template using the package name
 func (t Person) GetTemplateID() string {
-	return fmt.Sprintf("#%s:%s:%s", packageName, "Address", "Person")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "Address", "Person")
 }
 
-// CreateCommand returns a CreateCommand for this template
-func (t Person) CreateCommand() *model.CreateCommand {
-	args := make(map[string]interface{})
+// GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
+func (t Person) GetTemplateIDWithPackageID(packageID string) string {
+	return fmt.Sprintf("%s:%s:%s", packageID, "Address", "Person")
+}
 
+// CreateCommand returns a CreateCommand for this template using the package name
+func (t Person) CreateCommand() *model.CreateCommand {
+	args := make(map[string]any)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["person"] = t.Person.ToMap()
 
-	args["address"] = t.Address
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["address"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Address).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Address
+	}()
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateID(),
@@ -312,13 +458,33 @@ func (t Person) CreateCommand() *model.CreateCommand {
 	}
 }
 
-// MarshalJSON implements custom JSON marshaling for Person using JsonCodec
+// CreateCommandWithPackageID returns a CreateCommand using the provided package ID instead of package name
+func (t Person) CreateCommandWithPackageID(packageID string) *model.CreateCommand {
+	args := make(map[string]any)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["person"] = t.Person.ToMap()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["address"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Address).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Address
+	}()
+
+	return &model.CreateCommand{
+		TemplateID: t.GetTemplateIDWithPackageID(packageID),
+		Arguments:  args,
+	}
+}
+
 func (t Person) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for Person using JsonCodec
 func (t *Person) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -327,12 +493,23 @@ func (t *Person) UnmarshalJSON(data []byte) error {
 // Choice methods for Person
 
 // Archive exercises the Archive choice on this Person contract
+// This method uses the package name in the template ID
 func (t Person) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageName, "Address", "Person"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "Address", "Person"),
 		ContractID: contractID,
 		Choice:     "Archive",
-		Arguments:  map[string]interface{}{},
+		Arguments:  map[string]any{},
+	}
+}
+
+// ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
+func (t Person) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "Address", "Person"),
+		ContractID: contractID,
+		Choice:     "Archive",
+		Arguments:  map[string]any{},
 	}
 }
 
@@ -347,29 +524,40 @@ type SimpleFields struct {
 	ADatetime TIMESTAMP `json:"aDatetime"`
 }
 
-// GetTemplateID returns the template ID for this template
+// GetTemplateID returns the template ID for this template using the package name
 func (t SimpleFields) GetTemplateID() string {
-	return fmt.Sprintf("#%s:%s:%s", packageName, "Primitives", "SimpleFields")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "Primitives", "SimpleFields")
 }
 
-// CreateCommand returns a CreateCommand for this template
-func (t SimpleFields) CreateCommand() *model.CreateCommand {
-	args := make(map[string]interface{})
+// GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
+func (t SimpleFields) GetTemplateIDWithPackageID(packageID string) string {
+	return fmt.Sprintf("%s:%s:%s", packageID, "Primitives", "SimpleFields")
+}
 
+// CreateCommand returns a CreateCommand for this template using the package name
+func (t SimpleFields) CreateCommand() *model.CreateCommand {
+	args := make(map[string]any)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["party"] = t.Party.ToMap()
 
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["aBool"] = bool(t.ABool)
 
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["aInt"] = int64(t.AInt)
 
-	if t.ADecimal != nil {
-		args["aDecimal"] = (*big.Int)(t.ADecimal)
+	if t.ADecimal != "" {
+		args["aDecimal"] = t.ADecimal
 	}
 
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["aText"] = string(t.AText)
 
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["aDate"] = t.ADate
 
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["aDatetime"] = t.ADatetime
 
 	return &model.CreateCommand{
@@ -378,13 +566,43 @@ func (t SimpleFields) CreateCommand() *model.CreateCommand {
 	}
 }
 
-// MarshalJSON implements custom JSON marshaling for SimpleFields using JsonCodec
+// CreateCommandWithPackageID returns a CreateCommand using the provided package ID instead of package name
+func (t SimpleFields) CreateCommandWithPackageID(packageID string) *model.CreateCommand {
+	args := make(map[string]any)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["party"] = t.Party.ToMap()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["aBool"] = bool(t.ABool)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["aInt"] = int64(t.AInt)
+
+	if t.ADecimal != "" {
+		args["aDecimal"] = t.ADecimal
+	}
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["aText"] = string(t.AText)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["aDate"] = t.ADate
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["aDatetime"] = t.ADatetime
+
+	return &model.CreateCommand{
+		TemplateID: t.GetTemplateIDWithPackageID(packageID),
+		Arguments:  args,
+	}
+}
+
 func (t SimpleFields) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for SimpleFields using JsonCodec
 func (t *SimpleFields) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -393,9 +611,20 @@ func (t *SimpleFields) UnmarshalJSON(data []byte) error {
 // Choice methods for SimpleFields
 
 // SimpleFieldsCleanUp exercises the SimpleFieldsCleanUp choice on this SimpleFields contract
+// This method uses the package name in the template ID
 func (t SimpleFields) SimpleFieldsCleanUp(contractID string, args SimpleFieldsCleanUp) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageName, "Primitives", "SimpleFields"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "Primitives", "SimpleFields"),
+		ContractID: contractID,
+		Choice:     "SimpleFieldsCleanUp",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// SimpleFieldsCleanUpWithPackageID exercises the SimpleFieldsCleanUp choice using the provided package ID instead of package name
+func (t SimpleFields) SimpleFieldsCleanUpWithPackageID(contractID string, packageID string, args SimpleFieldsCleanUp) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "Primitives", "SimpleFields"),
 		ContractID: contractID,
 		Choice:     "SimpleFieldsCleanUp",
 		Arguments:  argsToMap(args),
@@ -403,12 +632,23 @@ func (t SimpleFields) SimpleFieldsCleanUp(contractID string, args SimpleFieldsCl
 }
 
 // Archive exercises the Archive choice on this SimpleFields contract
+// This method uses the package name in the template ID
 func (t SimpleFields) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageName, "Primitives", "SimpleFields"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "Primitives", "SimpleFields"),
 		ContractID: contractID,
 		Choice:     "Archive",
-		Arguments:  map[string]interface{}{},
+		Arguments:  map[string]any{},
+	}
+}
+
+// ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
+func (t SimpleFields) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "Primitives", "SimpleFields"),
+		ContractID: contractID,
+		Choice:     "Archive",
+		Arguments:  map[string]any{},
 	}
 }
 
@@ -417,19 +657,16 @@ type SimpleFieldsCleanUp struct {
 }
 
 // ToMap converts SimpleFieldsCleanUp to a map for DAML arguments
-func (t SimpleFieldsCleanUp) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
-
+func (t SimpleFieldsCleanUp) ToMap() map[string]any {
+	m := make(map[string]any)
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for SimpleFieldsCleanUp using JsonCodec
 func (t SimpleFieldsCleanUp) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for SimpleFieldsCleanUp using JsonCodec
 func (t *SimpleFieldsCleanUp) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -445,8 +682,8 @@ type UKAddress struct {
 }
 
 // ToMap converts UKAddress to a map for DAML arguments
-func (t UKAddress) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t UKAddress) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["address"] = t.Address
 
@@ -461,13 +698,11 @@ func (t UKAddress) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for UKAddress using JsonCodec
 func (t UKAddress) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for UKAddress using JsonCodec
 func (t *UKAddress) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -482,8 +717,8 @@ type USAddress struct {
 }
 
 // ToMap converts USAddress to a map for DAML arguments
-func (t USAddress) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t USAddress) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["address"] = t.Address
 
@@ -496,13 +731,11 @@ func (t USAddress) ToMap() map[string]interface{} {
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for USAddress using JsonCodec
 func (t USAddress) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for USAddress using JsonCodec
 func (t *USAddress) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)

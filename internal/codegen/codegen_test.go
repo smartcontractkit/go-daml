@@ -3,6 +3,7 @@ package codegen
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -205,7 +206,7 @@ func TestGetMainDalfAllTypes(t *testing.T) {
 		require.Fail(t, "OptionalFields should be either Record or Template type, got: %s", optionalFieldsStruct.RawType)
 	}
 
-	res, err := Bind("main", ast.Name, manifest.SdkVersion, ast.Structs, true, false)
+	res, err := Bind("main", strings.ToLower(ast.Name), manifest.SdkVersion, ast.Structs, true, false)
 	require.NoError(t, err)
 	require.NotEmpty(t, res)
 

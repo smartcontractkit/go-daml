@@ -21,7 +21,7 @@ type tmplData struct {
 	ChoiceArgTypes   map[string]bool // Types used as choice arguments (for Encode functions)
 }
 
-//go:embed source.go.tpl
+//go:embed source.go.tmpl
 var tmplSource string
 
 func Bind(pkg string, packageName string, sdkVersion string, structs map[string]*model.TmplStruct, isMainDalf bool, generateHexCodec bool) (string, error) {

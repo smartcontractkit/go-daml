@@ -6,47 +6,46 @@ import (
 	"math/big"
 	"strings"
 
+	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
 	. "github.com/smartcontractkit/go-daml/pkg/types"
 )
 
 var (
+	_ = fmt.Sprintf
 	_ = errors.New
 	_ = big.NewInt
 	_ = strings.NewReader
+	_ = model.Command{}
+	_ bind.BoundTemplate
 )
 
+const PackageName = "all-kinds-of"
 const SDKVersion = "3.3.0-snapshot.20250417.0"
-
-const packageName = "all-kinds-of-1.0.0"
 
 type Template interface {
 	CreateCommand() *model.CreateCommand
 	GetTemplateID() string
 }
 
-func argsToMap(args interface{}) map[string]interface{} {
+func argsToMap(args any) map[string]any {
 	if args == nil {
-		return map[string]interface{}{}
+		return map[string]any{}
 	}
 
-	if m, ok := args.(map[string]interface{}); ok {
+	if m, ok := args.(map[string]any); ok {
 		return m
 	}
 
-	// Check if the type has a ToMap method
 	type mapper interface {
-		ToMap() map[string]interface{}
+		ToMap() map[string]any
 	}
-
 	if mapper, ok := args.(mapper); ok {
 		return mapper.ToMap()
 	}
 
-	return map[string]interface{}{
-		"args": args,
-	}
+	return map[string]any{"args": args}
 }
 
 // Accept is a Record type
@@ -54,19 +53,16 @@ type Accept struct {
 }
 
 // ToMap converts Accept to a map for DAML arguments
-func (t Accept) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
-
+func (t Accept) ToMap() map[string]any {
+	m := make(map[string]any)
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for Accept using JsonCodec
 func (t Accept) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for Accept using JsonCodec
 func (t *Accept) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -76,34 +72,34 @@ func (t *Accept) UnmarshalJSON(data []byte) error {
 type Color string
 
 const (
-	ColorRed   Color = "Red"
+	ColorRed Color = "Red"
+
 	ColorGreen Color = "Green"
-	ColorBlue  Color = "Blue"
+
+	ColorBlue Color = "Blue"
 )
 
-// GetEnumConstructor implements types.ENUM interface
-func (e Color) GetEnumConstructor() string {
-	return string(e)
-}
+func (e Color) GetEnumConstructor() string { return string(e) }
 
-// GetEnumTypeID implements types.ENUM interface
 func (e Color) GetEnumTypeID() string {
-	return fmt.Sprintf("#%s:%s:%s", packageName, "AllKindsOf", "Color")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "AllKindsOf", "Color")
 }
 
-// MarshalJSON implements custom JSON marshaling for Color using JsonCodec
+// GetEnumTypeIDWithPackageID returns the enum type ID using the provided package ID instead of package name
+func (e Color) GetEnumTypeIDWithPackageID(packageID string) string {
+	return fmt.Sprintf("#%s:%s:%s", packageID, "AllKindsOf", "Color")
+}
+
 func (e Color) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(e)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for Color using JsonCodec
 func (e *Color) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, e)
 }
 
-// Verify interface implementation
 var _ ENUM = Color("")
 
 // MappyContract is a Template type
@@ -112,20 +108,31 @@ type MappyContract struct {
 	Value    TEXTMAP `json:"value"`
 }
 
-// GetTemplateID returns the template ID for this template
+// GetTemplateID returns the template ID for this template using the package name
 func (t MappyContract) GetTemplateID() string {
-	return fmt.Sprintf("#%s:%s:%s", packageName, "AllKindsOf", "MappyContract")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "AllKindsOf", "MappyContract")
 }
 
-// CreateCommand returns a CreateCommand for this template
-func (t MappyContract) CreateCommand() *model.CreateCommand {
-	args := make(map[string]interface{})
+// GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
+func (t MappyContract) GetTemplateIDWithPackageID(packageID string) string {
+	return fmt.Sprintf("%s:%s:%s", packageID, "AllKindsOf", "MappyContract")
+}
 
+// CreateCommand returns a CreateCommand for this template using the package name
+func (t MappyContract) CreateCommand() *model.CreateCommand {
+	args := make(map[string]any)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["operator"] = t.Operator.ToMap()
 
-	if t.Value != nil && len(t.Value) > 0 {
-		args["value"] = map[string]interface{}{"_type": "textmap", "value": t.Value}
-	}
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["value"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Value).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Value
+	}()
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateID(),
@@ -133,13 +140,33 @@ func (t MappyContract) CreateCommand() *model.CreateCommand {
 	}
 }
 
-// MarshalJSON implements custom JSON marshaling for MappyContract using JsonCodec
+// CreateCommandWithPackageID returns a CreateCommand using the provided package ID instead of package name
+func (t MappyContract) CreateCommandWithPackageID(packageID string) *model.CreateCommand {
+	args := make(map[string]any)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["operator"] = t.Operator.ToMap()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["value"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Value).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Value
+	}()
+
+	return &model.CreateCommand{
+		TemplateID: t.GetTemplateIDWithPackageID(packageID),
+		Arguments:  args,
+	}
+}
+
 func (t MappyContract) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for MappyContract using JsonCodec
 func (t *MappyContract) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -148,39 +175,60 @@ func (t *MappyContract) UnmarshalJSON(data []byte) error {
 // Choice methods for MappyContract
 
 // Archive exercises the Archive choice on this MappyContract contract
+// This method uses the package name in the template ID
 func (t MappyContract) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageName, "AllKindsOf", "MappyContract"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "AllKindsOf", "MappyContract"),
 		ContractID: contractID,
 		Choice:     "Archive",
-		Arguments:  map[string]interface{}{},
+		Arguments:  map[string]any{},
+	}
+}
+
+// ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
+func (t MappyContract) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "AllKindsOf", "MappyContract"),
+		ContractID: contractID,
+		Choice:     "Archive",
+		Arguments:  map[string]any{},
 	}
 }
 
 // MyPair is a Record type
 type MyPair struct {
-	Left  interface{} `json:"left"`
-	Right interface{} `json:"right"`
+	Left  any `json:"left"`
+	Right any `json:"right"`
 }
 
 // ToMap converts MyPair to a map for DAML arguments
-func (t MyPair) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t MyPair) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["left"] = t.Left
+	m["left"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Left).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Left
+	}()
 
-	m["right"] = t.Right
+	m["right"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.Right).(mapper); ok {
+			return m.toMap()
+		}
+		return t.Right
+	}()
 
 	return m
 }
 
-// MarshalJSON implements custom JSON marshaling for MyPair using JsonCodec
 func (t MyPair) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for MyPair using JsonCodec
 func (t *MyPair) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -206,70 +254,116 @@ type OneOfEverything struct {
 	TheUnit         UNIT      `json:"theUnit"`
 }
 
-// GetTemplateID returns the template ID for this template
+// GetTemplateID returns the template ID for this template using the package name
 func (t OneOfEverything) GetTemplateID() string {
-	return fmt.Sprintf("#%s:%s:%s", packageName, "AllKindsOf", "OneOfEverything")
+	return fmt.Sprintf("#%s:%s:%s", PackageName, "AllKindsOf", "OneOfEverything")
 }
 
-// CreateCommand returns a CreateCommand for this template
-func (t OneOfEverything) CreateCommand() *model.CreateCommand {
-	args := make(map[string]interface{})
+// GetTemplateIDWithPackageID returns the template ID using the provided package ID instead of package name
+func (t OneOfEverything) GetTemplateIDWithPackageID(packageID string) string {
+	return fmt.Sprintf("%s:%s:%s", packageID, "AllKindsOf", "OneOfEverything")
+}
 
+// CreateCommand returns a CreateCommand for this template using the package name
+func (t OneOfEverything) CreateCommand() *model.CreateCommand {
+	args := make(map[string]any)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["operator"] = t.Operator.ToMap()
 
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["someBoolean"] = bool(t.SomeBoolean)
 
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["someInteger"] = int64(t.SomeInteger)
 
-	if t.SomeDecimal != nil {
-		args["someDecimal"] = (*big.Int)(t.SomeDecimal)
+	if t.SomeDecimal != "" {
+		args["someDecimal"] = t.SomeDecimal
 	}
 
 	if t.SomeMaybe != nil {
-		args["someMaybe"] = map[string]interface{}{
+		args["someMaybe"] = map[string]any{
 			"_type": "optional",
 			"value": int64(*t.SomeMaybe),
 		}
 	} else {
-		args["someMaybe"] = map[string]interface{}{
+		args["someMaybe"] = map[string]any{
 			"_type": "optional",
 		}
 	}
 
 	if t.SomeMaybeNot != nil {
-		args["someMaybeNot"] = map[string]interface{}{
+		args["someMaybeNot"] = map[string]any{
 			"_type": "optional",
 			"value": int64(*t.SomeMaybeNot),
 		}
 	} else {
-		args["someMaybeNot"] = map[string]interface{}{
+		args["someMaybeNot"] = map[string]any{
 			"_type": "optional",
 		}
 	}
 
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["someText"] = string(t.SomeText)
 
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["someDate"] = t.SomeDate
 
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["someDatetime"] = t.SomeDatetime
 
-	args["someSimpleList"] = t.SomeSimpleList
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["someSimpleList"] = func() []any {
+		res := make([]any, 0, len(t.SomeSimpleList))
+		for _, e := range t.SomeSimpleList {
+			res = append(res, int64(e))
+		}
+		return res
+	}()
 
-	args["someSimplePair"] = t.SomeSimplePair
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["someSimplePair"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.SomeSimplePair).(mapper); ok {
+			return m.toMap()
+		}
+		return t.SomeSimplePair
+	}()
 
-	args["someNestedPair"] = t.SomeNestedPair
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["someNestedPair"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.SomeNestedPair).(mapper); ok {
+			return m.toMap()
+		}
+		return t.SomeNestedPair
+	}()
 
-	args["someUglyNesting"] = t.SomeUglyNesting
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["someUglyNesting"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.SomeUglyNesting).(mapper); ok {
+			return m.toMap()
+		}
+		return t.SomeUglyNesting
+	}()
 
-	if t.SomeMeasurement != nil {
-		args["someMeasurement"] = (*big.Int)(t.SomeMeasurement)
+	if t.SomeMeasurement != "" {
+		args["someMeasurement"] = t.SomeMeasurement
 	}
 
 	if t.SomeEnum != "" {
-		args["someEnum"] = t.SomeEnum
+		args["someEnum"] = func() any {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(t.SomeEnum).(mapper); ok {
+				return m.toMap()
+			}
+			return t.SomeEnum
+		}()
 	}
 
-	args["theUnit"] = map[string]interface{}{"_type": "unit"}
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["theUnit"] = map[string]any{"_type": "unit"}
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateID(),
@@ -277,13 +371,118 @@ func (t OneOfEverything) CreateCommand() *model.CreateCommand {
 	}
 }
 
-// MarshalJSON implements custom JSON marshaling for OneOfEverything using JsonCodec
+// CreateCommandWithPackageID returns a CreateCommand using the provided package ID instead of package name
+func (t OneOfEverything) CreateCommandWithPackageID(packageID string) *model.CreateCommand {
+	args := make(map[string]any)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["operator"] = t.Operator.ToMap()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["someBoolean"] = bool(t.SomeBoolean)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["someInteger"] = int64(t.SomeInteger)
+
+	if t.SomeDecimal != "" {
+		args["someDecimal"] = t.SomeDecimal
+	}
+
+	if t.SomeMaybe != nil {
+		args["someMaybe"] = map[string]any{
+			"_type": "optional",
+			"value": int64(*t.SomeMaybe),
+		}
+	} else {
+		args["someMaybe"] = map[string]any{
+			"_type": "optional",
+		}
+	}
+
+	if t.SomeMaybeNot != nil {
+		args["someMaybeNot"] = map[string]any{
+			"_type": "optional",
+			"value": int64(*t.SomeMaybeNot),
+		}
+	} else {
+		args["someMaybeNot"] = map[string]any{
+			"_type": "optional",
+		}
+	}
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["someText"] = string(t.SomeText)
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["someDate"] = t.SomeDate
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["someDatetime"] = t.SomeDatetime
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["someSimpleList"] = func() []any {
+		res := make([]any, 0, len(t.SomeSimpleList))
+		for _, e := range t.SomeSimpleList {
+			res = append(res, int64(e))
+		}
+		return res
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["someSimplePair"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.SomeSimplePair).(mapper); ok {
+			return m.toMap()
+		}
+		return t.SomeSimplePair
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["someNestedPair"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.SomeNestedPair).(mapper); ok {
+			return m.toMap()
+		}
+		return t.SomeNestedPair
+	}()
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["someUglyNesting"] = func() any {
+		type mapper interface{ toMap() map[string]any }
+		if m, ok := any(t.SomeUglyNesting).(mapper); ok {
+			return m.toMap()
+		}
+		return t.SomeUglyNesting
+	}()
+
+	if t.SomeMeasurement != "" {
+		args["someMeasurement"] = t.SomeMeasurement
+	}
+
+	if t.SomeEnum != "" {
+		args["someEnum"] = func() any {
+			type mapper interface{ toMap() map[string]any }
+			if m, ok := any(t.SomeEnum).(mapper); ok {
+				return m.toMap()
+			}
+			return t.SomeEnum
+		}()
+	}
+
+	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
+	args["theUnit"] = map[string]any{"_type": "unit"}
+
+	return &model.CreateCommand{
+		TemplateID: t.GetTemplateIDWithPackageID(packageID),
+		Arguments:  args,
+	}
+}
+
 func (t OneOfEverything) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Marshall(t)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for OneOfEverything using JsonCodec
 func (t *OneOfEverything) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, t)
@@ -292,19 +491,41 @@ func (t *OneOfEverything) UnmarshalJSON(data []byte) error {
 // Choice methods for OneOfEverything
 
 // Archive exercises the Archive choice on this OneOfEverything contract
+// This method uses the package name in the template ID
 func (t OneOfEverything) Archive(contractID string) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageName, "AllKindsOf", "OneOfEverything"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "AllKindsOf", "OneOfEverything"),
 		ContractID: contractID,
 		Choice:     "Archive",
-		Arguments:  map[string]interface{}{},
+		Arguments:  map[string]any{},
+	}
+}
+
+// ArchiveWithPackageID exercises the Archive choice using the provided package ID instead of package name
+func (t OneOfEverything) ArchiveWithPackageID(contractID string, packageID string) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "AllKindsOf", "OneOfEverything"),
+		ContractID: contractID,
+		Choice:     "Archive",
+		Arguments:  map[string]any{},
 	}
 }
 
 // Accept exercises the Accept choice on this OneOfEverything contract
+// This method uses the package name in the template ID
 func (t OneOfEverything) Accept(contractID string, args Accept) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
-		TemplateID: fmt.Sprintf("#%s:%s:%s", packageName, "AllKindsOf", "OneOfEverything"),
+		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "AllKindsOf", "OneOfEverything"),
+		ContractID: contractID,
+		Choice:     "Accept",
+		Arguments:  argsToMap(args),
+	}
+}
+
+// AcceptWithPackageID exercises the Accept choice using the provided package ID instead of package name
+func (t OneOfEverything) AcceptWithPackageID(contractID string, packageID string, args Accept) *model.ExerciseCommand {
+	return &model.ExerciseCommand{
+		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "AllKindsOf", "OneOfEverything"),
 		ContractID: contractID,
 		Choice:     "Accept",
 		Arguments:  argsToMap(args),
@@ -313,9 +534,9 @@ func (t OneOfEverything) Accept(contractID string, args Accept) *model.ExerciseC
 
 // VPair is a variant/union type
 type VPair struct {
-	Left  *interface{} `json:"Left,omitempty"`
-	Right *interface{} `json:"Right,omitempty"`
-	Both  *VPair       `json:"Both,omitempty"`
+	Left  *any   `json:"Left,omitempty"`
+	Right *any   `json:"Right,omitempty"`
+	Both  *VPair `json:"Both,omitempty"`
 }
 
 // MarshalJSON implements custom JSON marshaling for VPair
@@ -324,7 +545,7 @@ func (v VPair) MarshalJSON() ([]byte, error) {
 	return jsonCodec.Marshall(v)
 }
 
-// UnmarshalJSON implements custom JSON unmarshaling for VPair
+// UnmarshalJSON implements custom JSON unmarshalling for VPair
 func (v *VPair) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
 	return jsonCodec.Unmarshall(data, v)
@@ -349,7 +570,7 @@ func (v VPair) GetVariantTag() string {
 }
 
 // GetVariantValue implements types.VARIANT interface
-func (v VPair) GetVariantValue() interface{} {
+func (v VPair) GetVariantValue() any {
 
 	if v.Left != nil {
 		return v.Left
@@ -366,5 +587,4 @@ func (v VPair) GetVariantValue() interface{} {
 	return nil
 }
 
-// Verify interface implementation
 var _ VARIANT = (*VPair)(nil)
