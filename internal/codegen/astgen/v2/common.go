@@ -4,7 +4,8 @@ import (
 	"errors"
 	"fmt"
 
-	daml "github.com/digital-asset/dazl-client/v8/go/api/com/daml/daml_lf_1_17"
+	damlcommon "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/daml/lf/archive"
+	daml "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/daml/lf/archive/daml_lf_1"
 	"github.com/rs/zerolog/log"
 	"github.com/smartcontractkit/go-daml/internal/codegen/model"
 	"google.golang.org/protobuf/proto"
@@ -30,32 +31,38 @@ func NewCodegenAst(payload []byte) *codeGenAst {
 func (c *codeGenAst) GetInterfaces() (map[string]*model.TmplStruct, error) {
 	interfaceMap := make(map[string]*model.TmplStruct)
 
-	var archive daml.Archive
+	var archive damlcommon.Archive
 	err := proto.Unmarshal(c.payload, &archive)
 	if err != nil {
 		return nil, err
 	}
 
-	var payloadMapped daml.ArchivePayload
+	var payloadMapped damlcommon.ArchivePayload
 	err = proto.Unmarshal(archive.Payload, &payloadMapped)
 	if err != nil {
 		return nil, err
 	}
 
-	damlLf1 := payloadMapped.GetDamlLf_1()
-	if damlLf1 == nil {
+	damlLfBytes := payloadMapped.GetDamlLf_1()
+	if damlLfBytes == nil {
 		return nil, errors.New("unsupported daml version")
 	}
 
-	for _, module := range damlLf1.Modules {
-		if len(damlLf1.InternedStrings) == 0 {
+	var damlLf daml.Package
+	err = proto.Unmarshal(damlLfBytes, &damlLf)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, module := range damlLf.Modules {
+		if len(damlLf.InternedStrings) == 0 {
 			continue
 		}
 
-		idx := damlLf1.InternedDottedNames[module.GetNameInternedDname()].SegmentsInternedStr
-		moduleName := damlLf1.InternedStrings[idx[len(idx)-1]]
+		idx := damlLf.InternedDottedNames[module.GetNameInternedDname()].SegmentsInternedStr
+		moduleName := damlLf.InternedStrings[idx[len(idx)-1]]
 
-		interfaces, err := c.getInterfaces(damlLf1, module, moduleName)
+		interfaces, err := c.getInterfaces(&damlLf, module, moduleName)
 		if err != nil {
 			return nil, err
 		}
@@ -70,13 +77,13 @@ func (c *codeGenAst) GetInterfaces() (map[string]*model.TmplStruct, error) {
 func (c *codeGenAst) GetTemplateStructs(_ map[string]model.InterfaceMap) (map[string]*model.TmplStruct, error) {
 	structs := make(map[string]*model.TmplStruct)
 
-	var archive daml.Archive
+	var archive damlcommon.Archive
 	err := proto.Unmarshal(c.payload, &archive)
 	if err != nil {
 		return nil, err
 	}
 
-	var payloadMapped daml.ArchivePayload
+	var payloadMapped damlcommon.ArchivePayload
 	err = proto.Unmarshal(archive.Payload, &payloadMapped)
 	if err != nil {
 		return nil, err
@@ -87,16 +94,27 @@ func (c *codeGenAst) GetTemplateStructs(_ map[string]model.InterfaceMap) (map[st
 		return nil, errors.New("unsupported daml version")
 	}
 
-	for _, module := range damlLf1.Modules {
-		if len(damlLf1.InternedStrings) == 0 {
+	damlLfBytes := payloadMapped.GetDamlLf_1()
+	if damlLfBytes == nil {
+		return nil, errors.New("unsupported daml version")
+	}
+
+	var damlLf daml.Package
+	err = proto.Unmarshal(damlLfBytes, &damlLf)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, module := range damlLf.Modules {
+		if len(damlLf.InternedStrings) == 0 {
 			continue
 		}
 
-		idx := damlLf1.InternedDottedNames[module.GetNameInternedDname()].SegmentsInternedStr
-		moduleName := damlLf1.InternedStrings[idx[len(idx)-1]]
+		idx := damlLf.InternedDottedNames[module.GetNameInternedDname()].SegmentsInternedStr
+		moduleName := damlLf.InternedStrings[idx[len(idx)-1]]
 		log.Info().Msgf("processing module %s", moduleName)
 
-		templates, err := c.getTemplates(damlLf1, module, moduleName)
+		templates, err := c.getTemplates(&damlLf, module, moduleName)
 		if err != nil {
 			return nil, err
 		}
@@ -104,7 +122,7 @@ func (c *codeGenAst) GetTemplateStructs(_ map[string]model.InterfaceMap) (map[st
 			structs[key] = val
 		}
 
-		interfaces, err := c.getInterfaces(damlLf1, module, moduleName)
+		interfaces, err := c.getInterfaces(&damlLf, module, moduleName)
 		if err != nil {
 			return nil, err
 		}
@@ -112,7 +130,7 @@ func (c *codeGenAst) GetTemplateStructs(_ map[string]model.InterfaceMap) (map[st
 			structs[key] = val
 		}
 
-		dataTypes, err := c.getDataTypes(damlLf1, module, moduleName)
+		dataTypes, err := c.getDataTypes(&damlLf, module, moduleName)
 		if err != nil {
 			return nil, err
 		}
