@@ -8,13 +8,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/smartcontractkit/go-daml/examples/codegen/interfaces"
 	"github.com/smartcontractkit/go-daml/pkg/client"
 	"github.com/smartcontractkit/go-daml/pkg/errors"
 	"github.com/smartcontractkit/go-daml/pkg/model"
 	"github.com/smartcontractkit/go-daml/pkg/service/ledger"
+	"github.com/smartcontractkit/go-daml/pkg/testutil"
 	. "github.com/smartcontractkit/go-daml/pkg/types"
 	"github.com/stretchr/testify/require"
 )
@@ -26,12 +26,13 @@ const (
 )
 
 func TestCodegenIntegration(t *testing.T) {
-	zerolog.SetGlobalLevel(zerolog.InfoLevel)
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
-
+	t.Parallel()
 	ctx := t.Context()
 
-	var err error
+	sandbox, err := testutil.CreateSandbox(t)
+	require.NoError(t, err)
+	cl := sandbox.BindingClient
+
 	if err = cl.ValidateSDKVersion(ctx, SDKVersion); err != nil {
 		log.Warn().Err(err).Msg("failed to validate SDK version, ignoring")
 	}
@@ -196,14 +197,13 @@ func TestCodegenIntegration(t *testing.T) {
 }
 
 func TestCodegenIntegrationAllFieldsContract(t *testing.T) {
-	zerolog.SetGlobalLevel(zerolog.DebugLevel)
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+	t.Parallel()
+	ctx := t.Context()
 
-	log.Info().Msg("Using package ID from generated code")
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
+	sandbox, err := testutil.CreateSandbox(t)
+	require.NoError(t, err)
+	cl := sandbox.BindingClient
 
-	var err error
 	if err = cl.ValidateSDKVersion(ctx, SDKVersion); err != nil {
 		log.Warn().Err(err).Msg("failed to validate SDK version, ignoring")
 	}
@@ -447,14 +447,13 @@ func TestCodegenIntegrationAllFieldsContract(t *testing.T) {
 }
 
 func TestAmuletsTransfer(t *testing.T) {
-	zerolog.SetGlobalLevel(zerolog.InfoLevel)
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+	t.Parallel()
+	ctx := t.Context()
 
-	log.Info().Str("interfacePackageID", interfaces.PackageID).Msg("Using interface package ID")
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
+	sandbox, err := testutil.CreateSandbox(t)
+	require.NoError(t, err)
+	cl := sandbox.BindingClient
 
-	var err error
 	if err = cl.ValidateSDKVersion(ctx, SDKVersion); err != nil {
 		log.Warn().Err(err).Msg("failed to validate SDK version, ignoring")
 	}

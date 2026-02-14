@@ -17,10 +17,13 @@ import (
 )
 
 func TestAllocateExternalParty(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
-	defer cancel()
+	t.Parallel()
+	ctx := t.Context()
 
-	cl := testutil.GetClient()
+	sandbox, err := testutil.CreateSandbox(t)
+	require.NoError(t, err)
+	cl := sandbox.BindingClient
+
 	require.NotNil(t, cl)
 	require.NotNil(t, cl.PartyMng)
 	require.NotNil(t, cl.TopologyManagerWrite)
@@ -82,12 +85,12 @@ func TestAllocateExternalParty(t *testing.T) {
 }
 
 func TestAllocateExternalParty_ErrorHandling(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
-	defer cancel()
+	t.Parallel()
+	ctx := t.Context()
 
-	cl := testutil.GetClient()
-	require.NotNil(t, cl)
-	require.NotNil(t, cl.PartyMng)
+	sandbox, err := testutil.CreateSandbox(t)
+	require.NoError(t, err)
+	cl := sandbox.BindingClient
 
 	syncResp, err := cl.StateService.GetConnectedSynchronizers(ctx, &model.GetConnectedSynchronizersRequest{})
 	require.NoError(t, err)
