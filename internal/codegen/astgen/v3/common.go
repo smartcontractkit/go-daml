@@ -516,7 +516,9 @@ func (c *codeGenAst) extractType(pkg *daml.Package, typ *daml.Type) string {
 
 	case *daml.Type_Var_:
 		if int(v.Var.GetVarInternedStr()) < len(pkg.InternedStrings) {
-			return model.NormalizeDAMLType(pkg.InternedStrings[v.Var.GetVarInternedStr()])
+			// Can't handle these properly yet...
+			// return model.NormalizeDAMLType(pkg.InternedStrings[v.Var.GetVarInternedStr()])
+			return model.NormalizeDAMLType("any")
 		}
 		return "unknown_var"
 

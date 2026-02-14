@@ -29,23 +29,23 @@ type Template interface {
 	GetTemplateID() string
 }
 
-func argsToMap(args interface{}) map[string]interface{} {
+func argsToMap(args any) map[string]any {
 	if args == nil {
-		return map[string]interface{}{}
+		return map[string]any{}
 	}
 
-	if m, ok := args.(map[string]interface{}); ok {
+	if m, ok := args.(map[string]any); ok {
 		return m
 	}
 
 	type mapper interface {
-		ToMap() map[string]interface{}
+		ToMap() map[string]any
 	}
 	if mapper, ok := args.(mapper); ok {
 		return mapper.ToMap()
 	}
 
-	return map[string]interface{}{"args": args}
+	return map[string]any{"args": args}
 }
 
 // Accept is a Record type
@@ -53,8 +53,8 @@ type Accept struct {
 }
 
 // ToMap converts Accept to a map for DAML arguments
-func (t Accept) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t Accept) ToMap() map[string]any {
+	m := make(map[string]any)
 	return m
 }
 
@@ -120,14 +120,14 @@ func (t MappyContract) GetTemplateIDWithPackageID(packageID string) string {
 
 // CreateCommand returns a CreateCommand for this template using the package name
 func (t MappyContract) CreateCommand() *model.CreateCommand {
-	args := make(map[string]interface{})
+	args := make(map[string]any)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["operator"] = t.Operator.ToMap()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["value"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	args["value"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.Value).(mapper); ok {
 			return m.toMap()
 		}
@@ -142,14 +142,14 @@ func (t MappyContract) CreateCommand() *model.CreateCommand {
 
 // CreateCommandWithPackageID returns a CreateCommand using the provided package ID instead of package name
 func (t MappyContract) CreateCommandWithPackageID(packageID string) *model.CreateCommand {
-	args := make(map[string]interface{})
+	args := make(map[string]any)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["operator"] = t.Operator.ToMap()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["value"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	args["value"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.Value).(mapper); ok {
 			return m.toMap()
 		}
@@ -181,7 +181,7 @@ func (t MappyContract) Archive(contractID string) *model.ExerciseCommand {
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "AllKindsOf", "MappyContract"),
 		ContractID: contractID,
 		Choice:     "Archive",
-		Arguments:  map[string]interface{}{},
+		Arguments:  map[string]any{},
 	}
 }
 
@@ -191,30 +191,30 @@ func (t MappyContract) ArchiveWithPackageID(contractID string, packageID string)
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "AllKindsOf", "MappyContract"),
 		ContractID: contractID,
 		Choice:     "Archive",
-		Arguments:  map[string]interface{}{},
+		Arguments:  map[string]any{},
 	}
 }
 
 // MyPair is a Record type
 type MyPair struct {
-	Left  a `json:"left"`
-	Right a `json:"right"`
+	Left  any `json:"left"`
+	Right any `json:"right"`
 }
 
 // ToMap converts MyPair to a map for DAML arguments
-func (t MyPair) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t MyPair) ToMap() map[string]any {
+	m := make(map[string]any)
 
-	m["left"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["left"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.Left).(mapper); ok {
 			return m.toMap()
 		}
 		return t.Left
 	}()
 
-	m["right"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	m["right"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.Right).(mapper); ok {
 			return m.toMap()
 		}
@@ -266,7 +266,7 @@ func (t OneOfEverything) GetTemplateIDWithPackageID(packageID string) string {
 
 // CreateCommand returns a CreateCommand for this template using the package name
 func (t OneOfEverything) CreateCommand() *model.CreateCommand {
-	args := make(map[string]interface{})
+	args := make(map[string]any)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["operator"] = t.Operator.ToMap()
@@ -282,23 +282,23 @@ func (t OneOfEverything) CreateCommand() *model.CreateCommand {
 	}
 
 	if t.SomeMaybe != nil {
-		args["someMaybe"] = map[string]interface{}{
+		args["someMaybe"] = map[string]any{
 			"_type": "optional",
 			"value": int64(*t.SomeMaybe),
 		}
 	} else {
-		args["someMaybe"] = map[string]interface{}{
+		args["someMaybe"] = map[string]any{
 			"_type": "optional",
 		}
 	}
 
 	if t.SomeMaybeNot != nil {
-		args["someMaybeNot"] = map[string]interface{}{
+		args["someMaybeNot"] = map[string]any{
 			"_type": "optional",
 			"value": int64(*t.SomeMaybeNot),
 		}
 	} else {
-		args["someMaybeNot"] = map[string]interface{}{
+		args["someMaybeNot"] = map[string]any{
 			"_type": "optional",
 		}
 	}
@@ -313,8 +313,8 @@ func (t OneOfEverything) CreateCommand() *model.CreateCommand {
 	args["someDatetime"] = t.SomeDatetime
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["someSimpleList"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.SomeSimpleList))
+	args["someSimpleList"] = func() []any {
+		res := make([]any, 0, len(t.SomeSimpleList))
 		for _, e := range t.SomeSimpleList {
 			res = append(res, int64(e))
 		}
@@ -322,8 +322,8 @@ func (t OneOfEverything) CreateCommand() *model.CreateCommand {
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["someSimplePair"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	args["someSimplePair"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.SomeSimplePair).(mapper); ok {
 			return m.toMap()
 		}
@@ -331,8 +331,8 @@ func (t OneOfEverything) CreateCommand() *model.CreateCommand {
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["someNestedPair"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	args["someNestedPair"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.SomeNestedPair).(mapper); ok {
 			return m.toMap()
 		}
@@ -340,8 +340,8 @@ func (t OneOfEverything) CreateCommand() *model.CreateCommand {
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["someUglyNesting"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	args["someUglyNesting"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.SomeUglyNesting).(mapper); ok {
 			return m.toMap()
 		}
@@ -353,8 +353,8 @@ func (t OneOfEverything) CreateCommand() *model.CreateCommand {
 	}
 
 	if t.SomeEnum != "" {
-		args["someEnum"] = func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
+		args["someEnum"] = func() any {
+			type mapper interface{ toMap() map[string]any }
 			if m, ok := any(t.SomeEnum).(mapper); ok {
 				return m.toMap()
 			}
@@ -363,7 +363,7 @@ func (t OneOfEverything) CreateCommand() *model.CreateCommand {
 	}
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["theUnit"] = map[string]interface{}{"_type": "unit"}
+	args["theUnit"] = map[string]any{"_type": "unit"}
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateID(),
@@ -373,7 +373,7 @@ func (t OneOfEverything) CreateCommand() *model.CreateCommand {
 
 // CreateCommandWithPackageID returns a CreateCommand using the provided package ID instead of package name
 func (t OneOfEverything) CreateCommandWithPackageID(packageID string) *model.CreateCommand {
-	args := make(map[string]interface{})
+	args := make(map[string]any)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["operator"] = t.Operator.ToMap()
@@ -389,23 +389,23 @@ func (t OneOfEverything) CreateCommandWithPackageID(packageID string) *model.Cre
 	}
 
 	if t.SomeMaybe != nil {
-		args["someMaybe"] = map[string]interface{}{
+		args["someMaybe"] = map[string]any{
 			"_type": "optional",
 			"value": int64(*t.SomeMaybe),
 		}
 	} else {
-		args["someMaybe"] = map[string]interface{}{
+		args["someMaybe"] = map[string]any{
 			"_type": "optional",
 		}
 	}
 
 	if t.SomeMaybeNot != nil {
-		args["someMaybeNot"] = map[string]interface{}{
+		args["someMaybeNot"] = map[string]any{
 			"_type": "optional",
 			"value": int64(*t.SomeMaybeNot),
 		}
 	} else {
-		args["someMaybeNot"] = map[string]interface{}{
+		args["someMaybeNot"] = map[string]any{
 			"_type": "optional",
 		}
 	}
@@ -420,8 +420,8 @@ func (t OneOfEverything) CreateCommandWithPackageID(packageID string) *model.Cre
 	args["someDatetime"] = t.SomeDatetime
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["someSimpleList"] = func() []interface{} {
-		res := make([]interface{}, 0, len(t.SomeSimpleList))
+	args["someSimpleList"] = func() []any {
+		res := make([]any, 0, len(t.SomeSimpleList))
 		for _, e := range t.SomeSimpleList {
 			res = append(res, int64(e))
 		}
@@ -429,8 +429,8 @@ func (t OneOfEverything) CreateCommandWithPackageID(packageID string) *model.Cre
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["someSimplePair"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	args["someSimplePair"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.SomeSimplePair).(mapper); ok {
 			return m.toMap()
 		}
@@ -438,8 +438,8 @@ func (t OneOfEverything) CreateCommandWithPackageID(packageID string) *model.Cre
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["someNestedPair"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	args["someNestedPair"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.SomeNestedPair).(mapper); ok {
 			return m.toMap()
 		}
@@ -447,8 +447,8 @@ func (t OneOfEverything) CreateCommandWithPackageID(packageID string) *model.Cre
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["someUglyNesting"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	args["someUglyNesting"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.SomeUglyNesting).(mapper); ok {
 			return m.toMap()
 		}
@@ -460,8 +460,8 @@ func (t OneOfEverything) CreateCommandWithPackageID(packageID string) *model.Cre
 	}
 
 	if t.SomeEnum != "" {
-		args["someEnum"] = func() interface{} {
-			type mapper interface{ toMap() map[string]interface{} }
+		args["someEnum"] = func() any {
+			type mapper interface{ toMap() map[string]any }
 			if m, ok := any(t.SomeEnum).(mapper); ok {
 				return m.toMap()
 			}
@@ -470,7 +470,7 @@ func (t OneOfEverything) CreateCommandWithPackageID(packageID string) *model.Cre
 	}
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["theUnit"] = map[string]interface{}{"_type": "unit"}
+	args["theUnit"] = map[string]any{"_type": "unit"}
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateIDWithPackageID(packageID),
@@ -497,7 +497,7 @@ func (t OneOfEverything) Archive(contractID string) *model.ExerciseCommand {
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "AllKindsOf", "OneOfEverything"),
 		ContractID: contractID,
 		Choice:     "Archive",
-		Arguments:  map[string]interface{}{},
+		Arguments:  map[string]any{},
 	}
 }
 
@@ -507,7 +507,7 @@ func (t OneOfEverything) ArchiveWithPackageID(contractID string, packageID strin
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "AllKindsOf", "OneOfEverything"),
 		ContractID: contractID,
 		Choice:     "Archive",
-		Arguments:  map[string]interface{}{},
+		Arguments:  map[string]any{},
 	}
 }
 
@@ -534,8 +534,8 @@ func (t OneOfEverything) AcceptWithPackageID(contractID string, packageID string
 
 // VPair is a variant/union type
 type VPair struct {
-	Left  *a     `json:"Left,omitempty"`
-	Right *a     `json:"Right,omitempty"`
+	Left  *any   `json:"Left,omitempty"`
+	Right *any   `json:"Right,omitempty"`
 	Both  *VPair `json:"Both,omitempty"`
 }
 
@@ -570,7 +570,7 @@ func (v VPair) GetVariantTag() string {
 }
 
 // GetVariantValue implements types.VARIANT interface
-func (v VPair) GetVariantValue() interface{} {
+func (v VPair) GetVariantValue() any {
 
 	if v.Left != nil {
 		return v.Left

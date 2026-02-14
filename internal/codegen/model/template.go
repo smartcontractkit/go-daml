@@ -126,8 +126,8 @@ func NormalizeDAMLType(damlType string) string {
 		return "GENMAP"
 	case damlType == "20":
 		return "TEXTMAP"
-	case strings.Contains(damlType, "var:{var_interned_str:"):
-		return "interface{}"
+	case strings.Contains(damlType, "var:{var_interned_str:") || damlType == "interface{}" || damlType == "any":
+		return "any"
 	case damlType == "prim:{}" || damlType == "{}":
 		return "UNIT"
 	case damlType == "Archive":

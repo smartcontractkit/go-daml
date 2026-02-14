@@ -29,23 +29,23 @@ type Template interface {
 	GetTemplateID() string
 }
 
-func argsToMap(args interface{}) map[string]interface{} {
+func argsToMap(args any) map[string]any {
 	if args == nil {
-		return map[string]interface{}{}
+		return map[string]any{}
 	}
 
-	if m, ok := args.(map[string]interface{}); ok {
+	if m, ok := args.(map[string]any); ok {
 		return m
 	}
 
 	type mapper interface {
-		ToMap() map[string]interface{}
+		ToMap() map[string]any
 	}
 	if mapper, ok := args.(mapper); ok {
 		return mapper.ToMap()
 	}
 
-	return map[string]interface{}{"args": args}
+	return map[string]any{"args": args}
 }
 
 // Address is a variant/union type
@@ -81,7 +81,7 @@ func (v Address) GetVariantTag() string {
 }
 
 // GetVariantValue implements types.VARIANT interface
-func (v Address) GetVariantValue() interface{} {
+func (v Address) GetVariantValue() any {
 
 	if v.US != nil {
 		return v.US
@@ -114,14 +114,14 @@ func (t American) GetTemplateIDWithPackageID(packageID string) string {
 
 // CreateCommand returns a CreateCommand for this template using the package name
 func (t American) CreateCommand() *model.CreateCommand {
-	args := make(map[string]interface{})
+	args := make(map[string]any)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["person"] = t.Person.ToMap()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["address"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	args["address"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.Address).(mapper); ok {
 			return m.toMap()
 		}
@@ -136,14 +136,14 @@ func (t American) CreateCommand() *model.CreateCommand {
 
 // CreateCommandWithPackageID returns a CreateCommand using the provided package ID instead of package name
 func (t American) CreateCommandWithPackageID(packageID string) *model.CreateCommand {
-	args := make(map[string]interface{})
+	args := make(map[string]any)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["person"] = t.Person.ToMap()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["address"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	args["address"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.Address).(mapper); ok {
 			return m.toMap()
 		}
@@ -175,7 +175,7 @@ func (t American) Archive(contractID string) *model.ExerciseCommand {
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "Address", "American"),
 		ContractID: contractID,
 		Choice:     "Archive",
-		Arguments:  map[string]interface{}{},
+		Arguments:  map[string]any{},
 	}
 }
 
@@ -185,7 +185,7 @@ func (t American) ArchiveWithPackageID(contractID string, packageID string) *mod
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "Address", "American"),
 		ContractID: contractID,
 		Choice:     "Archive",
-		Arguments:  map[string]interface{}{},
+		Arguments:  map[string]any{},
 	}
 }
 
@@ -207,14 +207,14 @@ func (t Briton) GetTemplateIDWithPackageID(packageID string) string {
 
 // CreateCommand returns a CreateCommand for this template using the package name
 func (t Briton) CreateCommand() *model.CreateCommand {
-	args := make(map[string]interface{})
+	args := make(map[string]any)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["person"] = t.Person.ToMap()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["address"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	args["address"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.Address).(mapper); ok {
 			return m.toMap()
 		}
@@ -229,14 +229,14 @@ func (t Briton) CreateCommand() *model.CreateCommand {
 
 // CreateCommandWithPackageID returns a CreateCommand using the provided package ID instead of package name
 func (t Briton) CreateCommandWithPackageID(packageID string) *model.CreateCommand {
-	args := make(map[string]interface{})
+	args := make(map[string]any)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["person"] = t.Person.ToMap()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["address"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	args["address"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.Address).(mapper); ok {
 			return m.toMap()
 		}
@@ -268,7 +268,7 @@ func (t Briton) Archive(contractID string) *model.ExerciseCommand {
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "Address", "Briton"),
 		ContractID: contractID,
 		Choice:     "Archive",
-		Arguments:  map[string]interface{}{},
+		Arguments:  map[string]any{},
 	}
 }
 
@@ -278,7 +278,7 @@ func (t Briton) ArchiveWithPackageID(contractID string, packageID string) *model
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "Address", "Briton"),
 		ContractID: contractID,
 		Choice:     "Archive",
-		Arguments:  map[string]interface{}{},
+		Arguments:  map[string]any{},
 	}
 }
 
@@ -300,18 +300,18 @@ func (t OptionalFields) GetTemplateIDWithPackageID(packageID string) string {
 
 // CreateCommand returns a CreateCommand for this template using the package name
 func (t OptionalFields) CreateCommand() *model.CreateCommand {
-	args := make(map[string]interface{})
+	args := make(map[string]any)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["party"] = t.Party.ToMap()
 
 	if t.AMaybe != nil {
-		args["aMaybe"] = map[string]interface{}{
+		args["aMaybe"] = map[string]any{
 			"_type": "optional",
 			"value": *t.AMaybe,
 		}
 	} else {
-		args["aMaybe"] = map[string]interface{}{
+		args["aMaybe"] = map[string]any{
 			"_type": "optional",
 		}
 	}
@@ -324,18 +324,18 @@ func (t OptionalFields) CreateCommand() *model.CreateCommand {
 
 // CreateCommandWithPackageID returns a CreateCommand using the provided package ID instead of package name
 func (t OptionalFields) CreateCommandWithPackageID(packageID string) *model.CreateCommand {
-	args := make(map[string]interface{})
+	args := make(map[string]any)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["party"] = t.Party.ToMap()
 
 	if t.AMaybe != nil {
-		args["aMaybe"] = map[string]interface{}{
+		args["aMaybe"] = map[string]any{
 			"_type": "optional",
 			"value": *t.AMaybe,
 		}
 	} else {
-		args["aMaybe"] = map[string]interface{}{
+		args["aMaybe"] = map[string]any{
 			"_type": "optional",
 		}
 	}
@@ -365,7 +365,7 @@ func (t OptionalFields) Archive(contractID string) *model.ExerciseCommand {
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "Primitives", "OptionalFields"),
 		ContractID: contractID,
 		Choice:     "Archive",
-		Arguments:  map[string]interface{}{},
+		Arguments:  map[string]any{},
 	}
 }
 
@@ -375,7 +375,7 @@ func (t OptionalFields) ArchiveWithPackageID(contractID string, packageID string
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "Primitives", "OptionalFields"),
 		ContractID: contractID,
 		Choice:     "Archive",
-		Arguments:  map[string]interface{}{},
+		Arguments:  map[string]any{},
 	}
 }
 
@@ -405,8 +405,8 @@ type OptionalFieldsCleanUp struct {
 }
 
 // ToMap converts OptionalFieldsCleanUp to a map for DAML arguments
-func (t OptionalFieldsCleanUp) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t OptionalFieldsCleanUp) ToMap() map[string]any {
+	m := make(map[string]any)
 	return m
 }
 
@@ -438,14 +438,14 @@ func (t Person) GetTemplateIDWithPackageID(packageID string) string {
 
 // CreateCommand returns a CreateCommand for this template using the package name
 func (t Person) CreateCommand() *model.CreateCommand {
-	args := make(map[string]interface{})
+	args := make(map[string]any)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["person"] = t.Person.ToMap()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["address"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	args["address"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.Address).(mapper); ok {
 			return m.toMap()
 		}
@@ -460,14 +460,14 @@ func (t Person) CreateCommand() *model.CreateCommand {
 
 // CreateCommandWithPackageID returns a CreateCommand using the provided package ID instead of package name
 func (t Person) CreateCommandWithPackageID(packageID string) *model.CreateCommand {
-	args := make(map[string]interface{})
+	args := make(map[string]any)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["person"] = t.Person.ToMap()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["address"] = func() interface{} {
-		type mapper interface{ toMap() map[string]interface{} }
+	args["address"] = func() any {
+		type mapper interface{ toMap() map[string]any }
 		if m, ok := any(t.Address).(mapper); ok {
 			return m.toMap()
 		}
@@ -499,7 +499,7 @@ func (t Person) Archive(contractID string) *model.ExerciseCommand {
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "Address", "Person"),
 		ContractID: contractID,
 		Choice:     "Archive",
-		Arguments:  map[string]interface{}{},
+		Arguments:  map[string]any{},
 	}
 }
 
@@ -509,7 +509,7 @@ func (t Person) ArchiveWithPackageID(contractID string, packageID string) *model
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "Address", "Person"),
 		ContractID: contractID,
 		Choice:     "Archive",
-		Arguments:  map[string]interface{}{},
+		Arguments:  map[string]any{},
 	}
 }
 
@@ -536,7 +536,7 @@ func (t SimpleFields) GetTemplateIDWithPackageID(packageID string) string {
 
 // CreateCommand returns a CreateCommand for this template using the package name
 func (t SimpleFields) CreateCommand() *model.CreateCommand {
-	args := make(map[string]interface{})
+	args := make(map[string]any)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["party"] = t.Party.ToMap()
@@ -568,7 +568,7 @@ func (t SimpleFields) CreateCommand() *model.CreateCommand {
 
 // CreateCommandWithPackageID returns a CreateCommand using the provided package ID instead of package name
 func (t SimpleFields) CreateCommandWithPackageID(packageID string) *model.CreateCommand {
-	args := make(map[string]interface{})
+	args := make(map[string]any)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["party"] = t.Party.ToMap()
@@ -638,7 +638,7 @@ func (t SimpleFields) Archive(contractID string) *model.ExerciseCommand {
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "Primitives", "SimpleFields"),
 		ContractID: contractID,
 		Choice:     "Archive",
-		Arguments:  map[string]interface{}{},
+		Arguments:  map[string]any{},
 	}
 }
 
@@ -648,7 +648,7 @@ func (t SimpleFields) ArchiveWithPackageID(contractID string, packageID string) 
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "Primitives", "SimpleFields"),
 		ContractID: contractID,
 		Choice:     "Archive",
-		Arguments:  map[string]interface{}{},
+		Arguments:  map[string]any{},
 	}
 }
 
@@ -657,8 +657,8 @@ type SimpleFieldsCleanUp struct {
 }
 
 // ToMap converts SimpleFieldsCleanUp to a map for DAML arguments
-func (t SimpleFieldsCleanUp) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t SimpleFieldsCleanUp) ToMap() map[string]any {
+	m := make(map[string]any)
 	return m
 }
 
@@ -682,8 +682,8 @@ type UKAddress struct {
 }
 
 // ToMap converts UKAddress to a map for DAML arguments
-func (t UKAddress) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t UKAddress) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["address"] = t.Address
 
@@ -717,8 +717,8 @@ type USAddress struct {
 }
 
 // ToMap converts USAddress to a map for DAML arguments
-func (t USAddress) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t USAddress) ToMap() map[string]any {
+	m := make(map[string]any)
 
 	m["address"] = t.Address
 

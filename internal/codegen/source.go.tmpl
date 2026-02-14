@@ -1,3 +1,4 @@
+{{- /*gotype: github.com/smartcontractkit/go-daml/internal/codegen.tmplData*/ -}}
 package {{.Package}}
 
 import (
@@ -33,7 +34,7 @@ var (
   {{- else if eq $baseType "DECIMAL" -}}(*big.Int)(*t.{{capitalise .Name}})
   {{- else if eq $baseType "DATE" -}}*t.{{capitalise .Name}}
   {{- else if eq $baseType "TIMESTAMP" -}}*t.{{capitalise .Name}}
-  {{- else if eq $baseType "UNIT" -}}map[string]interface{}{"_type": "unit"}
+  {{- else if eq $baseType "UNIT" -}}map[string]any{"_type": "unit"}
   {{- else -}}*t.{{capitalise .Name}}
   {{- end -}}
 {{- else -}}
@@ -45,11 +46,11 @@ var (
   {{- else if eq .Type "DECIMAL" -}}(*big.Int)(t.{{capitalise .Name}})
   {{- else if eq .Type "DATE" -}}t.{{capitalise .Name}}
   {{- else if eq .Type "TIMESTAMP" -}}t.{{capitalise .Name}}
-  {{- else if eq .Type "UNIT" -}}map[string]interface{}{"_type": "unit"}
+  {{- else if eq .Type "UNIT" -}}map[string]any{"_type": "unit"}
 
   {{- else if stringsHasPrefix .Type "[]" -}}
-    func() []interface{} {
-      res := make([]interface{}, 0, len(t.{{capitalise .Name}}))
+    func() []any {
+      res := make([]any, 0, len(t.{{capitalise .Name}}))
       for _, e := range t.{{capitalise .Name}} {
         {{$elem := stringsTrimPrefix .Type "[]"}}
         {{- if eq $elem "PARTY" -}}
@@ -67,7 +68,7 @@ var (
         {{- else if eq $elem "DECIMAL" -}}
           res = append(res, (*big.Int)(e))
         {{- else -}}
-          type mapper interface{ toMap() map[string]interface{} }
+          type mapper interface{ toMap() map[string]any }
           if m, ok := any(e).(mapper); ok {
             res = append(res, m.toMap())
           } else {
@@ -81,19 +82,19 @@ var (
   {{- else if eq .Type "LIST" -}}t.{{capitalise .Name}}
 
   {{- else if eq .Type "GENMAP" -}}
-    func() interface{} {
+    func() any {
       if t.{{capitalise .Name}} == nil {
-        return map[string]interface{}{"_type": "genmap", "value": GENMAP{}}
+        return map[string]any{"_type": "genmap", "value": GENMAP{}}
       }
-      return map[string]interface{}{"_type": "genmap", "value": t.{{capitalise .Name}}}
+      return map[string]any{"_type": "genmap", "value": t.{{capitalise .Name}}}
     }()
 
   {{- else if eq .Type "MAP" -}}t.{{capitalise .Name}}
   {{- else if eq .Type "OPTIONAL" -}}t.{{capitalise .Name}}
   {{- else if eq .Type "string" -}}string(t.{{capitalise .Name}})
   {{- else -}}
-    func() interface{} {
-      type mapper interface{ toMap() map[string]interface{} }
+    func() any {
+      type mapper interface{ toMap() map[string]any }
       if m, ok := any(t.{{capitalise .Name}}).(mapper); ok {
         return m.toMap()
       }
@@ -120,8 +121,8 @@ var (
 {{- else if .IsOptional -}}t.{{capitalise .Name}} != nil
 {{- else if .IsEnum -}}t.{{capitalise .Name}} != ""
 {{- else -}}
-  func() interface{} {
-    type mapper interface{ toMap() map[string]interface{} }
+  func() any {
+    type mapper interface{ toMap() map[string]any }
     if m, ok := any(t.{{capitalise .Name}}).(mapper); ok {
       return m.toMap()
     }
@@ -158,23 +159,23 @@ type {{capitalise .Name}} interface {
 {{end}}
 
 {{if .IsMainDalf}}
-func argsToMap(args interface{}) map[string]interface{} {
+func argsToMap(args any) map[string]any {
 	if args == nil {
-		return map[string]interface{}{}
+		return map[string]any{}
 	}
 
-	if m, ok := args.(map[string]interface{}); ok {
+	if m, ok := args.(map[string]any); ok {
 		return m
 	}
 
 	type mapper interface {
-		ToMap() map[string]interface{}
+		ToMap() map[string]any
 	}
 	if mapper, ok := args.(mapper); ok {
 		return mapper.ToMap()
 	}
 
-	return map[string]interface{}{"args": args}
+	return map[string]any{"args": args}
 }
 {{end}}
 
@@ -231,7 +232,7 @@ func (v {{capitalise .Name}}) GetVariantTag() string {
 }
 
 // GetVariantValue implements types.VARIANT interface
-func (v {{capitalise .Name}}) GetVariantValue() interface{} {
+func (v {{capitalise .Name}}) GetVariantValue() any {
 	{{range $field := .Fields}}
 	if v.{{capitalise $field.Name}} != nil {
 		return v.{{capitalise $field.Name}}
@@ -299,17 +300,17 @@ type {{capitalise .Name}} struct {
 
 {{if and (eq .RawType "Record") (not .IsTemplate) (not .IsInterface)}}
 // ToMap converts {{capitalise .Name}} to a map for DAML arguments
-func (t {{capitalise .Name}}) ToMap() map[string]interface{} {
-	m := make(map[string]interface{})
+func (t {{capitalise .Name}}) ToMap() map[string]any {
+	m := make(map[string]any)
 	{{- range $field := .Fields}}
 	{{if $field.IsOptional}}
 	if t.{{capitalise $field.Name}} != nil {
-		m["{{$field.Name}}"] = map[string]interface{}{
+		m["{{$field.Name}}"] = map[string]any{
 			"_type": "optional",
 			"value": {{template "fieldToDAMLValue" $field}},
 		}
 	} else {
-		m["{{$field.Name}}"] = map[string]interface{}{
+		m["{{$field.Name}}"] = map[string]any{
 			"_type": "optional",
 		}
 	}
@@ -358,16 +359,16 @@ func (t {{capitalise .Name}}) GetTemplateIDWithPackageID(packageID string) strin
 
 // CreateCommand returns a CreateCommand for this template using the package name
 func (t {{capitalise .Name}}) CreateCommand() *model.CreateCommand {
-	args := make(map[string]interface{})
+	args := make(map[string]any)
 	{{- range $field := .Fields}}
 	{{if $field.IsOptional}}
 	if t.{{capitalise $field.Name}} != nil {
-		args["{{$field.Name}}"] = map[string]interface{}{
+		args["{{$field.Name}}"] = map[string]any{
 			"_type": "optional",
 			"value": {{template "fieldToDAMLValue" $field}},
 		}
 	} else {
-		args["{{$field.Name}}"] = map[string]interface{}{
+		args["{{$field.Name}}"] = map[string]any{
 			"_type": "optional",
 		}
 	}
@@ -388,16 +389,16 @@ func (t {{capitalise .Name}}) CreateCommand() *model.CreateCommand {
 
 // CreateCommandWithPackageID returns a CreateCommand using the provided package ID instead of package name
 func (t {{capitalise .Name}}) CreateCommandWithPackageID(packageID string) *model.CreateCommand {
-	args := make(map[string]interface{})
+	args := make(map[string]any)
 	{{- range $field := .Fields}}
 	{{if $field.IsOptional}}
 	if t.{{capitalise $field.Name}} != nil {
-		args["{{$field.Name}}"] = map[string]interface{}{
+		args["{{$field.Name}}"] = map[string]any{
 			"_type": "optional",
 			"value": {{template "fieldToDAMLValue" $field}},
 		}
 	} else {
-		args["{{$field.Name}}"] = map[string]interface{}{
+		args["{{$field.Name}}"] = map[string]any{
 			"_type": "optional",
 		}
 	}
@@ -481,7 +482,7 @@ func (t {{capitalise $templateName}}) {{capitalise $choice.Name}}(contractID str
 		{{- if and (ne $argType "UNIT") (ne $argType "")}}
 		Arguments: argsToMap(args),
 		{{- else}}
-		Arguments: map[string]interface{}{},
+		Arguments: map[string]any{},
 		{{- end}}
 	}
 }
@@ -499,7 +500,7 @@ func (t {{capitalise $templateName}}) {{capitalise $choice.Name}}WithPackageID(c
 		{{- if and (ne $argType "UNIT") (ne $argType "")}}
 		Arguments: argsToMap(args),
 		{{- else}}
-		Arguments: map[string]interface{}{},
+		Arguments: map[string]any{},
 		{{- end}}
 	}
 }
