@@ -845,8 +845,26 @@ func (codec *JsonCodec) assignReltimeValue(jsonValue interface{}, target reflect
 	case int64:
 		target.Set(reflect.ValueOf(types.RELTIME(time.Duration(v) * time.Microsecond)))
 		return nil
+	case map[string]interface{}:
+		// Handle RelTime returned as record with microseconds field from Ledger API
+		if micros, ok := v["microseconds"]; ok {
+			switch m := micros.(type) {
+			case float64:
+				target.Set(reflect.ValueOf(types.RELTIME(time.Duration(int64(m)) * time.Microsecond)))
+				return nil
+			case int64:
+				target.Set(reflect.ValueOf(types.RELTIME(time.Duration(m) * time.Microsecond)))
+				return nil
+			case string:
+				if i, err := parseIntFromString(m); err == nil {
+					target.Set(reflect.ValueOf(types.RELTIME(time.Duration(i) * time.Microsecond)))
+					return nil
+				}
+			}
+		}
+		return fmt.Errorf("invalid map format for RELTIME: expected {microseconds: ...}, got %v", v)
 	default:
-		return fmt.Errorf("expected string or number for RELTIME, got %T", jsonValue)
+		return fmt.Errorf("expected string, number, or map for RELTIME, got %T", jsonValue)
 	}
 }
 
