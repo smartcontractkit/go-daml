@@ -5,7 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	daml "github.com/digital-asset/dazl-client/v8/go/api/com/daml/daml_lf_2_1"
+	damlcommon "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/daml/lf/archive"
+	daml "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/daml/lf/archive/daml_lf_2"
 	"github.com/rs/zerolog/log"
 	"github.com/smartcontractkit/go-daml/internal/codegen/model"
 	"google.golang.org/protobuf/proto"
@@ -51,13 +52,13 @@ func (c *codeGenAst) isEnumType(typeName string, pkg *daml.Package) bool {
 func (c *codeGenAst) GetInterfaces() (map[string]*model.TmplStruct, error) {
 	interfaceMap := make(map[string]*model.TmplStruct)
 
-	var archive daml.Archive
+	var archive damlcommon.Archive
 	err := proto.Unmarshal(c.payload, &archive)
 	if err != nil {
 		return nil, err
 	}
 
-	var payloadMapped daml.ArchivePayload
+	var payloadMapped damlcommon.ArchivePayload
 	err = proto.Unmarshal(archive.Payload, &payloadMapped)
 	if err != nil {
 		return nil, err
@@ -96,13 +97,13 @@ func (c *codeGenAst) GetInterfaces() (map[string]*model.TmplStruct, error) {
 func (c *codeGenAst) GetTemplateStructs(ifcByModule map[string]model.InterfaceMap) (map[string]*model.TmplStruct, error) {
 	structs := make(map[string]*model.TmplStruct)
 
-	var archive daml.Archive
+	var archive damlcommon.Archive
 	err := proto.Unmarshal(c.payload, &archive)
 	if err != nil {
 		return nil, err
 	}
 
-	var payloadMapped daml.ArchivePayload
+	var payloadMapped damlcommon.ArchivePayload
 	err = proto.Unmarshal(archive.Payload, &payloadMapped)
 	if err != nil {
 		return nil, err
