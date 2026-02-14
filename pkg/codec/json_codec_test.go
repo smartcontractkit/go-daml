@@ -613,6 +613,52 @@ func TestJsonCodec_Unmarshall_RELTIME(t *testing.T) {
 	}
 }
 
+func TestJsonCodec_Unmarshall_RELTIME_FromMap(t *testing.T) {
+	codec := NewJsonCodec()
+
+	tests := []struct {
+		name     string
+		json     string
+		expected RELTIME
+	}{
+		{
+			name:     "microseconds from map with number",
+			json:     `{"microseconds": 1000000}`,
+			expected: RELTIME(1 * time.Second),
+		},
+		{
+			name:     "microseconds from map with string",
+			json:     `{"microseconds": "5000000"}`,
+			expected: RELTIME(5 * time.Second),
+		},
+		{
+			name:     "microseconds from map with large value",
+			json:     `{"microseconds": 3600000000}`,
+			expected: RELTIME(1 * time.Hour),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var result RELTIME
+			err := codec.Unmarshall([]byte(tt.json), &result)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestJsonCodec_Unmarshall_RELTIME_FromMap_InvalidFormat(t *testing.T) {
+	codec := NewJsonCodec()
+
+	// Map without microseconds field should fail
+	json := `{"other_field": 1000000}`
+	var result RELTIME
+	err := codec.Unmarshall([]byte(json), &result)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid map format for RELTIME")
+}
+
 func TestJsonCodec_Marshall_SET(t *testing.T) {
 	codec := NewJsonCodec()
 
