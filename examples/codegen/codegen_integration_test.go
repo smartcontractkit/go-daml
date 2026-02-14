@@ -22,7 +22,6 @@ import (
 const (
 	darFilePath      = "../../test-data/all-kinds-of-1.0.0.dar"
 	interfaceDarPath = "../../test-data/amulets-interface-test-1.0.0.dar"
-	user             = "app-provider"
 )
 
 func TestCodegenIntegration(t *testing.T) {
@@ -57,13 +56,13 @@ func TestCodegenIntegration(t *testing.T) {
 		log.Fatal().Err(err).Msg("failed to list users")
 	}
 	for _, u := range users {
-		if u.ID == user {
+		if u.ID == testutil.SandboxUserId {
 			party = u.PrimaryParty
 			log.Info().Msgf("user %s has primary party %s, using it", u.ID, u.PrimaryParty)
 		}
 	}
 
-	rights, err := cl.UserMng.ListUserRights(ctx, user)
+	rights, err := cl.UserMng.ListUserRights(ctx, testutil.SandboxUserId)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to list user rights")
 	}
@@ -79,7 +78,7 @@ func TestCodegenIntegration(t *testing.T) {
 		log.Info().Msg("grant rights")
 		newRights := make([]*model.Right, 0)
 		newRights = append(newRights, &model.Right{Type: model.CanReadAs{Party: party}})
-		_, err = cl.UserMng.GrantUserRights(context.Background(), user, "", newRights)
+		_, err = cl.UserMng.GrantUserRights(context.Background(), testutil.SandboxUserId, "", newRights)
 		if err != nil {
 			log.Fatal().Err(err).Msg("failed to grant user rights")
 		}
@@ -115,7 +114,7 @@ func TestCodegenIntegration(t *testing.T) {
 	submissionReq := &model.SubmitAndWaitRequest{
 		Commands: &model.Commands{
 			WorkflowID:   "archive-workflow-" + time.Now().Format("20060102150405"),
-			UserID:       user,
+			UserID:       testutil.SandboxUserId,
 			CommandID:    commandID,
 			ActAs:        []string{party},
 			SubmissionID: "sub-" + time.Now().Format("20060102150405"),
@@ -228,7 +227,7 @@ func TestCodegenIntegrationAllFieldsContract(t *testing.T) {
 		log.Fatal().Err(err).Msg("failed to list users")
 	}
 	for _, u := range users {
-		if u.ID == user {
+		if u.ID == testutil.SandboxUserId {
 			party = u.PrimaryParty
 			log.Info().Msgf("user %s has primary party %s, using it", u.ID, u.PrimaryParty)
 		}
@@ -273,7 +272,7 @@ func TestCodegenIntegrationAllFieldsContract(t *testing.T) {
 		}
 	}()
 
-	rights, err := cl.UserMng.ListUserRights(ctx, user)
+	rights, err := cl.UserMng.ListUserRights(ctx, testutil.SandboxUserId)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to list user rights")
 	}
@@ -289,7 +288,7 @@ func TestCodegenIntegrationAllFieldsContract(t *testing.T) {
 		log.Info().Msg("granting rights")
 		newRights := make([]*model.Right, 0)
 		newRights = append(newRights, &model.Right{Type: model.CanReadAs{Party: party}})
-		_, err = cl.UserMng.GrantUserRights(context.Background(), user, "", newRights)
+		_, err = cl.UserMng.GrantUserRights(context.Background(), testutil.SandboxUserId, "", newRights)
 		if err != nil {
 			log.Fatal().Err(err).Msg("failed to grant user rights")
 		}
@@ -355,7 +354,7 @@ func TestCodegenIntegrationAllFieldsContract(t *testing.T) {
 	submissionReq := &model.SubmitAndWaitRequest{
 		Commands: &model.Commands{
 			WorkflowID:   "archive-workflow-" + time.Now().Format("20060102150405"),
-			UserID:       user,
+			UserID:       testutil.SandboxUserId,
 			CommandID:    commandID,
 			ActAs:        []string{party},
 			SubmissionID: "sub-" + time.Now().Format("20060102150405"),
@@ -471,7 +470,7 @@ func TestAmuletsTransfer(t *testing.T) {
 		log.Fatal().Err(err).Msg("failed to list users")
 	}
 	for _, u := range users {
-		if u.ID == user {
+		if u.ID == testutil.SandboxUserId {
 			party = u.PrimaryParty
 			log.Info().Msgf("user %s has primary party %s, using it", u.ID, u.PrimaryParty)
 		}
@@ -572,7 +571,7 @@ func TestAmuletsTransfer(t *testing.T) {
 	transferSubmissionReq := &model.SubmitAndWaitRequest{
 		Commands: &model.Commands{
 			WorkflowID:   "transfer-workflow-" + time.Now().Format("20060102150405"),
-			UserID:       user,
+			UserID:       testutil.SandboxUserId,
 			CommandID:    "transfer-" + time.Now().Format("20060102150405"),
 			ActAs:        []string{party},
 			SubmissionID: "transfer-sub-" + time.Now().Format("20060102150405"),
@@ -597,7 +596,7 @@ func TestAmuletsTransfer(t *testing.T) {
 	archiveSubmissionReq := &model.SubmitAndWaitRequest{
 		Commands: &model.Commands{
 			WorkflowID:   "archive-workflow-" + time.Now().Format("20060102150405"),
-			UserID:       user,
+			UserID:       testutil.SandboxUserId,
 			CommandID:    "archive-" + time.Now().Format("20060102150405"),
 			ActAs:        []string{party},
 			SubmissionID: "archive-sub-" + time.Now().Format("20060102150405"),
@@ -720,7 +719,7 @@ func createContract(ctx context.Context, party, packageID string, cl *client.Dam
 	createSubmissionReq := &model.SubmitAndWaitRequest{
 		Commands: &model.Commands{
 			WorkflowID:   "create-contracts-" + time.Now().Format("20060102150405"),
-			UserID:       user,
+			UserID:       testutil.SandboxUserId,
 			CommandID:    "create-" + time.Now().Format("20060102150405"),
 			ActAs:        []string{party},
 			SubmissionID: "create-sub-" + time.Now().Format("20060102150405"),
@@ -793,7 +792,7 @@ func createContractWithUpdateID(ctx context.Context, party, packageID string, cl
 	createSubmissionReq := &model.SubmitAndWaitRequest{
 		Commands: &model.Commands{
 			WorkflowID:   "create-contracts-" + time.Now().Format("20060102150405"),
-			UserID:       user,
+			UserID:       testutil.SandboxUserId,
 			CommandID:    "create-" + time.Now().Format("20060102150405"),
 			ActAs:        []string{party},
 			SubmissionID: "create-sub-" + time.Now().Format("20060102150405"),
@@ -833,7 +832,7 @@ func getUpdateIDFromContractCreate(ctx context.Context, party, packageID string,
 	createSubmissionReq := &model.SubmitAndWaitRequest{
 		Commands: &model.Commands{
 			WorkflowID:   "create-for-typed-test-" + time.Now().Format("20060102150405"),
-			UserID:       user,
+			UserID:       testutil.SandboxUserId,
 			CommandID:    "create-typed-" + time.Now().Format("20060102150405"),
 			ActAs:        []string{party},
 			SubmissionID: "create-typed-sub-" + time.Now().Format("20060102150405"),

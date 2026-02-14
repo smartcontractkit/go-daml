@@ -8,6 +8,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 	"github.com/smartcontractkit/freeport"
+	"github.com/smartcontractkit/go-daml/pkg/model"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 
@@ -17,6 +18,7 @@ import (
 const (
 	DamlSandboxImage   = "digitalasset/daml-sdk"
 	DamlSandboxVersion = "3.5.0-snapshot.20251106.0"
+	SandboxUserId      = "app-provider"
 )
 
 type Output struct {
@@ -34,10 +36,11 @@ func CreateSandbox(t *testing.T) (*Output, error) {
 		fmt.Sprintf("%d:%d", ports[1], 6866),
 	}
 
+	log.Info().Msg("Starting sandbox container...")
 	req := testcontainers.ContainerRequest{
 		Image:        fmt.Sprintf("%s:%s", DamlSandboxImage, DamlSandboxVersion),
 		ExposedPorts: exposedPorts,
-		WaitingFor:   wait.ForLog("Canton sandbox is ready.").WithStartupTimeout(time.Minute * 5),
+		WaitingFor:   wait.ForLog("Canton sandbox is ready.").WithStartupTimeout(time.Minute * 10),
 		Files: []testcontainers.ContainerFile{
 			{
 				Reader:            strings.NewReader(GetCantonConfig()),
@@ -74,9 +77,34 @@ func CreateSandbox(t *testing.T) (*Output, error) {
 		return nil, fmt.Errorf("failed to list users: %w", err)
 	}
 
-	for _, user := range users {
-		log.Info().Str("UserID", user.ID).Str("PrimaryParty", user.PrimaryParty).Msg("Existing user")
+	userExists := false
+	for _, u := range users {
+		if u.ID == SandboxUserId {
+			userExists = true
+		}
 	}
+
+	if !userExists {
+		partyDetails, err := c.PartyMng.AllocateParty(t.Context(), "", nil, "")
+		if err != nil {
+			return nil, fmt.Errorf("failed to allocate party: %w", err)
+		}
+		log.Debug().Str("PartyId", partyDetails.Party).Msg("Allocated party")
+		user := &model.User{
+			ID:           SandboxUserId,
+			PrimaryParty: partyDetails.Party,
+		}
+		rights := []*model.Right{
+			{Type: model.CanActAs{Party: partyDetails.Party}},
+			{Type: model.CanReadAs{Party: partyDetails.Party}},
+		}
+		_, err = c.UserMng.CreateUser(t.Context(), user, rights)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create user: %w", err)
+		}
+	}
+
+	log.Info().Msg("Sandbox ready")
 
 	return &Output{
 		Container:     container,
