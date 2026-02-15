@@ -632,7 +632,7 @@ func (c *codeGenAst) handleBuiltinType(pkg *daml.Package, b *daml.Type_Builtin) 
 			Inner: c.extractType(pkg, b.Args[0]),
 		}
 	case daml.BuiltinType_GENMAP:
-		return model.Map{}
+		return model.GenMap{}
 	case daml.BuiltinType_ANY:
 		return model.Any{}
 	case daml.BuiltinType_ANY_EXCEPTION:

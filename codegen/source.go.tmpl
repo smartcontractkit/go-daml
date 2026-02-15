@@ -88,7 +88,7 @@ var (
   {{- else if eq .Type.GoType "types.GENMAP" -}}
     func() any {
       if t.{{capitalise .Name}} == nil {
-        return map[string]any{"_type": "genmap", "value": GENMAP{}}
+        return map[string]any{"_type": "genmap", "value": types.GENMAP{}}
       }
       return map[string]any{"_type": "genmap", "value": t.{{capitalise .Name}}}
     }()
@@ -140,8 +140,11 @@ var (
    --------------------------------------------------------- */}}
 
 {{if .IsMainDalf}}
-const PackageName = "{{.PackageName}}"
-const SDKVersion = "{{.SdkVersion}}"
+const (
+	PackageName = "{{.PackageName}}"
+	PackageID   = "{{.PackageID}}"
+	SDKVersion  = "{{.SdkVersion}}"
+)
 
 type Template interface {
 	CreateCommand() *model.CreateCommand

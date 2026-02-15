@@ -13,6 +13,7 @@ import (
 
 type tmplData struct {
 	Package          string
+	PackageID        string
 	PackageName      string
 	SdkVersion       string
 	Structs          map[string]*model.TmplStruct
@@ -46,6 +47,7 @@ func Bind(genPkg string, pkg *model.Package, sdkVersion string, isMainDalf bool,
 
 	data := &tmplData{
 		Package:          genPkg,
+		PackageID:        pkg.PackageID,
 		PackageName:      pkg.Name,
 		SdkVersion:       sdkVersion,
 		Structs:          pkg.Structs,
