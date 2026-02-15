@@ -60,7 +60,7 @@ func TestBind(t *testing.T) {
 		t.Error("Generated code does not contain JSON tags with original field names")
 	}
 
-	if !strings.Contains(result, `SDKVersion = "2.0.0"`) {
+	if !strings.Contains(result, `SDKVersion  = "2.0.0"`) {
 		t.Error("Generated code does not contain SDKVersion constant")
 	}
 }
