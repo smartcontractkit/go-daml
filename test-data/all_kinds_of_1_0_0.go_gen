@@ -21,8 +21,11 @@ var (
 	_ bind.BoundTemplate
 )
 
-const PackageName = "all-kinds-of"
-const SDKVersion = "3.3.0-snapshot.20250417.0"
+const (
+	PackageName = "all-kinds-of"
+	PackageID   = "6d7e83e81a0a7960eec37340f5b11e7a61606bd9161f413684bc345c3f387948"
+	SDKVersion  = "3.3.0-snapshot.20250417.0"
+)
 
 type Template interface {
 	CreateCommand() *model.CreateCommand
