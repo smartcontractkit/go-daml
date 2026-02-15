@@ -971,7 +971,7 @@ func recordToStruct(record *v2.Record, target interface{}) error {
 		return fmt.Errorf("failed to marshal record to JSON: %w", err)
 	}
 
-	if err := defaultJsonCodec.Unmarshall(jsonData, target); err != nil {
+	if err := defaultJsonCodec.Unmarshal(jsonData, target); err != nil {
 		return fmt.Errorf("failed to unmarshal JSON to struct (target type: %T): %w", target, err)
 	}
 
@@ -1014,7 +1014,7 @@ func MapToStruct(data map[string]interface{}, target interface{}) error {
 		return fmt.Errorf("failed to marshal map to JSON: %w", err)
 	}
 
-	if err := defaultJsonCodec.Unmarshall(jsonData, target); err != nil {
+	if err := defaultJsonCodec.Unmarshal(jsonData, target); err != nil {
 		return fmt.Errorf("failed to unmarshal JSON to struct (target type: %T): %w", target, err)
 	}
 

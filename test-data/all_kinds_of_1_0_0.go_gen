@@ -9,7 +9,7 @@ import (
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 	"github.com/smartcontractkit/go-daml/pkg/model"
-	. "github.com/smartcontractkit/go-daml/pkg/types"
+	"github.com/smartcontractkit/go-daml/pkg/types"
 )
 
 var (
@@ -60,12 +60,12 @@ func (t Accept) ToMap() map[string]any {
 
 func (t Accept) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshall(t)
+	return jsonCodec.Marshal(t)
 }
 
 func (t *Accept) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshall(data, t)
+	return jsonCodec.Unmarshal(data, t)
 }
 
 // Color is an enum type
@@ -92,20 +92,20 @@ func (e Color) GetEnumTypeIDWithPackageID(packageID string) string {
 
 func (e Color) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshall(e)
+	return jsonCodec.Marshal(e)
 }
 
 func (e *Color) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshall(data, e)
+	return jsonCodec.Unmarshal(data, e)
 }
 
-var _ ENUM = Color("")
+var _ types.ENUM = Color("")
 
 // MappyContract is a Template type
 type MappyContract struct {
-	Operator PARTY   `json:"operator"`
-	Value    TEXTMAP `json:"value"`
+	Operator types.PARTY   `json:"operator"`
+	Value    types.TEXTMAP `json:"value"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -164,12 +164,12 @@ func (t MappyContract) CreateCommandWithPackageID(packageID string) *model.Creat
 
 func (t MappyContract) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshall(t)
+	return jsonCodec.Marshal(t)
 }
 
 func (t *MappyContract) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshall(data, t)
+	return jsonCodec.Unmarshal(data, t)
 }
 
 // Choice methods for MappyContract
@@ -226,32 +226,32 @@ func (t MyPair) ToMap() map[string]any {
 
 func (t MyPair) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshall(t)
+	return jsonCodec.Marshal(t)
 }
 
 func (t *MyPair) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshall(data, t)
+	return jsonCodec.Unmarshal(data, t)
 }
 
 // OneOfEverything is a Template type
 type OneOfEverything struct {
-	Operator        PARTY     `json:"operator"`
-	SomeBoolean     BOOL      `json:"someBoolean"`
-	SomeInteger     INT64     `json:"someInteger"`
-	SomeDecimal     NUMERIC   `json:"someDecimal"`
-	SomeMaybe       *INT64    `json:"someMaybe"`
-	SomeMaybeNot    *INT64    `json:"someMaybeNot"`
-	SomeText        TEXT      `json:"someText"`
-	SomeDate        DATE      `json:"someDate"`
-	SomeDatetime    TIMESTAMP `json:"someDatetime"`
-	SomeSimpleList  []INT64   `json:"someSimpleList"`
-	SomeSimplePair  MyPair    `json:"someSimplePair"`
-	SomeNestedPair  MyPair    `json:"someNestedPair"`
-	SomeUglyNesting VPair     `json:"someUglyNesting"`
-	SomeMeasurement NUMERIC   `json:"someMeasurement"`
-	SomeEnum        Color     `json:"someEnum"`
-	TheUnit         UNIT      `json:"theUnit"`
+	Operator        types.PARTY     `json:"operator"`
+	SomeBoolean     types.BOOL      `json:"someBoolean"`
+	SomeInteger     types.INT64     `json:"someInteger"`
+	SomeDecimal     types.NUMERIC   `json:"someDecimal"`
+	SomeMaybe       *types.INT64    `json:"someMaybe"`
+	SomeMaybeNot    *types.INT64    `json:"someMaybeNot"`
+	SomeText        types.TEXT      `json:"someText"`
+	SomeDate        types.DATE      `json:"someDate"`
+	SomeDatetime    types.TIMESTAMP `json:"someDatetime"`
+	SomeSimpleList  []types.INT64   `json:"someSimpleList"`
+	SomeSimplePair  MyPair          `json:"someSimplePair"`
+	SomeNestedPair  MyPair          `json:"someNestedPair"`
+	SomeUglyNesting VPair           `json:"someUglyNesting"`
+	SomeMeasurement types.NUMERIC   `json:"someMeasurement"`
+	SomeEnum        Color           `json:"someEnum"`
+	TheUnit         types.UNIT      `json:"theUnit"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -480,12 +480,12 @@ func (t OneOfEverything) CreateCommandWithPackageID(packageID string) *model.Cre
 
 func (t OneOfEverything) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshall(t)
+	return jsonCodec.Marshal(t)
 }
 
 func (t *OneOfEverything) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshall(data, t)
+	return jsonCodec.Unmarshal(data, t)
 }
 
 // Choice methods for OneOfEverything
@@ -542,13 +542,13 @@ type VPair struct {
 // MarshalJSON implements custom JSON marshaling for VPair
 func (v VPair) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshall(v)
+	return jsonCodec.Marshal(v)
 }
 
 // UnmarshalJSON implements custom JSON unmarshalling for VPair
 func (v *VPair) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshall(data, v)
+	return jsonCodec.Unmarshal(data, v)
 }
 
 // GetVariantTag implements types.VARIANT interface
@@ -587,4 +587,4 @@ func (v VPair) GetVariantValue() any {
 	return nil
 }
 
-var _ VARIANT = (*VPair)(nil)
+var _ types.VARIANT = (*VPair)(nil)

@@ -8,7 +8,7 @@ import (
 	damlcommon "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/daml/lf/archive"
 	daml "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/daml/lf/archive/daml_lf_2"
 	"github.com/rs/zerolog/log"
-	"github.com/smartcontractkit/go-daml/internal/codegen/model"
+	"github.com/smartcontractkit/go-daml/codegen/model"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -25,13 +25,21 @@ const (
 
 type codeGenAst struct {
 	payload []byte
+	// Optional external packages to allow referencing external types
+	externalPackages model.ExternalPackages
+	// For keeping track of which packages have been imported, will start off empty and be populated as we process the
+	// DAML LF and encounter references to external packages. This allows us to include only the necessary imports in the generated code
+	importedPackages map[string]model.ExternalPackage
 }
 
-func NewCodegenAst(payload []byte) *codeGenAst {
-	return &codeGenAst{payload: payload}
+func NewCodegenAst(payload []byte, externalPackages model.ExternalPackages) *codeGenAst {
+	return &codeGenAst{
+		payload:          payload,
+		externalPackages: externalPackages,
+	}
 }
 
-func (c *codeGenAst) isEnumType(typeName string, pkg *daml.Package) bool {
+func (c *codeGenAst) isEnumType(typeName model.DamlType, pkg *daml.Package) bool {
 	for _, module := range pkg.Modules {
 		for _, dataType := range module.GetDataTypes() {
 			if !dataType.Serializable {
@@ -39,7 +47,7 @@ func (c *codeGenAst) isEnumType(typeName string, pkg *daml.Package) bool {
 			}
 
 			name := c.getName(pkg, dataType.GetNameInternedDname())
-			if name == typeName {
+			if name == typeName.GoType() {
 				if _, isEnum := dataType.DataCons.(*daml.DefDataType_Enum); isEnum {
 					return true
 				}
@@ -94,30 +102,32 @@ func (c *codeGenAst) GetInterfaces() (map[string]*model.TmplStruct, error) {
 	return interfaceMap, nil
 }
 
-func (c *codeGenAst) GetTemplateStructs(ifcByModule map[string]model.InterfaceMap) (map[string]*model.TmplStruct, error) {
+func (c *codeGenAst) GetTemplateStructs(ifcByModule map[string]model.InterfaceMap) (map[string]*model.TmplStruct, model.ExternalPackages, error) {
 	structs := make(map[string]*model.TmplStruct)
+	// Reset imported packages map before processing, will be populated with any external packages that are actually referenced by this package.
+	c.importedPackages = make(map[string]model.ExternalPackage)
 
 	var archive damlcommon.Archive
 	err := proto.Unmarshal(c.payload, &archive)
 	if err != nil {
-		return nil, err
+		return nil, model.ExternalPackages{}, err
 	}
 
 	var payloadMapped damlcommon.ArchivePayload
 	err = proto.Unmarshal(archive.Payload, &payloadMapped)
 	if err != nil {
-		return nil, err
+		return nil, model.ExternalPackages{}, err
 	}
 
 	damlLfBytes := payloadMapped.GetDamlLf_2()
 	if damlLfBytes == nil {
-		return nil, errors.New("unsupported daml version")
+		return nil, model.ExternalPackages{}, errors.New("unsupported daml version")
 	}
 
 	var damlLf daml.Package
 	err = proto.Unmarshal(damlLfBytes, &damlLf)
 	if err != nil {
-		return nil, err
+		return nil, model.ExternalPackages{}, err
 	}
 
 	for _, module := range damlLf.Modules {
@@ -130,7 +140,7 @@ func (c *codeGenAst) GetTemplateStructs(ifcByModule map[string]model.InterfaceMa
 
 		dataTypes, err := c.getDataTypes(&damlLf, module, moduleName)
 		if err != nil {
-			return nil, err
+			return nil, model.ExternalPackages{}, err
 		}
 		for key, val := range dataTypes {
 			structs[key] = val
@@ -138,7 +148,7 @@ func (c *codeGenAst) GetTemplateStructs(ifcByModule map[string]model.InterfaceMa
 
 		templates, err := c.getTemplates(&damlLf, module, moduleName, ifcByModule)
 		if err != nil {
-			return nil, err
+			return nil, model.ExternalPackages{}, err
 		}
 		for key, val := range templates {
 			structs[key] = val
@@ -146,7 +156,13 @@ func (c *codeGenAst) GetTemplateStructs(ifcByModule map[string]model.InterfaceMa
 
 	}
 
-	return structs, nil
+	// Return all packages that have actually been imported
+	importedPackages := model.ExternalPackages{
+		Packages: c.importedPackages,
+	}
+	c.importedPackages = nil
+
+	return structs, importedPackages, nil
 }
 
 func (c *codeGenAst) getName(pkg *daml.Package, id int32) string {
@@ -193,7 +209,7 @@ func (c *codeGenAst) getTemplates(
 				if err != nil {
 					return nil, err
 				}
-				isOptional := typeExtracted == RawTypeOptional || strings.HasPrefix(typeExtracted, "*")
+				_, isOptional := typeExtracted.(model.Optional)
 				tmplStruct.Fields = append(tmplStruct.Fields, &model.TmplField{
 					Name:       fieldExtracted,
 					Type:       typeExtracted,
@@ -241,8 +257,46 @@ func (c *codeGenAst) getTemplates(
 		if len(template.Implements) > 0 {
 			for _, impl := range template.Implements {
 				if impl.Interface != nil {
+
 					interfaceName := "I" + c.getName(pkg, impl.Interface.GetNameInternedDname())
-					tmplStruct.Implements = append(tmplStruct.Implements, interfaceName)
+
+					var extPkg model.ExternalPackage
+					implements := model.DamlType(model.Unknown{String: interfaceName})
+					switch pkgId := impl.Interface.Module.PackageId.Sum.(type) {
+					case *daml.SelfOrImportedPackageId_SelfPackageId:
+						// Local interface - nothing to do
+					case *daml.SelfOrImportedPackageId_ImportedPackageIdInternedStr:
+						// Type constructor from an imported package - referenced by interned string
+						importedPackageId := pkg.InternedStrings[pkgId.ImportedPackageIdInternedStr]
+						// Check if this is an external package that we have access to via externalPackages
+						var exists bool
+						extPkg, exists = c.externalPackages.Packages[importedPackageId]
+						if exists {
+							c.importedPackages[importedPackageId] = extPkg
+							implements = model.Imported{
+								Underlying:      model.Unknown{String: interfaceName},
+								ExternalPackage: extPkg,
+							}
+						}
+					case *daml.SelfOrImportedPackageId_PackageImportId:
+						// Type constructor from an imported package - referenced by package import id
+						importedPackageId := pkg.GetPackageImports().ImportedPackages[pkgId.PackageImportId]
+						// Check if this is an external package that we have access to via externalPackages
+						var exists bool
+						extPkg, exists = c.externalPackages.Packages[importedPackageId]
+						if exists {
+							c.importedPackages[importedPackageId] = extPkg
+							implements = model.Imported{
+								Underlying:      model.Unknown{String: interfaceName},
+								ExternalPackage: extPkg,
+							}
+						}
+					default:
+						log.Warn().Msgf("unknown package ID type for interface implementation: %T", pkgId)
+						continue
+					}
+
+					tmplStruct.Implements = append(tmplStruct.Implements, implements)
 					ifcModuleName := c.getDottedName(pkg, impl.Interface.Module.ModuleNameInternedDname)
 					log.Debug().Msgf("template %s -implements interface: %s location %s", templateName, interfaceName, ifcModuleName)
 
@@ -258,13 +312,27 @@ func (c *codeGenAst) getTemplates(
 							}
 							if !found {
 								log.Debug().Msgf("adding interface choice %s to template %s", ifaceChoice.Name, templateName)
-								tmplStruct.Choices = append(tmplStruct.Choices, &model.TmplChoice{
-									Name:              ifaceChoice.Name,
-									ArgType:           ifaceChoice.ArgType,
-									ReturnType:        ifaceChoice.ReturnType,
-									InterfaceName:     interfaceName,
-									InterfaceDAMLName: interfaceStruct.DAMLName,
-								})
+								if extPkg != (model.ExternalPackage{}) {
+									log.Debug().Msg("Interface choice is from an external package, adding using imports")
+									tmplStruct.Choices = append(tmplStruct.Choices, &model.TmplChoice{
+										Name: ifaceChoice.Name,
+										ArgType: model.Imported{
+											Underlying:      ifaceChoice.ArgType,
+											ExternalPackage: extPkg,
+										},
+										// ReturnType:        ifaceChoice.ReturnType,
+										InterfaceName:     interfaceName,
+										InterfaceDAMLName: interfaceStruct.DAMLName,
+									})
+								} else {
+									tmplStruct.Choices = append(tmplStruct.Choices, &model.TmplChoice{
+										Name:    ifaceChoice.Name,
+										ArgType: ifaceChoice.ArgType,
+										// ReturnType:        ifaceChoice.ReturnType,
+										InterfaceName:     interfaceName,
+										InterfaceDAMLName: interfaceStruct.DAMLName,
+									})
+								}
 							}
 						}
 					}
@@ -289,15 +357,20 @@ func (c *codeGenAst) getChoices(pkg *daml.Package, choices []*daml.TemplateChoic
 		// Extract argument type if present
 		if argBinder := choice.GetArgBinder(); argBinder != nil && argBinder.Type != nil {
 			argType := c.extractType(pkg, argBinder.Type)
+			// TODO
 			// Only set ArgType if it's not a UNIT type
-			if argType != "UNIT" && argType != "" {
-				choiceStruct.ArgType = argType
+			// if argType.GoType() != "UNIT" && argType.GoType() != "" {
+			// }
+			// If this is an Archive choice, set ArgType to Unit in order to ignore it in the template
+			if argType.GoType() == "Archive" {
+				argType = model.Unit{}
 			}
+			choiceStruct.ArgType = argType
 		}
 
-		if retType := choice.GetRetType(); retType != nil {
-			choiceStruct.ReturnType = c.extractType(pkg, retType)
-		}
+		// if retType := choice.GetRetType(); retType != nil {
+		// 	choiceStruct.ReturnType = c.extractType(pkg, retType)
+		// }
 
 		res = append(res, choiceStruct)
 	}
@@ -356,7 +429,7 @@ func (c *codeGenAst) getDataTypes(pkg *daml.Package, module *daml.Module, module
 				if err != nil {
 					return nil, err
 				}
-				isOptional := typeExtracted == RawTypeOptional || strings.HasPrefix(typeExtracted, "*")
+				_, isOptional := typeExtracted.(model.Optional)
 				tmplStruct.Fields = append(tmplStruct.Fields, &model.TmplField{
 					Name:       fieldExtracted,
 					Type:       typeExtracted,
@@ -385,7 +458,7 @@ func (c *codeGenAst) getDataTypes(pkg *daml.Package, module *daml.Module, module
 					constructorName := pkg.InternedStrings[constructorIdx]
 					tmplStruct.Fields = append(tmplStruct.Fields, &model.TmplField{
 						Name: constructorName,
-						Type: "enum",
+						Type: model.Enum{},
 					})
 				}
 			}
@@ -462,33 +535,33 @@ func (c *codeGenAst) parseExpressionForFields(pkg *daml.Package, expr *daml.Expr
 	return fieldNames
 }
 
-func (c *codeGenAst) extractTapp(pkg *daml.Package, tapp *daml.Type_TApp) string {
+func (c *codeGenAst) extractTapp(pkg *daml.Package, tapp *daml.Type_TApp) model.DamlType {
 	if tapp == nil {
-		return "unknown_tapp"
+		return model.Unknown{String: "unknown_tapp"}
 	}
 
-	lhs := model.NormalizeDAMLType(c.extractType(pkg, tapp.GetLhs()))
+	lhs := c.extractType(pkg, tapp.GetLhs())
 
-	switch lhs {
-	case "LIST":
-		elem := model.NormalizeDAMLType(c.extractType(pkg, tapp.GetRhs()))
-		return "[]" + elem
-
-	case "OPTIONAL":
-		elem := model.NormalizeDAMLType(c.extractType(pkg, tapp.GetRhs()))
-		return "*" + elem
-
-	case "CONTRACT_ID":
+	switch lhs.(type) {
+	case model.List:
+		rhs := c.extractType(pkg, tapp.GetRhs())
+		return model.List{Inner: rhs}
+	case model.Optional:
+		rhs := c.extractType(pkg, tapp.GetRhs())
+		return model.Optional{Inner: rhs}
+	case model.ContractId:
 		// ContractId X  -> CONTRACT_ID (don’t collapse to string)
-		return "CONTRACT_ID"
+		// Don't extract rhs here, to prevent the referred package from being imported
+		return lhs
 	}
 
 	// some other type application; keep lhs
 	return lhs
 }
-func (c *codeGenAst) extractType(pkg *daml.Package, typ *daml.Type) string {
+
+func (c *codeGenAst) extractType(pkg *daml.Package, typ *daml.Type) model.DamlType {
 	if typ == nil {
-		return ""
+		return model.Unknown{}
 	}
 
 	switch v := typ.Sum.(type) {
@@ -496,80 +569,140 @@ func (c *codeGenAst) extractType(pkg *daml.Package, typ *daml.Type) string {
 	case *daml.Type_InternedType:
 		prim := pkg.InternedTypes[v.InternedType]
 		if prim == nil {
-			return "unknown_interned_type"
+			return model.Unknown{String: "unknown_interned_type"}
 		}
-		// recurse into the interned definition (may be TApp/Builtin/Con/etc)
-		return model.NormalizeDAMLType(c.extractType(pkg, prim))
-
-	case *daml.Type_Tapp: // ✅ MUST be Type_Tapp? nope -> Type_Tapp is wrong; you want Type_Tapp? actually the oneof wrapper is Type_Tapp, but the inner is Type_TApp
-		// IMPORTANT: depending on generated code, wrapper is Type_Tapp but inner is Type_TApp.
-		// In your earlier error, v.Tapp is *Type_TApp, so this compiles.
-		return model.NormalizeDAMLType(c.extractTapp(pkg, v.Tapp))
-
+		// recurse into the interned definition
+		return c.extractType(pkg, prim)
+	case *daml.Type_Tapp:
+		// Application type
+		return c.extractTapp(pkg, v.Tapp)
 	case *daml.Type_Builtin_:
-		return model.NormalizeDAMLType(c.handleBuiltinType(pkg, v.Builtin))
-
+		// Builtin types
+		return c.handleBuiltinType(pkg, v.Builtin)
 	case *daml.Type_Con_:
-		if v.Con.Tycon != nil {
-			return model.NormalizeDAMLType(c.getName(pkg, v.Con.Tycon.GetNameInternedDname()))
-		}
-		return "con_without_tycon"
-
+		// Type constructor
+		return c.handleConType(pkg, v.Con)
 	case *daml.Type_Var_:
-		if int(v.Var.GetVarInternedStr()) < len(pkg.InternedStrings) {
-			// Can't handle these properly yet...
-			// return model.NormalizeDAMLType(pkg.InternedStrings[v.Var.GetVarInternedStr()])
-			return model.NormalizeDAMLType("any")
-		}
-		return "unknown_var"
-
+		// Can't handle these properly yet...
+		return model.Any{}
 	case *daml.Type_Syn_:
+		// Synonym
 		if v.Syn.Tysyn != nil {
-			return model.NormalizeDAMLType(fmt.Sprintf("syn_%s", c.getName(pkg, v.Syn.Tysyn.GetNameInternedDname())))
+			return model.Unknown{String: c.getName(pkg, v.Syn.Tysyn.GetNameInternedDname())}
 		}
-		return "syn_without_name"
+		return model.Unknown{String: "syn_without_name"}
 
 	default:
-		return model.NormalizeDAMLType(fmt.Sprintf("unknown_type_%T", typ.Sum))
+		return model.Unknown{String: fmt.Sprintf("unknown_type_%T", typ.Sum)}
 	}
 }
 
-func (c *codeGenAst) handleBuiltinType(pkg *daml.Package, b *daml.Type_Builtin) string {
+func (c *codeGenAst) handleBuiltinType(pkg *daml.Package, b *daml.Type_Builtin) model.DamlType {
 	switch b.Builtin {
-
-	case daml.BuiltinType_LIST:
-		// LIST a
-		if len(b.Args) > 0 {
-			elem := model.NormalizeDAMLType(c.extractType(pkg, b.Args[0]))
-			return "[]" + elem
-		}
-		return RawTypeList // fallback
-
-	case daml.BuiltinType_OPTIONAL:
-		// Optional a
-		if len(b.Args) > 0 {
-			elem := model.NormalizeDAMLType(c.extractType(pkg, b.Args[0]))
-			return "*" + elem
-		}
-		return RawTypeOptional
-
+	case daml.BuiltinType_UNIT:
+		return model.Unit{}
+	case daml.BuiltinType_BOOL:
+		return model.Bool{}
+	case daml.BuiltinType_INT64:
+		return model.Int64{}
+	case daml.BuiltinType_DATE:
+		return model.Date{}
+	case daml.BuiltinType_TIMESTAMP:
+		return model.Timestamp{}
+	case daml.BuiltinType_NUMERIC:
+		return model.Numeric{}
+	case daml.BuiltinType_PARTY:
+		return model.Party{}
+	case daml.BuiltinType_TEXT:
+		return model.Text{}
 	case daml.BuiltinType_CONTRACT_ID:
-		// ContractId a  -> CONTRACT_ID (do not collapse to string)
-		return RawTypeContractID
-
+		return model.ContractId{}
+	case daml.BuiltinType_OPTIONAL:
+		if b.Args == nil || len(b.Args) == 0 {
+			return model.Optional{Inner: model.Unknown{String: "optional_without_arg"}}
+		}
+		return model.Optional{
+			Inner: c.extractType(pkg, b.Args[0]),
+		}
+	case daml.BuiltinType_LIST:
+		if b.Args == nil || len(b.Args) == 0 {
+			return model.List{Inner: model.Unknown{String: "list_without_arg"}}
+		}
+		return model.List{
+			Inner: c.extractType(pkg, b.Args[0]),
+		}
 	case daml.BuiltinType_GENMAP:
-		return "GENMAP"
-
+		return model.Map{}
+	case daml.BuiltinType_ANY:
+		return model.Any{}
+	case daml.BuiltinType_ANY_EXCEPTION:
+		return model.Unknown{}
+	case daml.BuiltinType_TYPE_REP:
+		return model.Unknown{}
+	case daml.BuiltinType_ARROW:
+		return model.Unknown{}
+	case daml.BuiltinType_UPDATE:
+		return model.Unknown{}
+	case daml.BuiltinType_FAILURE_CATEGORY:
+		return model.Unknown{}
 	case daml.BuiltinType_TEXTMAP:
-		return "TEXTMAP"
+		return model.TextMap{}
+	case daml.BuiltinType_BIGNUMERIC:
+		return model.BigNumeric{}
+	case daml.BuiltinType_ROUNDING_MODE:
+		return model.RoundingMode{}
 
 	default:
-		return b.Builtin.String()
+		return model.Unknown{}
 	}
 }
 
-func (c *codeGenAst) handleConType(pkg *daml.Package, conType *daml.Type_Con) string {
-	if conType == nil || conType.Tycon == nil {
+func (c *codeGenAst) handleConType(pkg *daml.Package, conType *daml.Type_Con) model.DamlType {
+
+	switch pkgId := conType.Tycon.Module.PackageId.Sum.(type) {
+	case *daml.SelfOrImportedPackageId_SelfPackageId:
+		// Type constructor from the same package, will be generated as part of the output
+		name := c.getName(pkg, conType.Tycon.GetNameInternedDname())
+		return model.Unknown{String: name}
+	case *daml.SelfOrImportedPackageId_ImportedPackageIdInternedStr:
+		// Type constructor from an imported package - referenced by interned string
+		importedPackageId := pkg.InternedStrings[pkgId.ImportedPackageIdInternedStr]
+		name := c.getName(pkg, conType.Tycon.GetNameInternedDname())
+
+		// Check if this is an external package that we have access to via externalPackages
+		if extPkg, exists := c.externalPackages.Packages[importedPackageId]; exists {
+			c.importedPackages[importedPackageId] = extPkg
+			return model.Imported{
+				Underlying:      model.Unknown{String: name},
+				ExternalPackage: extPkg,
+			}
+		}
+
+		// Special handling for certain stdlib/DA types that have generated types
+		switch name {
+		case "RelTime":
+			return model.RelTime{}
+		default:
+			return model.Unknown{String: name}
+		}
+	case *daml.SelfOrImportedPackageId_PackageImportId:
+		// Type constructor from an imported package - referenced by package import id
+		importedPackageId := pkg.GetPackageImports().ImportedPackages[pkgId.PackageImportId]
+		name := c.getName(pkg, conType.Tycon.GetNameInternedDname())
+
+		// Check if this is an external package that we have access to via externalPackages
+		if extPkg, exists := c.externalPackages.Packages[importedPackageId]; exists {
+			c.importedPackages[importedPackageId] = extPkg
+			return model.Imported{
+				Underlying:      model.Unknown{String: name},
+				ExternalPackage: extPkg,
+			}
+		}
+
+		return model.Unknown{String: name}
+	}
+
+	/*if conType == nil || conType.Tycon == nil {
 		return "con_without_tycon"
 	}
 
@@ -607,26 +740,27 @@ func (c *codeGenAst) handleConType(pkg *daml.Package, conType *daml.Type_Con) st
 		return "TUPLE3"
 	default:
 		return tyconName
-	}
+	}*/
+	return model.Unknown{String: "con_without_tycon"}
 }
 
-func (c *codeGenAst) extractField(pkg *daml.Package, field *daml.FieldWithType) (string, string, error) {
+func (c *codeGenAst) extractField(pkg *daml.Package, field *daml.FieldWithType) (string, model.DamlType, error) {
 	if field == nil {
-		return "", "", fmt.Errorf("field is nil")
+		return "", nil, fmt.Errorf("field is nil")
 	}
 
 	idx := field.GetFieldInternedStr()
 	if int(idx) >= len(pkg.InternedStrings) {
-		return "", "", fmt.Errorf("invalid interned string index for field name: %d", idx)
+		return "", nil, fmt.Errorf("invalid interned string index for field name: %d", idx)
 	}
 	fieldName := pkg.InternedStrings[idx]
 
 	if field.Type == nil {
-		return fieldName, "", fmt.Errorf("field type is nil")
+		return fieldName, nil, fmt.Errorf("field type is nil")
 	}
 
 	ty := c.extractType(pkg, field.Type) // ✅ funnels everything through tapp/builtin/etc
-	return fieldName, model.NormalizeDAMLType(ty), nil
+	return fieldName, ty, nil
 }
 
 func (c *codeGenAst) getDottedName(pkg *daml.Package, dottedNameID int32) string {

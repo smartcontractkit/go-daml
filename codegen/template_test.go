@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/smartcontractkit/go-daml/internal/codegen/model"
+	"github.com/smartcontractkit/go-daml/codegen/model"
 )
 
 func TestBind(t *testing.T) {
@@ -13,23 +13,28 @@ func TestBind(t *testing.T) {
 			Name:    "RentalProposal",
 			RawType: "Record",
 			Fields: []*model.TmplField{
-				{Name: "landlord", Type: "string"},
-				{Name: "tenant", Type: "string"},
-				{Name: "terms", Type: "string"},
+				{Name: "landlord", Type: model.Text{}},
+				{Name: "tenant", Type: model.Text{}},
+				{Name: "terms", Type: model.Text{}},
 			},
 		},
 		"RentalAgreement": {
 			Name:    "RentalAgreement",
 			RawType: "Record",
 			Fields: []*model.TmplField{
-				{Name: "landlord", Type: "string"},
-				{Name: "tenant", Type: "string"},
-				{Name: "terms", Type: "string"},
+				{Name: "landlord", Type: model.Text{}},
+				{Name: "tenant", Type: model.Text{}},
+				{Name: "terms", Type: model.Text{}},
 			},
 		},
 	}
 
-	result, err := Bind("main", "test-package-name", "2.0.0", structs, true, false)
+	pkg := &model.Package{
+		Name:    "test-package-name",
+		Structs: structs,
+	}
+
+	result, err := Bind("main", pkg, "2.0.0", true, false)
 	if err != nil {
 		t.Fatalf("Bind failed: %v", err)
 	}
@@ -47,7 +52,7 @@ func TestBind(t *testing.T) {
 		t.Error("Generated code does not contain RentalAgreement struct")
 	}
 
-	if !strings.Contains(result, "Landlord string") {
+	if !strings.Contains(result, "Landlord types.TEXT") {
 		t.Error("Generated code does not contain capitalized field names")
 	}
 

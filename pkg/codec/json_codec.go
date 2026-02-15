@@ -62,8 +62,8 @@ func NewJsonCodecWithOptions(encodeNumericAsString, encodeInt64AsString, exclude
 	}
 }
 
-// Marshall converts a DAML structure to JSON bytes following transcode patterns
-func (codec *JsonCodec) Marshall(value interface{}) ([]byte, error) {
+// Marshal converts a DAML structure to JSON bytes following transcode patterns
+func (codec *JsonCodec) Marshal(value interface{}) ([]byte, error) {
 	jsonValue, err := codec.toDynamicValue(value)
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert to dynamic value: %w", err)
@@ -71,8 +71,8 @@ func (codec *JsonCodec) Marshall(value interface{}) ([]byte, error) {
 	return json.Marshal(jsonValue)
 }
 
-// Unmarshall converts JSON bytes back to a DAML structure following transcode patterns
-func (codec *JsonCodec) Unmarshall(data []byte, target interface{}) error {
+// Unmarshal converts JSON bytes back to a DAML structure following transcode patterns
+func (codec *JsonCodec) Unmarshal(data []byte, target interface{}) error {
 	var intermediate interface{}
 	if err := json.Unmarshal(data, &intermediate); err != nil {
 		return fmt.Errorf("failed to unmarshal JSON: %w", err)
