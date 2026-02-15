@@ -17,14 +17,14 @@ type TmplStruct struct {
 	IsInterface bool
 	Key         *TmplField
 	Choices     []*TmplChoice
-	Implements  []string
+	Implements  []DamlType // Set if this struct implements any interfaces
 	Signatories []string
 	Observers   []string
 	Location    string
 }
 
 type TmplField struct {
-	Type       string
+	Type       DamlType
 	Name       string
 	RawType    string
 	IsOptional bool
@@ -32,19 +32,21 @@ type TmplField struct {
 }
 
 type TmplChoice struct {
-	Name              string
-	ArgType           string
-	ReturnType        string
-	InterfaceName     string // The Go name of the interface this choice comes from (e.g., "ITransferable")
-	InterfaceDAMLName string // The original DAML name of the interface (e.g., "Transferable")
+	Name    string
+	ArgType DamlType
+	// ReturnType        DamlType // Not used for now
+	Interface         DamlType // If this choice is implementing an interface
+	InterfaceName     string   // The Go name of the interface this choice comes from (e.g., "ITransferable")
+	InterfaceDAMLName string   // The original DAML name of the interface (e.g., "Transferable")
 }
 
 type Package struct {
-	Name      string
-	Version   string
-	PackageID string
-	Structs   map[string]*TmplStruct
-	Metadata  *Metadata
+	Name             string
+	Version          string
+	PackageID        string
+	Structs          map[string]*TmplStruct
+	Metadata         *Metadata
+	ImportedPackages []ExternalPackage
 }
 
 type Metadata struct {

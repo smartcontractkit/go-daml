@@ -13,8 +13,8 @@ jobs:
       fail-fast: false
       matrix:
         dir:
+          - codegen
           - examples
-          - internal
           - pkg
     runs-on: ubuntu-latest
     steps:
