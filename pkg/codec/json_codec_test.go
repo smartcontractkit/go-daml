@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestJsonCodec_Marshall_BasicTypes(t *testing.T) {
+func TestJsonCodec_Marshal_BasicTypes(t *testing.T) {
 	codec := NewJsonCodec()
 
 	tests := []struct {
@@ -74,14 +74,14 @@ func TestJsonCodec_Marshall_BasicTypes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := codec.Marshall(tt.input)
+			result, err := codec.Marshal(tt.input)
 			require.NoError(t, err)
 			assert.JSONEq(t, tt.expected, string(result))
 		})
 	}
 }
 
-func TestJsonCodec_Marshall_NumericAsNumber(t *testing.T) {
+func TestJsonCodec_Marshal_NumericAsNumber(t *testing.T) {
 	codec := NewJsonCodecWithOptions(false, false, false)
 
 	tests := []struct {
@@ -103,14 +103,14 @@ func TestJsonCodec_Marshall_NumericAsNumber(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := codec.Marshall(tt.input)
+			result, err := codec.Marshal(tt.input)
 			require.NoError(t, err)
 			assert.JSONEq(t, tt.expected, string(result))
 		})
 	}
 }
 
-func TestJsonCodec_Marshall_Collections(t *testing.T) {
+func TestJsonCodec_Marshal_Collections(t *testing.T) {
 	codec := NewJsonCodec()
 
 	tests := []struct {
@@ -140,7 +140,7 @@ func TestJsonCodec_Marshall_Collections(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := codec.Marshall(tt.input)
+			result, err := codec.Marshal(tt.input)
 			require.NoError(t, err)
 			assert.JSONEq(t, tt.expected, string(result))
 		})
@@ -155,7 +155,7 @@ type TestRecord struct {
 	Optional *TEXT   `json:"optional"`
 }
 
-func TestJsonCodec_Marshall_Records(t *testing.T) {
+func TestJsonCodec_Marshal_Records(t *testing.T) {
 	codec := NewJsonCodec()
 
 	optionalValue := TEXT("present")
@@ -167,7 +167,7 @@ func TestJsonCodec_Marshall_Records(t *testing.T) {
 		Optional: &optionalValue,
 	}
 
-	result, err := codec.Marshall(record)
+	result, err := codec.Marshal(record)
 	require.NoError(t, err)
 
 	var parsed map[string]interface{}
@@ -181,7 +181,7 @@ func TestJsonCodec_Marshall_Records(t *testing.T) {
 	assert.Equal(t, "present", parsed["optional"])
 }
 
-func TestJsonCodec_Marshall_RecordWithNilOptional(t *testing.T) {
+func TestJsonCodec_Marshal_RecordWithNilOptional(t *testing.T) {
 	codec := NewJsonCodec()
 
 	record := TestRecord{
@@ -192,7 +192,7 @@ func TestJsonCodec_Marshall_RecordWithNilOptional(t *testing.T) {
 		Optional: nil, // nil optional
 	}
 
-	result, err := codec.Marshall(record)
+	result, err := codec.Marshal(record)
 	require.NoError(t, err)
 
 	var parsed map[string]interface{}
@@ -206,7 +206,7 @@ func TestJsonCodec_Marshall_RecordWithNilOptional(t *testing.T) {
 	assert.Nil(t, parsed["optional"]) // nil optional included
 }
 
-func TestJsonCodec_Marshall_ExcludeNullValues(t *testing.T) {
+func TestJsonCodec_Marshal_ExcludeNullValues(t *testing.T) {
 	codec := NewJsonCodecWithOptions(true, true, true) // exclude null values
 
 	record := TestRecord{
@@ -217,7 +217,7 @@ func TestJsonCodec_Marshall_ExcludeNullValues(t *testing.T) {
 		Optional: nil, // nil optional
 	}
 
-	result, err := codec.Marshall(record)
+	result, err := codec.Marshal(record)
 	require.NoError(t, err)
 
 	var parsed map[string]interface{}
@@ -251,10 +251,10 @@ func (e TestColor) GetEnumTypeID() string {
 
 var _ ENUM = TestColor("")
 
-func TestJsonCodec_Marshall_Enum(t *testing.T) {
+func TestJsonCodec_Marshal_Enum(t *testing.T) {
 	codec := NewJsonCodec()
 
-	result, err := codec.Marshall(TestColorRed)
+	result, err := codec.Marshal(TestColorRed)
 	require.NoError(t, err)
 
 	assert.JSONEq(t, `"Red"`, string(result))
@@ -267,7 +267,7 @@ type ComplexRecord struct {
 	Config   TestRecord             `json:"config"`
 }
 
-func TestJsonCodec_Marshall_ComplexNested(t *testing.T) {
+func TestJsonCodec_Marshal_ComplexNested(t *testing.T) {
 	codec := NewJsonCodec()
 
 	optionalText := TEXT("nested")
@@ -287,7 +287,7 @@ func TestJsonCodec_Marshall_ComplexNested(t *testing.T) {
 		},
 	}
 
-	result, err := codec.Marshall(complex)
+	result, err := codec.Marshal(complex)
 	require.NoError(t, err)
 
 	var parsed map[string]interface{}
@@ -309,9 +309,9 @@ func TestJsonCodec_Marshall_ComplexNested(t *testing.T) {
 	assert.Equal(t, "nested", config["optional"])
 }
 
-// ========== UNMARSHALL TESTS ==========
+// ========== UNMARSHAL TESTS ==========
 
-func TestJsonCodec_Unmarshall_BasicTypes(t *testing.T) {
+func TestJsonCodec_Unmarshal_BasicTypes(t *testing.T) {
 	codec := NewJsonCodec()
 
 	tests := []struct {
@@ -390,7 +390,7 @@ func TestJsonCodec_Unmarshall_BasicTypes(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := codec.Unmarshall([]byte(tt.json), tt.target)
+			err := codec.Unmarshal([]byte(tt.json), tt.target)
 			require.NoError(t, err)
 
 			rv := reflect.ValueOf(tt.target).Elem().Interface()
@@ -399,7 +399,7 @@ func TestJsonCodec_Unmarshall_BasicTypes(t *testing.T) {
 	}
 }
 
-func TestJsonCodec_Unmarshall_Collections(t *testing.T) {
+func TestJsonCodec_Unmarshal_Collections(t *testing.T) {
 	codec := NewJsonCodec()
 
 	tests := []struct {
@@ -439,7 +439,7 @@ func TestJsonCodec_Unmarshall_Collections(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := codec.Unmarshall([]byte(tt.json), tt.target)
+			err := codec.Unmarshal([]byte(tt.json), tt.target)
 			require.NoError(t, err)
 
 			rv := reflect.ValueOf(tt.target).Elem().Interface()
@@ -448,7 +448,7 @@ func TestJsonCodec_Unmarshall_Collections(t *testing.T) {
 	}
 }
 
-func TestJsonCodec_Unmarshall_Records(t *testing.T) {
+func TestJsonCodec_Unmarshal_Records(t *testing.T) {
 	codec := NewJsonCodec()
 
 	jsonData := `{
@@ -460,7 +460,7 @@ func TestJsonCodec_Unmarshall_Records(t *testing.T) {
 	}`
 
 	var result TestRecord
-	err := codec.Unmarshall([]byte(jsonData), &result)
+	err := codec.Unmarshal([]byte(jsonData), &result)
 	require.NoError(t, err)
 
 	assert.Equal(t, TEXT("Alice"), result.Name)
@@ -471,7 +471,7 @@ func TestJsonCodec_Unmarshall_Records(t *testing.T) {
 	assert.Equal(t, TEXT("present"), *result.Optional)
 }
 
-func TestJsonCodec_Unmarshall_RecordWithNilOptional(t *testing.T) {
+func TestJsonCodec_Unmarshal_RecordWithNilOptional(t *testing.T) {
 	codec := NewJsonCodec()
 
 	jsonData := `{
@@ -482,7 +482,7 @@ func TestJsonCodec_Unmarshall_RecordWithNilOptional(t *testing.T) {
 	}`
 
 	var result TestRecord
-	err := codec.Unmarshall([]byte(jsonData), &result)
+	err := codec.Unmarshal([]byte(jsonData), &result)
 	require.NoError(t, err)
 
 	assert.Equal(t, TEXT("Bob"), result.Name)
@@ -492,7 +492,7 @@ func TestJsonCodec_Unmarshall_RecordWithNilOptional(t *testing.T) {
 	assert.Nil(t, result.Optional)
 }
 
-func TestJsonCodec_RoundTrip_Marshall_Unmarshall(t *testing.T) {
+func TestJsonCodec_RoundTrip_Marshal_Unmarshal(t *testing.T) {
 	codec := NewJsonCodec()
 
 	optionalValue := TEXT("present")
@@ -504,11 +504,11 @@ func TestJsonCodec_RoundTrip_Marshall_Unmarshall(t *testing.T) {
 		Optional: &optionalValue,
 	}
 
-	jsonBytes, err := codec.Marshall(original)
+	jsonBytes, err := codec.Marshal(original)
 	require.NoError(t, err)
 
 	var result TestRecord
-	err = codec.Unmarshall(jsonBytes, &result)
+	err = codec.Unmarshal(jsonBytes, &result)
 	require.NoError(t, err)
 	assert.Equal(t, original.Name, result.Name)
 	assert.Equal(t, original.Age, result.Age)
@@ -530,11 +530,11 @@ func TestJsonCodec_RoundTrip_WithNumericAsNumber(t *testing.T) {
 		Optional: nil,
 	}
 
-	jsonBytes, err := codec.Marshall(original)
+	jsonBytes, err := codec.Marshal(original)
 	require.NoError(t, err)
 
 	var result TestRecord
-	err = codec.Unmarshall(jsonBytes, &result)
+	err = codec.Unmarshal(jsonBytes, &result)
 	require.NoError(t, err)
 
 	assert.Equal(t, original.Name, result.Name)
@@ -544,7 +544,7 @@ func TestJsonCodec_RoundTrip_WithNumericAsNumber(t *testing.T) {
 	assert.Nil(t, result.Optional)
 }
 
-func TestJsonCodec_Marshall_RELTIME(t *testing.T) {
+func TestJsonCodec_Marshal_RELTIME(t *testing.T) {
 	codec := NewJsonCodec()
 
 	tests := []struct {
@@ -571,14 +571,14 @@ func TestJsonCodec_Marshall_RELTIME(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := codec.Marshall(tt.input)
+			result, err := codec.Marshal(tt.input)
 			require.NoError(t, err)
 			assert.JSONEq(t, tt.expected, string(result))
 		})
 	}
 }
 
-func TestJsonCodec_Unmarshall_RELTIME(t *testing.T) {
+func TestJsonCodec_Unmarshal_RELTIME(t *testing.T) {
 	codec := NewJsonCodec()
 
 	tests := []struct {
@@ -606,14 +606,14 @@ func TestJsonCodec_Unmarshall_RELTIME(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var result RELTIME
-			err := codec.Unmarshall([]byte(tt.json), &result)
+			err := codec.Unmarshal([]byte(tt.json), &result)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
 
-func TestJsonCodec_Unmarshall_RELTIME_FromMap(t *testing.T) {
+func TestJsonCodec_Unmarshal_RELTIME_FromMap(t *testing.T) {
 	codec := NewJsonCodec()
 
 	tests := []struct {
@@ -641,25 +641,25 @@ func TestJsonCodec_Unmarshall_RELTIME_FromMap(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var result RELTIME
-			err := codec.Unmarshall([]byte(tt.json), &result)
+			err := codec.Unmarshal([]byte(tt.json), &result)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
 
-func TestJsonCodec_Unmarshall_RELTIME_FromMap_InvalidFormat(t *testing.T) {
+func TestJsonCodec_Unmarshal_RELTIME_FromMap_InvalidFormat(t *testing.T) {
 	codec := NewJsonCodec()
 
 	// Map without microseconds field should fail
 	json := `{"other_field": 1000000}`
 	var result RELTIME
-	err := codec.Unmarshall([]byte(json), &result)
+	err := codec.Unmarshal([]byte(json), &result)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid map format for RELTIME")
 }
 
-func TestJsonCodec_Marshall_SET(t *testing.T) {
+func TestJsonCodec_Marshal_SET(t *testing.T) {
 	codec := NewJsonCodec()
 
 	tests := []struct {
@@ -686,14 +686,14 @@ func TestJsonCodec_Marshall_SET(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := codec.Marshall(tt.input)
+			result, err := codec.Marshal(tt.input)
 			require.NoError(t, err)
 			assert.JSONEq(t, tt.expected, string(result))
 		})
 	}
 }
 
-func TestJsonCodec_Unmarshall_SET(t *testing.T) {
+func TestJsonCodec_Unmarshal_SET(t *testing.T) {
 	codec := NewJsonCodec()
 
 	tests := []struct {
@@ -716,7 +716,7 @@ func TestJsonCodec_Unmarshall_SET(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var result SET
-			err := codec.Unmarshall([]byte(tt.json), &result)
+			err := codec.Unmarshal([]byte(tt.json), &result)
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, result)
 		})
@@ -727,62 +727,62 @@ func TestJsonCodec_RoundTrip_RELTIME_SET(t *testing.T) {
 	codec := NewJsonCodec()
 
 	originalReltime := RELTIME(5 * time.Minute)
-	jsonBytes, err := codec.Marshall(originalReltime)
+	jsonBytes, err := codec.Marshal(originalReltime)
 	require.NoError(t, err)
 
 	var resultReltime RELTIME
-	err = codec.Unmarshall(jsonBytes, &resultReltime)
+	err = codec.Unmarshal(jsonBytes, &resultReltime)
 	require.NoError(t, err)
 	assert.Equal(t, originalReltime, resultReltime)
 
 	originalSet := SET{"a", "b", "c"}
-	jsonBytes, err = codec.Marshall(originalSet)
+	jsonBytes, err = codec.Marshal(originalSet)
 	require.NoError(t, err)
 
 	var resultSet SET
-	err = codec.Unmarshall(jsonBytes, &resultSet)
+	err = codec.Unmarshal(jsonBytes, &resultSet)
 	require.NoError(t, err)
 	assert.Equal(t, originalSet, resultSet)
 }
 
-// func TestJsonCodec_Marshall_TUPLE2(t *testing.T) {
+// func TestJsonCodec_Marshal_TUPLE2(t *testing.T) {
 // 	codec := NewJsonCodec()
 
 // 	t.Run("TUPLE2 of strings", func(t *testing.T) {
 // 		input := TUPLE2[string, string]{First: "hello", Second: "world"}
-// 		result, err := codec.Marshall(input)
+// 		result, err := codec.Marshal(input)
 // 		require.NoError(t, err)
 // 		assert.JSONEq(t, `{"_1":"hello","_2":"world"}`, string(result))
 // 	})
 
 // 	t.Run("TUPLE2 of mixed types", func(t *testing.T) {
 // 		input := TUPLE2[INT64, TEXT]{First: INT64(42), Second: TEXT("test")}
-// 		result, err := codec.Marshall(input)
+// 		result, err := codec.Marshal(input)
 // 		require.NoError(t, err)
 // 		assert.JSONEq(t, `{"_1":"42","_2":"test"}`, string(result))
 // 	})
 
 // 	t.Run("TUPLE2 of numbers", func(t *testing.T) {
 // 		input := TUPLE2[int, int]{First: 1, Second: 2}
-// 		result, err := codec.Marshall(input)
+// 		result, err := codec.Marshal(input)
 // 		require.NoError(t, err)
 // 		assert.JSONEq(t, `{"_1":"1","_2":"2"}`, string(result))
 // 	})
 // }
 
-// func TestJsonCodec_Unmarshall_TUPLE2(t *testing.T) {
+// func TestJsonCodec_Unmarshal_TUPLE2(t *testing.T) {
 // 	codec := NewJsonCodec()
 
 // 	t.Run("TUPLE2 from object", func(t *testing.T) {
 // 		var result TUPLE2[string, string]
-// 		err := codec.Unmarshall([]byte(`{"_1":"hello","_2":"world"}`), &result)
+// 		err := codec.Unmarshal([]byte(`{"_1":"hello","_2":"world"}`), &result)
 // 		require.NoError(t, err)
 // 		assert.Equal(t, TUPLE2[string, string]{First: "hello", Second: "world"}, result)
 // 	})
 
 // 	t.Run("TUPLE2 with numbers", func(t *testing.T) {
 // 		var result TUPLE2[float64, float64]
-// 		err := codec.Unmarshall([]byte(`{"_1":42,"_2":100}`), &result)
+// 		err := codec.Unmarshal([]byte(`{"_1":42,"_2":100}`), &result)
 // 		require.NoError(t, err)
 // 		assert.Equal(t, TUPLE2[float64, float64]{First: float64(42), Second: float64(100)}, result)
 // 	})
@@ -795,11 +795,11 @@ func TestJsonCodec_RoundTrip_RELTIME_SET(t *testing.T) {
 // 		First:  "first value",
 // 		Second: "second value",
 // 	}
-// 	jsonBytes, err := codec.Marshall(original)
+// 	jsonBytes, err := codec.Marshal(original)
 // 	require.NoError(t, err)
 
 // 	var result TUPLE2[string, string]
-// 	err = codec.Unmarshall(jsonBytes, &result)
+// 	err = codec.Unmarshal(jsonBytes, &result)
 // 	require.NoError(t, err)
 // 	assert.Equal(t, original, result)
 // }

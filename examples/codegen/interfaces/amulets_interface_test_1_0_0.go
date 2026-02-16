@@ -90,13 +90,13 @@ func (t Asset) CreateCommand() *model.CreateCommand {
 // MarshalJSON implements custom JSON marshaling for Asset using JsonCodec
 func (t Asset) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshall(t)
+	return jsonCodec.Marshal(t)
 }
 
 // UnmarshalJSON implements custom JSON unmarshaling for Asset using JsonCodec
 func (t *Asset) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshall(data, t)
+	return jsonCodec.Unmarshal(data, t)
 }
 
 // Choice methods for Asset
@@ -150,13 +150,13 @@ func (t AssetTransfer) toMap() map[string]interface{} {
 // MarshalJSON implements custom JSON marshaling for AssetTransfer using JsonCodec
 func (t AssetTransfer) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshall(t)
+	return jsonCodec.Marshal(t)
 }
 
 // UnmarshalJSON implements custom JSON unmarshaling for AssetTransfer using JsonCodec
 func (t *AssetTransfer) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshall(data, t)
+	return jsonCodec.Unmarshal(data, t)
 }
 
 // Token is a Template type
@@ -192,13 +192,13 @@ func (t Token) CreateCommand() *model.CreateCommand {
 // MarshalJSON implements custom JSON marshaling for Token using JsonCodec
 func (t Token) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshall(t)
+	return jsonCodec.Marshal(t)
 }
 
 // UnmarshalJSON implements custom JSON unmarshaling for Token using JsonCodec
 func (t *Token) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshall(data, t)
+	return jsonCodec.Unmarshal(data, t)
 }
 
 // Choice methods for Token
@@ -242,13 +242,13 @@ func (t Transfer) toMap() map[string]interface{} {
 // MarshalJSON implements custom JSON marshaling for Transfer using JsonCodec
 func (t Transfer) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshall(t)
+	return jsonCodec.Marshal(t)
 }
 
 // UnmarshalJSON implements custom JSON unmarshaling for Transfer using JsonCodec
 func (t *Transfer) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshall(data, t)
+	return jsonCodec.Unmarshal(data, t)
 }
 
 // TransferableView is a Record type
@@ -266,13 +266,13 @@ func (t TransferableView) toMap() map[string]interface{} {
 // MarshalJSON implements custom JSON marshaling for TransferableView using JsonCodec
 func (t TransferableView) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshall(t)
+	return jsonCodec.Marshal(t)
 }
 
 // UnmarshalJSON implements custom JSON unmarshaling for TransferableView using JsonCodec
 func (t *TransferableView) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshall(data, t)
+	return jsonCodec.Unmarshal(data, t)
 }
 
 // ITransferableInterfaceID returns the interface ID for the ITransferable interface

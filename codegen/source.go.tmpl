@@ -1,4 +1,4 @@
-{{- /*gotype: github.com/smartcontractkit/go-daml/internal/codegen.tmplData*/ -}}
+{{- /*gotype: github.com/smartcontractkit/go-daml/codegen.tmplData*/ -}}
 package {{.Package}}
 
 import (
@@ -9,8 +9,12 @@ import (
 
 	"github.com/smartcontractkit/go-daml/pkg/bind"
 	"github.com/smartcontractkit/go-daml/pkg/model"
-	. "github.com/smartcontractkit/go-daml/pkg/types"
+	"github.com/smartcontractkit/go-daml/pkg/types"
 	"github.com/smartcontractkit/go-daml/pkg/codec"
+
+	{{- range .ImportedPackages}}
+	{{.Alias}} "{{.Import}}"
+	{{- end}}
 )
 
 var (
@@ -25,47 +29,47 @@ var (
 
 {{define "fieldToDAMLValue"}}
 {{- if .IsOptional -}}
-  {{$baseType := stringsTrimPrefix .Type "*"}}
-  {{- if eq $baseType "INT64" -}}int64(*t.{{capitalise .Name}})
-  {{- else if eq $baseType "TEXT" -}}string(*t.{{capitalise .Name}})
-  {{- else if eq $baseType "BOOL" -}}bool(*t.{{capitalise .Name}})
-  {{- else if eq $baseType "PARTY" -}}(*t.{{capitalise .Name}}).ToMap()
-  {{- else if eq $baseType "NUMERIC" -}}*t.{{capitalise .Name}}
-  {{- else if eq $baseType "DECIMAL" -}}(*big.Int)(*t.{{capitalise .Name}})
-  {{- else if eq $baseType "DATE" -}}*t.{{capitalise .Name}}
-  {{- else if eq $baseType "TIMESTAMP" -}}*t.{{capitalise .Name}}
-  {{- else if eq $baseType "UNIT" -}}map[string]any{"_type": "unit"}
+  {{$baseType := stringsTrimPrefix .Type.GoType "*"}}
+  {{- if eq $baseType "types.INT64" -}}int64(*t.{{capitalise .Name}})
+  {{- else if eq $baseType "types.TEXT" -}}string(*t.{{capitalise .Name}})
+  {{- else if eq $baseType "types.BOOL" -}}bool(*t.{{capitalise .Name}})
+  {{- else if eq $baseType "types.PARTY" -}}(*t.{{capitalise .Name}}).ToMap()
+  {{- else if eq $baseType "types.NUMERIC" -}}*t.{{capitalise .Name}}
+  {{- else if eq $baseType "types.DECIMAL" -}}(*big.Int)(*t.{{capitalise .Name}})
+  {{- else if eq $baseType "types.DATE" -}}*t.{{capitalise .Name}}
+  {{- else if eq $baseType "types.TIMESTAMP" -}}*t.{{capitalise .Name}}
+  {{- else if eq $baseType "types.UNIT" -}}map[string]any{"_type": "unit"}
   {{- else -}}*t.{{capitalise .Name}}
   {{- end -}}
 {{- else -}}
-  {{- if eq .Type "PARTY" -}}t.{{capitalise .Name}}.ToMap()
-  {{- else if eq .Type "TEXT" -}}string(t.{{capitalise .Name}})
-  {{- else if eq .Type "INT64" -}}int64(t.{{capitalise .Name}})
-  {{- else if eq .Type "BOOL" -}}bool(t.{{capitalise .Name}})
-  {{- else if eq .Type "NUMERIC" -}}t.{{capitalise .Name}}
-  {{- else if eq .Type "DECIMAL" -}}(*big.Int)(t.{{capitalise .Name}})
-  {{- else if eq .Type "DATE" -}}t.{{capitalise .Name}}
-  {{- else if eq .Type "TIMESTAMP" -}}t.{{capitalise .Name}}
-  {{- else if eq .Type "UNIT" -}}map[string]any{"_type": "unit"}
+  {{- if eq .Type.GoType "types.PARTY" -}}t.{{capitalise .Name}}.ToMap()
+  {{- else if eq .Type.GoType "types.TEXT" -}}string(t.{{capitalise .Name}})
+  {{- else if eq .Type.GoType "types.INT64" -}}int64(t.{{capitalise .Name}})
+  {{- else if eq .Type.GoType "types.BOOL" -}}bool(t.{{capitalise .Name}})
+  {{- else if eq .Type.GoType "types.NUMERIC" -}}t.{{capitalise .Name}}
+  {{- else if eq .Type.GoType "types.DECIMAL" -}}(*big.Int)(t.{{capitalise .Name}})
+  {{- else if eq .Type.GoType "types.DATE" -}}t.{{capitalise .Name}}
+  {{- else if eq .Type.GoType "types.TIMESTAMP" -}}t.{{capitalise .Name}}
+  {{- else if eq .Type.GoType "types.UNIT" -}}map[string]any{"_type": "unit"}
 
-  {{- else if stringsHasPrefix .Type "[]" -}}
+  {{- else if stringsHasPrefix .Type.GoType "[]" -}}
     func() []any {
       res := make([]any, 0, len(t.{{capitalise .Name}}))
       for _, e := range t.{{capitalise .Name}} {
-        {{$elem := stringsTrimPrefix .Type "[]"}}
-        {{- if eq $elem "PARTY" -}}
+        {{$elem := stringsTrimPrefix .Type.GoType "[]"}}
+        {{- if eq $elem "types.PARTY" -}}
           res = append(res, e.ToMap())
-        {{- else if eq $elem "TEXT" -}}
+        {{- else if eq $elem "types.TEXT" -}}
           res = append(res, string(e))
-        {{- else if eq $elem "INT64" -}}
+        {{- else if eq $elem "types.INT64" -}}
           res = append(res, int64(e))
-        {{- else if eq $elem "BOOL" -}}
+        {{- else if eq $elem "types.BOOL" -}}
           res = append(res, bool(e))
-        {{- else if eq $elem "CONTRACT_ID" -}}
+        {{- else if eq $elem "types.CONTRACT_ID" -}}
           res = append(res, e)
-        {{- else if eq $elem "NUMERIC" -}}
+        {{- else if eq $elem "types.NUMERIC" -}}
           res = append(res, e)
-        {{- else if eq $elem "DECIMAL" -}}
+        {{- else if eq $elem "types.DECIMAL" -}}
           res = append(res, (*big.Int)(e))
         {{- else -}}
           type mapper interface{ toMap() map[string]any }
@@ -79,19 +83,19 @@ var (
       return res
     }()
 
-  {{- else if eq .Type "LIST" -}}t.{{capitalise .Name}}
+  {{- else if eq .Type.GoType "types.LIST" -}}t.{{capitalise .Name}}
 
-  {{- else if eq .Type "GENMAP" -}}
+  {{- else if eq .Type.GoType "types.GENMAP" -}}
     func() any {
       if t.{{capitalise .Name}} == nil {
-        return map[string]any{"_type": "genmap", "value": GENMAP{}}
+        return map[string]any{"_type": "genmap", "value": types.GENMAP{}}
       }
       return map[string]any{"_type": "genmap", "value": t.{{capitalise .Name}}}
     }()
 
-  {{- else if eq .Type "MAP" -}}t.{{capitalise .Name}}
-  {{- else if eq .Type "OPTIONAL" -}}t.{{capitalise .Name}}
-  {{- else if eq .Type "string" -}}string(t.{{capitalise .Name}})
+  {{- else if eq .Type.GoType "types.MAP" -}}t.{{capitalise .Name}}
+  {{- else if eq .Type.GoType "types.OPTIONAL" -}}t.{{capitalise .Name}}
+  {{- else if eq .Type.GoType "string" -}}string(t.{{capitalise .Name}})
   {{- else -}}
     func() any {
       type mapper interface{ toMap() map[string]any }
@@ -105,19 +109,19 @@ var (
 {{end}}
 
 {{define "fieldIsNotEmpty"}}
-{{- if eq .Type "PARTY" -}}t.{{capitalise .Name}} != ""
-{{- else if eq .Type "TEXT" -}}t.{{capitalise .Name}} != ""
-{{- else if eq .Type "INT64" -}}t.{{capitalise .Name}} != 0
-{{- else if eq .Type "BOOL" -}}true
-{{- else if eq .Type "NUMERIC" -}}t.{{capitalise .Name}} != ""
-{{- else if eq .Type "DECIMAL" -}}t.{{capitalise .Name}} != nil
-{{- else if eq .Type "DATE" -}}!t.{{capitalise .Name}}.IsZero()
-{{- else if eq .Type "TIMESTAMP" -}}!t.{{capitalise .Name}}.IsZero()
-{{- else if eq .Type "LIST" -}}len(t.{{capitalise .Name}}) > 0
-{{- else if stringsHasPrefix .Type "[]" -}}len(t.{{capitalise .Name}}) > 0
-{{- else if eq .Type "GENMAP" -}}t.{{capitalise .Name}} != nil && len(t.{{capitalise .Name}}) > 0
-{{- else if eq .Type "MAP" -}}t.{{capitalise .Name}} != nil && len(t.{{capitalise .Name}}) > 0
-{{- else if eq .Type "OPTIONAL" -}}t.{{capitalise .Name}} != nil
+{{- if eq .Type.GoType "types.PARTY" -}}t.{{capitalise .Name}} != ""
+{{- else if eq .Type.GoType "types.TEXT" -}}t.{{capitalise .Name}} != ""
+{{- else if eq .Type.GoType "types.INT64" -}}t.{{capitalise .Name}} != 0
+{{- else if eq .Type.GoType "types.BOOL" -}}true
+{{- else if eq .Type.GoType "types.NUMERIC" -}}t.{{capitalise .Name}} != ""
+{{- else if eq .Type.GoType "types.DECIMAL" -}}t.{{capitalise .Name}} != nil
+{{- else if eq .Type.GoType "types.DATE" -}}!t.{{capitalise .Name}}.IsZero()
+{{- else if eq .Type.GoType "types.TIMESTAMP" -}}!t.{{capitalise .Name}}.IsZero()
+{{- else if eq .Type.GoType "types.LIST" -}}len(t.{{capitalise .Name}}) > 0
+{{- else if stringsHasPrefix .Type.GoType "[]" -}}len(t.{{capitalise .Name}}) > 0
+{{- else if eq .Type.GoType "types.GENMAP" -}}t.{{capitalise .Name}} != nil && len(t.{{capitalise .Name}}) > 0
+{{- else if eq .Type.GoType "types.MAP" -}}t.{{capitalise .Name}} != nil && len(t.{{capitalise .Name}}) > 0
+{{- else if eq .Type.GoType "types.OPTIONAL" -}}t.{{capitalise .Name}} != nil
 {{- else if .IsOptional -}}t.{{capitalise .Name}} != nil
 {{- else if .IsEnum -}}t.{{capitalise .Name}} != ""
 {{- else -}}
@@ -136,8 +140,11 @@ var (
    --------------------------------------------------------- */}}
 
 {{if .IsMainDalf}}
-const PackageName = "{{.PackageName}}"
-const SDKVersion = "{{.SdkVersion}}"
+const (
+	PackageName = "{{.PackageName}}"
+	PackageID   = "{{.PackageID}}"
+	SDKVersion  = "{{.SdkVersion}}"
+)
 
 type Template interface {
 	CreateCommand() *model.CreateCommand
@@ -152,7 +159,7 @@ type Template interface {
 type {{capitalise .Name}} interface {
 	{{range $choice := .Choices}}
 	// {{capitalise $choice.Name}} executes the {{$choice.Name}} choice
-	{{capitalise $choice.Name}}(contractID string{{if and (ne $choice.ArgType "UNIT") (ne $choice.ArgType "")}}, args {{$choice.ArgType}}{{end}}) *model.ExerciseCommand
+	{{capitalise $choice.Name}}(contractID string{{if and (ne $choice.ArgType.GoType "types.UNIT") (ne $choice.ArgType.GoType "")}}, args {{$choice.ArgType.GoType}}{{end}}) *model.ExerciseCommand
 	{{end}}
 }
 {{end}}
@@ -191,20 +198,20 @@ func argsToMap(args any) map[string]any {
 // {{capitalise .Name}} is a variant/union type
 type {{capitalise .Name}} struct {
 	{{- range $field := .Fields}}
-	{{capitalise $field.Name}} *{{$field.Type}} `json:"{{$field.Name}},omitempty"`
+	{{capitalise $field.Name}} *{{$field.Type.GoType}} `json:"{{$field.Name}},omitempty"`
 	{{- end}}
 }
 
 // MarshalJSON implements custom JSON marshaling for {{capitalise .Name}}
 func (v {{capitalise .Name}}) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshall(v)
+	return jsonCodec.Marshal(v)
 }
 
 // UnmarshalJSON implements custom JSON unmarshalling for {{capitalise .Name}}
 func (v *{{capitalise .Name}}) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshall(data, v)
+	return jsonCodec.Unmarshal(data, v)
 }
 
 {{if $.GenerateHexCodec}}
@@ -241,7 +248,7 @@ func (v {{capitalise .Name}}) GetVariantValue() any {
 	return nil
 }
 
-var _ VARIANT = (*{{capitalise .Name}})(nil)
+var _ types.VARIANT = (*{{capitalise .Name}})(nil)
 
 {{else if eq .RawType "Enum"}}
 // {{capitalise .Name}} is an enum type
@@ -266,12 +273,12 @@ func (e {{capitalise .Name}}) GetEnumTypeIDWithPackageID(packageID string) strin
 
 func (e {{capitalise .Name}}) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshall(e)
+	return jsonCodec.Marshal(e)
 }
 
 func (e *{{capitalise .Name}}) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshall(data, e)
+	return jsonCodec.Unmarshal(data, e)
 }
 
 {{if $.GenerateHexCodec}}
@@ -288,13 +295,13 @@ func (e *{{capitalise .Name}}) UnmarshalHex(data string) error {
 }
 {{end}}
 
-var _ ENUM = {{capitalise .Name}}("")
+var _ types.ENUM = {{capitalise .Name}}("")
 
 {{else}}
 // {{capitalise .Name}} is a {{.RawType}} type
 type {{capitalise .Name}} struct {
 	{{- range $field := .Fields}}
-	{{capitalise $field.Name}} {{$field.Type}} `json:"{{$field.Name}}"`
+	{{capitalise $field.Name}} {{$field.Type.GoType}} `json:"{{$field.Name}}"`
 	{{- end}}
 }
 
@@ -323,12 +330,12 @@ func (t {{capitalise .Name}}) ToMap() map[string]any {
 
 func (t {{capitalise .Name}}) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshall(t)
+	return jsonCodec.Marshal(t)
 }
 
 func (t *{{capitalise .Name}}) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshall(data, t)
+	return jsonCodec.Unmarshal(data, t)
 }
 
 {{if $.GenerateHexCodec}}
@@ -372,7 +379,7 @@ func (t {{capitalise .Name}}) CreateCommand() *model.CreateCommand {
 			"_type": "optional",
 		}
 	}
-	{{else if or $field.IsEnum (eq $field.Type "NUMERIC") (eq $field.Type "DECIMAL")}}
+	{{else if or $field.IsEnum (eq $field.Type.GoType "types.NUMERIC") (eq $field.Type.GoType "types.DECIMAL")}}
 	if {{template "fieldIsNotEmpty" $field}} {
 		args["{{$field.Name}}"] = {{template "fieldToDAMLValue" $field}}
 	}
@@ -402,7 +409,7 @@ func (t {{capitalise .Name}}) CreateCommandWithPackageID(packageID string) *mode
 			"_type": "optional",
 		}
 	}
-	{{else if or $field.IsEnum (eq $field.Type "NUMERIC") (eq $field.Type "DECIMAL")}}
+	{{else if or $field.IsEnum (eq $field.Type.GoType "types.NUMERIC") (eq $field.Type.GoType "types.DECIMAL")}}
 	if {{template "fieldIsNotEmpty" $field}} {
 		args["{{$field.Name}}"] = {{template "fieldToDAMLValue" $field}}
 	}
@@ -420,11 +427,11 @@ func (t {{capitalise .Name}}) CreateCommandWithPackageID(packageID string) *mode
 {{if .Key}}
 // GetKey returns the key for this template as a string
 func (t {{capitalise .Name}}) GetKey() string {
-	{{if eq .Key.Type "TEXT"}}
+	{{if eq .Key.Type.GoType "types.TEXT"}}
 	return string(t.{{capitalise .Key.Name}})
-	{{else if eq .Key.Type "PARTY"}}
+	{{else if eq .Key.Type.GoType "types.PARTY"}}
 	return string(t.{{capitalise .Key.Name}})
-	{{else if eq .Key.Type "INT64"}}
+	{{else if eq .Key.Type.GoType "types.INT64"}}
 	return fmt.Sprintf("%d", t.{{capitalise .Key.Name}})
 	{{else}}
 	return fmt.Sprintf("%v", t.{{capitalise .Key.Name}})
@@ -434,12 +441,12 @@ func (t {{capitalise .Name}}) GetKey() string {
 
 func (t {{capitalise .Name}}) MarshalJSON() ([]byte, error) {
 	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Marshall(t)
+	return jsonCodec.Marshal(t)
 }
 
 func (t *{{capitalise .Name}}) UnmarshalJSON(data []byte) error {
 	jsonCodec := codec.NewJsonCodec()
-	return jsonCodec.Unmarshall(data, t)
+	return jsonCodec.Unmarshal(data, t)
 }
 
 {{if $.GenerateHexCodec}}
@@ -463,14 +470,14 @@ func (t *{{capitalise .Name}}) UnmarshalHex(data string) error {
 
 // Choice methods for {{capitalise $templateName}}
 {{range $choice := .Choices}}
-{{$argType := $choice.ArgType}}
-{{- if eq $argType "SET" -}}
+{{$argType := $choice.ArgType.GoType}}
+{{- if eq $argType "types.SET" -}}
   {{$argType = capitalise $choice.Name}}
 {{- end -}}
 
 // {{capitalise $choice.Name}} exercises the {{$choice.Name}} choice on this {{capitalise $templateName}} contract{{if ne $choice.InterfaceName ""}} via the {{capitalise $choice.InterfaceName}} interface{{end}}
 // This method uses the package name in the template ID
-func (t {{capitalise $templateName}}) {{capitalise $choice.Name}}(contractID string{{if and (ne $argType "UNIT") (ne $argType "")}}, args {{$argType}}{{end}}) *model.ExerciseCommand {
+func (t {{capitalise $templateName}}) {{capitalise $choice.Name}}(contractID string{{if and (ne $argType "types.UNIT") (ne $argType "")}}, args {{$argType}}{{end}}) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		{{- if ne $choice.InterfaceName ""}}
 		TemplateID: fmt.Sprintf("#%s:%s:%s", PackageName, "{{$moduleName}}", "{{capitalise $choice.InterfaceDAMLName}}"),
@@ -479,7 +486,7 @@ func (t {{capitalise $templateName}}) {{capitalise $choice.Name}}(contractID str
 		{{- end}}
 		ContractID: contractID,
 		Choice:     "{{$choice.Name}}",
-		{{- if and (ne $argType "UNIT") (ne $argType "")}}
+		{{- if and (ne $argType "types.UNIT") (ne $argType "")}}
 		Arguments: argsToMap(args),
 		{{- else}}
 		Arguments: map[string]any{},
@@ -488,7 +495,7 @@ func (t {{capitalise $templateName}}) {{capitalise $choice.Name}}(contractID str
 }
 
 // {{capitalise $choice.Name}}WithPackageID exercises the {{$choice.Name}} choice using the provided package ID instead of package name
-func (t {{capitalise $templateName}}) {{capitalise $choice.Name}}WithPackageID(contractID string, packageID string{{if and (ne $argType "UNIT") (ne $argType "")}}, args {{$argType}}{{end}}) *model.ExerciseCommand {
+func (t {{capitalise $templateName}}) {{capitalise $choice.Name}}WithPackageID(contractID string, packageID string{{if and (ne $argType "types.UNIT") (ne $argType "")}}, args {{$argType}}{{end}}) *model.ExerciseCommand {
 	return &model.ExerciseCommand{
 		{{- if ne $choice.InterfaceName ""}}
 		TemplateID: fmt.Sprintf("#%s:%s:%s", packageID, "{{$moduleName}}", "{{capitalise $choice.InterfaceDAMLName}}"),
@@ -497,7 +504,7 @@ func (t {{capitalise $templateName}}) {{capitalise $choice.Name}}WithPackageID(c
 		{{- end}}
 		ContractID: contractID,
 		Choice:     "{{$choice.Name}}",
-		{{- if and (ne $argType "UNIT") (ne $argType "")}}
+		{{- if and (ne $argType "types.UNIT") (ne $argType "")}}
 		Arguments: argsToMap(args),
 		{{- else}}
 		Arguments: map[string]any{},
@@ -512,7 +519,7 @@ func (t {{capitalise $templateName}}) {{capitalise $choice.Name}}WithPackageID(c
 {{$templateName2 := .Name}}
 // Verify interface implementations for {{capitalise .Name}}
 {{range $interface := .Implements}}
-var _ {{capitalise $interface}} = (*{{capitalise $templateName2}})(nil)
+var _ {{$interface.GoType}} = (*{{capitalise $templateName2}})(nil)
 {{end}}
 {{end}}
 

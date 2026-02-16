@@ -8,30 +8,32 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/smartcontractkit/go-daml/internal/codegen/model"
+	"github.com/smartcontractkit/go-daml/codegen/model"
 )
 
 type tmplData struct {
 	Package          string
+	PackageID        string
 	PackageName      string
 	SdkVersion       string
 	Structs          map[string]*model.TmplStruct
 	IsMainDalf       bool
 	GenerateHexCodec bool
 	ChoiceArgTypes   map[string]bool // Types used as choice arguments (for Encode functions)
+	ImportedPackages []model.ExternalPackage
 }
 
 //go:embed source.go.tmpl
 var tmplSource string
 
-func Bind(pkg string, packageName string, sdkVersion string, structs map[string]*model.TmplStruct, isMainDalf bool, generateHexCodec bool) (string, error) {
+func Bind(genPkg string, pkg *model.Package, sdkVersion string, isMainDalf bool, generateHexCodec bool) (string, error) {
 	// Collect all types used as choice arguments
 	choiceArgTypes := make(map[string]bool)
-	for _, tmpl := range structs {
+	for _, tmpl := range pkg.Structs {
 		if tmpl.IsTemplate {
 			for _, choice := range tmpl.Choices {
-				if choice.ArgType != "" && choice.ArgType != "UNIT" {
-					argType := choice.ArgType
+				if choice.ArgType != nil && choice.ArgType.GoType() != "" && choice.ArgType.GoType() != "UNIT" {
+					argType := choice.ArgType.GoType()
 					// Special case: SET type uses the choice name as the struct name
 					// This matches the transformation done in the template for choice methods
 					if argType == "SET" {
@@ -44,13 +46,15 @@ func Bind(pkg string, packageName string, sdkVersion string, structs map[string]
 	}
 
 	data := &tmplData{
-		Package:          pkg,
-		PackageName:      packageName,
+		Package:          genPkg,
+		PackageID:        pkg.PackageID,
+		PackageName:      pkg.Name,
 		SdkVersion:       sdkVersion,
-		Structs:          structs,
+		Structs:          pkg.Structs,
 		IsMainDalf:       isMainDalf,
 		GenerateHexCodec: generateHexCodec,
 		ChoiceArgTypes:   choiceArgTypes,
+		ImportedPackages: pkg.ImportedPackages,
 	}
 	buffer := new(bytes.Buffer)
 
