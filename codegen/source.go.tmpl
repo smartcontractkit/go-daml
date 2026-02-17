@@ -561,7 +561,7 @@ func {{capitalise $interfaceName}}InterfaceIDWithPackageID(packageID string) str
 // Implemented by Encoder for method-based encoding.
 type MCMSEncoder interface {
 {{- range $structs4}}
-{{- $isChoiceArgType := index $choiceArgTypes .Name}}
+{{- $isChoiceArgType := index $choiceArgTypes (capitalise .Name)}}
 {{- $isParamsType := stringsHasSuffix .Name "Params"}}
 {{- $baseNameForParams := stringsTrimSuffix .Name "Params"}}
 {{- $hasCorrespondingChoiceArgType := and $isParamsType (index $choiceArgTypes $baseNameForParams)}}
@@ -605,7 +605,7 @@ func (c *Contract) Encoder() MCMSEncoder {
 
 {{range $structs4}}
 {{- /* Only generate encoder methods, no standalone Encode functions */}}
-{{- $isChoiceArgType := index $choiceArgTypes .Name}}
+{{- $isChoiceArgType := index $choiceArgTypes (capitalise .Name)}}
 {{- $isParamsType := stringsHasSuffix .Name "Params"}}
 {{- $baseNameForParams := stringsTrimSuffix .Name "Params"}}
 {{- $hasCorrespondingChoiceArgType := and $isParamsType (index $choiceArgTypes $baseNameForParams)}}
