@@ -767,16 +767,25 @@ func mapToValue(data interface{}) *v2.Value {
 func getMapConvert(genMapValue map[string]interface{}) *v2.Value {
 	entries := make([]*v2.GenMap_Entry, 0, len(genMapValue))
 	for key, val := range genMapValue {
+		// If the key looks like a ledger numeric literal, encode as Numeric.
+		if s, ok := normalizeLedgerNumericLiteral(key); ok {
+			entries = append(entries, &v2.GenMap_Entry{
+				Key:   &v2.Value{Sum: &v2.Value_Numeric{Numeric: s}},
+				Value: mapToValue(val),
+			})
+			continue
+		}
+
+		// Otherwise fall back to Text (covers GenMaps keyed by Text, Party, etc.)
 		entries = append(entries, &v2.GenMap_Entry{
 			Key:   &v2.Value{Sum: &v2.Value_Text{Text: key}},
 			Value: mapToValue(val),
 		})
 	}
+
 	return &v2.Value{
 		Sum: &v2.Value_GenMap{
-			GenMap: &v2.GenMap{
-				Entries: entries,
-			},
+			GenMap: &v2.GenMap{Entries: entries},
 		},
 	}
 }
