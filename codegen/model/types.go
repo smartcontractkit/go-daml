@@ -55,6 +55,38 @@ func (t Text) GoType() string {
 	return "types.TEXT"
 }
 
+type BytesHex struct {
+	noImport
+}
+
+func (t BytesHex) GoType() string {
+	return "types.TEXT" // BytesHex is represented as TEXT in Go
+}
+
+// IsBytesHex returns true - used by template to add hex:"bytes16" tag
+func (t BytesHex) IsBytesHex() bool {
+	return true
+}
+
+// BytesHexFieldNames contains field names that should use uint16 length prefix
+// encoding (hex:"bytes16" tag) instead of the default uint8 length prefix.
+//
+// Background: The Daml BytesHex type synonym is expanded to Text by the compiler,
+// so we cannot detect it from the compiled Daml LF. Instead, we use a field name
+// allowlist for fields that are known to potentially exceed 255 bytes.
+//
+// Fields requiring bytes16 encoding (from MCMS/Codec.daml):
+// - operationData: Serialized choice parameters in TimelockCall (encodeUint16)
+// - predecessor: Hex hash in ScheduleBatchParams (encodeUint16)
+// - salt: Hex value in ScheduleBatchParams (encodeUint16)
+//
+// To add a new field: add its name (case-sensitive) as a key with value true.
+var BytesHexFieldNames = map[string]bool{
+	"operationData": true,
+	"predecessor":   true,
+	"salt":          true,
+}
+
 type Int64 struct {
 	noImport
 }

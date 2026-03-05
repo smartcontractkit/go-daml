@@ -301,7 +301,7 @@ var _ types.ENUM = {{capitalise .Name}}("")
 // {{capitalise .Name}} is a {{.RawType}} type
 type {{capitalise .Name}} struct {
 	{{- range $field := .Fields}}
-	{{capitalise $field.Name}} {{$field.Type.GoType}} `json:"{{$field.Name}}"`
+	{{capitalise $field.Name}} {{$field.Type.GoType}} `json:"{{$field.Name}}"{{if $field.IsBytesHex}} hex:"bytes16"{{end}}`
 	{{- end}}
 }
 
@@ -350,6 +350,32 @@ func (t *{{capitalise .Name}}) UnmarshalHex(data string) error {
 	hexCodec := codec.NewHexCodec()
 	return hexCodec.Unmarshal(data, t)
 }
+
+{{/* Generate MCMSParams struct for choice arg types with caller field */}}
+{{- $isChoiceArgType := index $.ChoiceArgTypes (capitalise .Name)}}
+{{- if and $isChoiceArgType (hasCallerField .)}}
+// {{capitalise .Name}}MCMSParams is {{capitalise .Name}} without the Caller field for MCMS operationData encoding.
+// Use this when encoding choice arguments for MCMS timelock operations.
+type {{capitalise .Name}}MCMSParams struct {
+{{- range .Fields}}
+{{- if not (isCallerField .Name)}}
+	{{capitalise .Name}} {{.Type.GoType}} `json:"{{.Name}}"{{if .IsBytesHex}} hex:"bytes16"{{end}}`
+{{- end}}
+{{- end}}
+}
+
+// MarshalHex encodes {{capitalise .Name}}MCMSParams to hex string for MCMS operationData.
+func (t {{capitalise .Name}}MCMSParams) MarshalHex() (string, error) {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Marshal(t)
+}
+
+// UnmarshalHex decodes {{capitalise .Name}}MCMSParams from hex string.
+func (t *{{capitalise .Name}}MCMSParams) UnmarshalHex(data string) error {
+	hexCodec := codec.NewHexCodec()
+	return hexCodec.Unmarshal(data, t)
+}
+{{- end}}
 {{end}}
 {{end}}
 
@@ -571,6 +597,9 @@ type MCMSEncoder interface {
 {{- $methodName := .Name}}
 {{- if $hasParamsSuffix}}{{$methodName = stringsTrimSuffix (capitalise .Name) "Params"}}{{else}}{{$methodName = capitalise .Name}}{{end}}
 	{{$methodName}}(args {{capitalise .Name}}) (*bind.EncodedChoice, error)
+{{- if and $isChoiceArgType (hasCallerField .)}}
+	{{$methodName}}MCMSParams(args {{capitalise .Name}}MCMSParams) (*bind.EncodedChoice, error)
+{{- end}}
 {{- end}}
 {{- end}}
 {{- end}}
@@ -620,6 +649,13 @@ func (c *Contract) Encoder() MCMSEncoder {
 func (e *encoder) {{$methodName}}(args {{capitalise .Name}}) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("{{$choiceName}}", args)
 }
+{{- if and $isChoiceArgType (hasCallerField .)}}
+
+// {{$methodName}}MCMSParams encodes MCMS parameters (without Caller) for the {{$choiceName}} choice.
+func (e *encoder) {{$methodName}}MCMSParams(args {{capitalise .Name}}MCMSParams) (*bind.EncodedChoice, error) {
+	return e.EncodeChoiceArgs("{{$choiceName}}", args)
+}
+{{- end}}
 {{- end}}
 {{- end}}
 {{- end}}

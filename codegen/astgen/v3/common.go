@@ -216,6 +216,7 @@ func (c *codeGenAst) getTemplates(
 					RawType:    field.String(),
 					IsOptional: isOptional,
 					IsEnum:     c.isEnumType(typeExtracted, pkg),
+					IsBytesHex: model.BytesHexFieldNames[fieldExtracted],
 				})
 			}
 		default:
@@ -435,6 +436,7 @@ func (c *codeGenAst) getDataTypes(pkg *daml.Package, module *daml.Module, module
 					Type:       typeExtracted,
 					RawType:    field.String(),
 					IsOptional: isOptional,
+					IsBytesHex: model.BytesHexFieldNames[fieldExtracted],
 				})
 			}
 		case *daml.DefDataType_Variant:
@@ -449,6 +451,7 @@ func (c *codeGenAst) getDataTypes(pkg *daml.Package, module *daml.Module, module
 					Type:       typeExtracted,
 					RawType:    field.String(),
 					IsOptional: true,
+					IsBytesHex: model.BytesHexFieldNames[fieldExtracted],
 				})
 			}
 		case *daml.DefDataType_Enum:
@@ -586,9 +589,15 @@ func (c *codeGenAst) extractType(pkg *daml.Package, typ *daml.Type) model.DamlTy
 		// Can't handle these properly yet...
 		return model.Any{}
 	case *daml.Type_Syn_:
-		// Synonym
+		// Synonym - type synonyms are usually expanded by the Daml compiler,
+		// but we still handle them here for completeness
 		if v.Syn.Tysyn != nil {
-			return model.Unknown{String: c.getName(pkg, v.Syn.Tysyn.GetNameInternedDname())}
+			name := c.getName(pkg, v.Syn.Tysyn.GetNameInternedDname())
+			// Detect BytesHex type synonym from DA.Crypto.Text
+			if name == "BytesHex" {
+				return model.BytesHex{}
+			}
+			return model.Unknown{String: name}
 		}
 		return model.Unknown{String: "syn_without_name"}
 
