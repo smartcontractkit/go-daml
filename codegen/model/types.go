@@ -87,6 +87,33 @@ var BytesHexFieldNames = map[string]bool{
 	"salt":          true,
 }
 
+// Uint32FieldNames contains field names where INT64 should encode as 4-byte uint32.
+// This matches the Daml MCMS/Codec.daml encoding which uses encodeUint32 for these fields.
+//
+// From MCMS/Codec.daml encodeSignerInfo:
+// - signerIndex: encodeUint32 (4 bytes)
+// - signerGroup: encodeUint32 (4 bytes)
+var Uint32FieldNames = map[string]bool{
+	"signerIndex": true,
+	"signerGroup": true,
+}
+
+// Uint32ListFieldNames contains field names where []INT64 should encode as
+// length + uint32 elements (4 bytes each) instead of uint64 elements (8 bytes).
+// This matches the Daml MCMS/Codec.daml encoding which uses encodeUint32 for each element.
+//
+// From MCMS/Codec.daml encodeSetConfigParams and encodeMultisigConfig:
+// - groupQuorums: list of encodeUint32 (4 bytes each)
+// - groupParents: list of encodeUint32 (4 bytes each)
+// - apGroupQuorums: used in AdminParams.AP_SetConfig
+// - apGroupParents: used in AdminParams.AP_SetConfig
+var Uint32ListFieldNames = map[string]bool{
+	"groupQuorums":   true,
+	"groupParents":   true,
+	"apGroupQuorums": true,
+	"apGroupParents": true,
+}
+
 type Int64 struct {
 	noImport
 }

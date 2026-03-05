@@ -24,12 +24,14 @@ type TmplStruct struct {
 }
 
 type TmplField struct {
-	Type       DamlType
-	Name       string
-	RawType    string
-	IsOptional bool
-	IsEnum     bool
-	IsBytesHex bool // True if field should use uint16 length prefix (hex:"bytes16" tag)
+	Type         DamlType
+	Name         string
+	RawType      string
+	IsOptional   bool
+	IsEnum       bool
+	IsBytesHex   bool // True if field should use uint16 length prefix (hex:"bytes16" tag)
+	IsUint32     bool // True if INT64 field should encode as 4-byte uint32 (hex:"uint32" tag)
+	IsUint32List bool // True if []INT64 field should encode with 4-byte uint32 elements (hex:"[]uint32" tag)
 }
 
 type TmplChoice struct {

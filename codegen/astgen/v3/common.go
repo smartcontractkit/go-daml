@@ -211,12 +211,14 @@ func (c *codeGenAst) getTemplates(
 				}
 				_, isOptional := typeExtracted.(model.Optional)
 				tmplStruct.Fields = append(tmplStruct.Fields, &model.TmplField{
-					Name:       fieldExtracted,
-					Type:       typeExtracted,
-					RawType:    field.String(),
-					IsOptional: isOptional,
-					IsEnum:     c.isEnumType(typeExtracted, pkg),
-					IsBytesHex: model.BytesHexFieldNames[fieldExtracted],
+					Name:         fieldExtracted,
+					Type:         typeExtracted,
+					RawType:      field.String(),
+					IsOptional:   isOptional,
+					IsEnum:       c.isEnumType(typeExtracted, pkg),
+					IsBytesHex:   model.BytesHexFieldNames[fieldExtracted],
+					IsUint32:     model.Uint32FieldNames[fieldExtracted],
+					IsUint32List: model.Uint32ListFieldNames[fieldExtracted],
 				})
 			}
 		default:
@@ -432,11 +434,13 @@ func (c *codeGenAst) getDataTypes(pkg *daml.Package, module *daml.Module, module
 				}
 				_, isOptional := typeExtracted.(model.Optional)
 				tmplStruct.Fields = append(tmplStruct.Fields, &model.TmplField{
-					Name:       fieldExtracted,
-					Type:       typeExtracted,
-					RawType:    field.String(),
-					IsOptional: isOptional,
-					IsBytesHex: model.BytesHexFieldNames[fieldExtracted],
+					Name:         fieldExtracted,
+					Type:         typeExtracted,
+					RawType:      field.String(),
+					IsOptional:   isOptional,
+					IsBytesHex:   model.BytesHexFieldNames[fieldExtracted],
+					IsUint32:     model.Uint32FieldNames[fieldExtracted],
+					IsUint32List: model.Uint32ListFieldNames[fieldExtracted],
 				})
 			}
 		case *daml.DefDataType_Variant:
@@ -447,11 +451,13 @@ func (c *codeGenAst) getDataTypes(pkg *daml.Package, module *daml.Module, module
 					return nil, err
 				}
 				tmplStruct.Fields = append(tmplStruct.Fields, &model.TmplField{
-					Name:       fieldExtracted,
-					Type:       typeExtracted,
-					RawType:    field.String(),
-					IsOptional: true,
-					IsBytesHex: model.BytesHexFieldNames[fieldExtracted],
+					Name:         fieldExtracted,
+					Type:         typeExtracted,
+					RawType:      field.String(),
+					IsOptional:   true,
+					IsBytesHex:   model.BytesHexFieldNames[fieldExtracted],
+					IsUint32:     model.Uint32FieldNames[fieldExtracted],
+					IsUint32List: model.Uint32ListFieldNames[fieldExtracted],
 				})
 			}
 		case *daml.DefDataType_Enum:
