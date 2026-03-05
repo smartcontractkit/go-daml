@@ -29,6 +29,7 @@ type TmplField struct {
 	RawType    string
 	IsOptional bool
 	IsEnum     bool
+	IsBytesHex bool // True if field should use uint16 length prefix (hex:"bytes16" tag)
 }
 
 type TmplChoice struct {

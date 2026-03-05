@@ -57,17 +57,17 @@ func (c *HexCodec) encode(value interface{}) ([]byte, error) {
 	// Handle DAML types first
 	switch v := value.(type) {
 	case types.TEXT:
-		return c.encodeText(string(v)), nil
+		return c.encodeText(string(v))
 	case types.INT64:
 		return c.encodeInt64(int64(v)), nil
 	case types.BOOL:
 		return c.encodeBool(bool(v)), nil
 	case types.PARTY:
-		return c.encodeText(string(v)), nil
+		return c.encodeText(string(v))
 	case types.CONTRACT_ID:
-		return c.encodeText(string(v)), nil
+		return c.encodeText(string(v))
 	case types.NUMERIC:
-		return c.encodeText(string(v)), nil
+		return c.encodeText(string(v))
 	case types.RELTIME:
 		// RELTIME stored as time.Duration, encode microseconds as int64
 		microseconds := int64(time.Duration(v) / time.Microsecond)
@@ -78,9 +78,9 @@ func (c *HexCodec) encode(value interface{}) ([]byte, error) {
 	case types.DECIMAL:
 		// DECIMAL is *big.Int, encode as length-prefixed string representation
 		if v == nil {
-			return c.encodeText(""), nil
+			return c.encodeText("")
 		}
-		return c.encodeText((*big.Int)(v).String()), nil
+		return c.encodeText((*big.Int)(v).String())
 	case types.TIMESTAMP:
 		// TIMESTAMP as microseconds since epoch (int64)
 		microseconds := time.Time(v).UnixMicro()
@@ -111,7 +111,7 @@ func (c *HexCodec) encode(value interface{}) ([]byte, error) {
 		GetEnumConstructor() string
 	}
 	if e, ok := value.(enumConstructorGetter); ok {
-		return c.encodeText(e.GetEnumConstructor()), nil
+		return c.encodeText(e.GetEnumConstructor())
 	}
 
 	// Handle VARIANT types (implements types.VARIANT interface)
@@ -122,7 +122,7 @@ func (c *HexCodec) encode(value interface{}) ([]byte, error) {
 	// Handle Go primitive types
 	switch v := value.(type) {
 	case string:
-		return c.encodeText(v), nil
+		return c.encodeText(v)
 	case bool:
 		return c.encodeBool(v), nil
 	case int:
@@ -206,12 +206,41 @@ func (c *HexCodec) encodeInt64(v int64) []byte {
 	return c.encodeUint64(uint64(v))
 }
 
-func (c *HexCodec) encodeText(s string) []byte {
+func (c *HexCodec) encodeText(s string) ([]byte, error) {
 	b := []byte(s)
+	if len(b) > 255 {
+		return nil, fmt.Errorf("text length %d exceeds max 255 for uint8 prefix; use hex:\"bytes16\" tag for longer strings", len(b))
+	}
 	result := make([]byte, 1+len(b))
 	result[0] = byte(len(b))
 	copy(result[1:], b)
-	return result
+	return result, nil
+}
+
+// encodeTextBytes16 encodes a hex string with uint16 byte-count prefix.
+// The string is expected to be a hex-encoded byte sequence (e.g., "0102030405").
+// The length prefix is the BYTE count, and we write the actual bytes (not the string chars).
+// After Marshal() hex-encoding, the output will contain the original hex string.
+// This matches the Daml MCMS codec which concatenates BytesHex directly.
+func (c *HexCodec) encodeTextBytes16(s string) ([]byte, error) {
+	// s is a hex string like "a1b2c3d4" representing bytes [0xa1, 0xb2, 0xc3, 0xd4]
+	// We need to write the raw bytes so that after Marshal's hex.EncodeToString,
+	// the output contains the original hex string.
+	if len(s)%2 != 0 {
+		return nil, fmt.Errorf("hex string length %d is not even", len(s))
+	}
+	decoded, err := hex.DecodeString(s)
+	if err != nil {
+		return nil, fmt.Errorf("invalid hex string for bytes16: %w", err)
+	}
+	byteCount := len(decoded)
+	if byteCount > 65535 {
+		return nil, fmt.Errorf("byte count %d exceeds max 65535 for uint16 prefix", byteCount)
+	}
+	result := make([]byte, 2+byteCount)
+	binary.BigEndian.PutUint16(result[0:2], uint16(byteCount))
+	copy(result[2:], decoded)
+	return result, nil
 }
 
 func (c *HexCodec) encodeBytes(b []byte) []byte {
@@ -348,6 +377,16 @@ func (c *HexCodec) encodeStruct(rv reflect.Value) ([]byte, error) {
 				}
 				encoded = append(encoded, c.encodeInt64(val)...)
 			}
+		case "bytes16":
+			// hex:"bytes16" - encode string with uint16 length prefix (supports >255 bytes)
+			// Used for BytesHex fields that may contain long hex-encoded data
+			if field.Kind() != reflect.String {
+				return nil, fmt.Errorf("hex:\"bytes16\" tag only valid on string fields, got %v", field.Kind())
+			}
+			encoded, err = c.encodeTextBytes16(field.String())
+			if err != nil {
+				return nil, fmt.Errorf("failed to encode bytes16 field %s: %w", fieldType.Name, err)
+			}
 		default:
 			// No tag or unknown tag - use default encoding
 			encoded, err = c.encode(field.Interface())
@@ -383,7 +422,11 @@ func (c *HexCodec) encodeTextMap(m types.TEXTMAP) ([]byte, error) {
 	}
 	result := []byte{byte(length)}
 	for k, v := range m {
-		result = append(result, c.encodeText(k)...)
+		keyEncoded, err := c.encodeText(k)
+		if err != nil {
+			return nil, fmt.Errorf("failed to encode map key %s: %w", k, err)
+		}
+		result = append(result, keyEncoded...)
 		encoded, err := c.encode(v)
 		if err != nil {
 			return nil, fmt.Errorf("failed to encode map value for key %s: %w", k, err)
@@ -400,7 +443,11 @@ func (c *HexCodec) encodeGenMap(m map[string]interface{}) ([]byte, error) {
 	}
 	result := []byte{byte(length)}
 	for k, v := range m {
-		result = append(result, c.encodeText(k)...)
+		keyEncoded, err := c.encodeText(k)
+		if err != nil {
+			return nil, fmt.Errorf("failed to encode map key %s: %w", k, err)
+		}
+		result = append(result, keyEncoded...)
 		encoded, err := c.encode(v)
 		if err != nil {
 			return nil, fmt.Errorf("failed to encode map value for key %s: %w", k, err)
@@ -413,7 +460,10 @@ func (c *HexCodec) encodeGenMap(m map[string]interface{}) ([]byte, error) {
 func (c *HexCodec) encodeVariant(v types.VARIANT) ([]byte, error) {
 	tag := v.GetVariantTag()
 	value := v.GetVariantValue()
-	result := c.encodeText(tag)
+	result, err := c.encodeText(tag)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode variant tag: %w", err)
+	}
 	if value != nil {
 		encoded, err := c.encode(value)
 		if err != nil {
@@ -805,6 +855,25 @@ func (c *HexCodec) decodeStruct(data []byte, offset int, target reflect.Value) (
 				}
 			}
 			field.Set(slice)
+		case "bytes16":
+			// hex:"bytes16" - decode uint16 byte-count prefix + raw bytes -> hex string
+			// The data has been hex-decoded by Unmarshal, so we read raw bytes
+			// and encode them back to a hex string.
+			if field.Kind() != reflect.String {
+				return offset, fmt.Errorf("hex:\"bytes16\" tag only valid on string fields, got %v", field.Kind())
+			}
+			if offset+2 > len(data) {
+				return offset, fmt.Errorf("not enough data for bytes16 length at offset %d", offset)
+			}
+			byteCount := int(binary.BigEndian.Uint16(data[offset : offset+2]))
+			offset += 2
+			if offset+byteCount > len(data) {
+				return offset, fmt.Errorf("not enough data for bytes16 of %d bytes at offset %d", byteCount, offset)
+			}
+			// Read raw bytes and convert to hex string
+			rawBytes := data[offset : offset+byteCount]
+			field.SetString(hex.EncodeToString(rawBytes))
+			offset += byteCount
 		default:
 			// No tag or unknown tag - use default decoding
 			offset, err = c.decodeValue(data, offset, field)

@@ -918,3 +918,157 @@ func TestHexCodec_EncodeVARIANT_NilValue(t *testing.T) {
 	// "None" (044e6f6e65) only
 	assert.Equal(t, "044e6f6e65", result)
 }
+
+// Tests for bytes16 encoding (uint16 length prefix)
+
+type TestBytes16Struct struct {
+	Name          string `json:"name"`
+	OperationData string `json:"operationData" hex:"bytes16"`
+}
+
+func TestHexCodec_EncodeBytes16_Short(t *testing.T) {
+	c := NewHexCodec()
+	s := TestBytes16Struct{
+		Name:          "test",
+		OperationData: "aabbcc", // Valid hex string: 6 hex chars = 3 bytes
+	}
+	result, err := c.Marshal(s)
+	require.NoError(t, err)
+	// Name: len=4 (04) + "test" (74657374) = 0474657374
+	// OperationData: byteCount=3 as uint16 (0003) + raw bytes [0xaa, 0xbb, 0xcc]
+	//   After hex encoding: "aabbcc"
+	//   Full: "0003aabbcc"
+	assert.Equal(t, "0474657374"+"0003aabbcc", result)
+}
+
+func TestHexCodec_EncodeBytes16_Empty(t *testing.T) {
+	c := NewHexCodec()
+	s := TestBytes16Struct{
+		Name:          "x",
+		OperationData: "",
+	}
+	result, err := c.Marshal(s)
+	require.NoError(t, err)
+	// Name: len=1 (01) + "x" (78) = 0178
+	// OperationData: len=0 as uint16 (0000) = 0000
+	assert.Equal(t, "01780000", result)
+}
+
+func TestHexCodec_EncodeBytes16_LongString(t *testing.T) {
+	c := NewHexCodec()
+	// Create a valid hex string longer than 255 bytes (510 hex chars = 255 bytes)
+	// Using "ab" repeated 300 times = 600 hex chars = 300 bytes
+	longHexString := make([]byte, 600)
+	for i := 0; i < 600; i += 2 {
+		longHexString[i] = 'a'
+		longHexString[i+1] = 'b'
+	}
+	s := TestBytes16Struct{
+		Name:          "t",
+		OperationData: string(longHexString),
+	}
+	result, err := c.Marshal(s)
+	require.NoError(t, err)
+	// Name: len=1 (01) + "t" (74) = 0174
+	// OperationData: byteCount=300 as uint16 (012c) + 600 hex chars
+	assert.True(t, len(result) > 0)
+	// Verify the uint16 length prefix is correct (012c = 300 bytes)
+	assert.Equal(t, "0174012c", result[:8])
+}
+
+func TestHexCodec_DecodeBytes16_Short(t *testing.T) {
+	c := NewHexCodec()
+	// Name: len=4 (04) + "test" (74657374) = 0474657374
+	// OperationData: byteCount=3 as uint16 (0003) + raw bytes [0xaa, 0xbb, 0xcc]
+	//   hex encoded: "aabbcc"
+	hexStr := "0474657374" + "0003aabbcc"
+	var s TestBytes16Struct
+	err := c.Unmarshal(hexStr, &s)
+	require.NoError(t, err)
+	assert.Equal(t, "test", s.Name)
+	assert.Equal(t, "aabbcc", s.OperationData) // Hex string representing 3 bytes
+}
+
+func TestHexCodec_DecodeBytes16_Empty(t *testing.T) {
+	c := NewHexCodec()
+	// Name: len=1 (01) + "x" (78) = 0178
+	// OperationData: len=0 as uint16 (0000) = 0000
+	hexStr := "01780000"
+	var s TestBytes16Struct
+	err := c.Unmarshal(hexStr, &s)
+	require.NoError(t, err)
+	assert.Equal(t, "x", s.Name)
+	assert.Equal(t, "", s.OperationData)
+}
+
+func TestHexCodec_DecodeBytes16_LongString(t *testing.T) {
+	c := NewHexCodec()
+	// Create a valid hex string representing 300 bytes (600 hex chars)
+	longHexString := make([]byte, 600)
+	for i := 0; i < 600; i += 2 {
+		longHexString[i] = 'a'
+		longHexString[i+1] = 'b'
+	}
+	// Encode first
+	s := TestBytes16Struct{
+		Name:          "t",
+		OperationData: string(longHexString),
+	}
+	hexStr, err := c.Marshal(s)
+	require.NoError(t, err)
+
+	// Then decode
+	var decoded TestBytes16Struct
+	err = c.Unmarshal(hexStr, &decoded)
+	require.NoError(t, err)
+	assert.Equal(t, "t", decoded.Name)
+	assert.Equal(t, string(longHexString), decoded.OperationData)
+	assert.Equal(t, 600, len(decoded.OperationData)) // 600 hex chars = 300 bytes
+}
+
+func TestHexCodec_EncodeText_TooLong(t *testing.T) {
+	c := NewHexCodec()
+	// Create a string longer than 255 bytes without bytes16 tag
+	longString := make([]byte, 300)
+	for i := range longString {
+		longString[i] = 'b'
+	}
+	// Encoding a raw string >255 bytes should fail
+	_, err := c.Marshal(string(longString))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "exceeds max 255")
+}
+
+func TestHexCodec_RoundTrip_Bytes16(t *testing.T) {
+	c := NewHexCodec()
+
+	// Helper to generate valid hex string of n bytes (2n hex chars)
+	makeHexString := func(nBytes int) string {
+		result := make([]byte, nBytes*2)
+		for i := 0; i < nBytes*2; i += 2 {
+			result[i] = 'a'
+			result[i+1] = 'b'
+		}
+		return string(result)
+	}
+
+	testCases := []TestBytes16Struct{
+		{Name: "short", OperationData: "abcd"},                  // 4 hex chars = 2 bytes
+		{Name: "empty", OperationData: ""},                      // empty
+		{Name: "exactly255", OperationData: makeHexString(255)}, // 510 hex chars = 255 bytes
+		{Name: "over255", OperationData: makeHexString(500)},    // 1000 hex chars = 500 bytes
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.Name, func(t *testing.T) {
+			hexStr, err := c.Marshal(tc)
+			require.NoError(t, err)
+
+			var decoded TestBytes16Struct
+			err = c.Unmarshal(hexStr, &decoded)
+			require.NoError(t, err)
+			assert.Equal(t, tc.Name, decoded.Name)
+			assert.Equal(t, tc.OperationData, decoded.OperationData)
+		})
+	}
+}

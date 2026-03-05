@@ -65,6 +65,17 @@ func Bind(genPkg string, pkg *model.Package, sdkVersion string, isMainDalf bool,
 		"stringsTrimPrefix": strings.TrimPrefix,
 		"stringsHasSuffix":  strings.HasSuffix,
 		"stringsTrimSuffix": strings.TrimSuffix,
+		"hasCallerField": func(s *model.TmplStruct) bool {
+			for _, f := range s.Fields {
+				if strings.EqualFold(f.Name, "caller") {
+					return true
+				}
+			}
+			return false
+		},
+		"isCallerField": func(fieldName string) bool {
+			return strings.EqualFold(fieldName, "caller")
+		},
 	}
 	tmpl := template.Must(template.New("").Funcs(funcs).Parse(tmplSource))
 	if err := tmpl.Execute(buffer, data); err != nil {
