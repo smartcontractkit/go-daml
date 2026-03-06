@@ -243,8 +243,8 @@ type OneOfEverything struct {
 	SomeBoolean     types.BOOL      `json:"someBoolean"`
 	SomeInteger     types.INT64     `json:"someInteger"`
 	SomeDecimal     types.NUMERIC   `json:"someDecimal"`
-	SomeMaybe       *types.INT64    `json:"someMaybe"`
-	SomeMaybeNot    *types.INT64    `json:"someMaybeNot"`
+	SomeMaybe       *types.INT64    `json:"someMaybe" hex:"optional"`
+	SomeMaybeNot    *types.INT64    `json:"someMaybeNot" hex:"optional"`
 	SomeText        types.TEXT      `json:"someText"`
 	SomeDate        types.DATE      `json:"someDate"`
 	SomeDatetime    types.TIMESTAMP `json:"someDatetime"`
