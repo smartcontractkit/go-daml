@@ -301,7 +301,7 @@ var _ types.ENUM = {{capitalise .Name}}("")
 // {{capitalise .Name}} is a {{.RawType}} type
 type {{capitalise .Name}} struct {
 	{{- range $field := .Fields}}
-	{{capitalise $field.Name}} {{$field.Type.GoType}} `json:"{{$field.Name}}"{{if $field.IsBytesHex}} hex:"bytes16"{{else if $field.IsUint32}} hex:"uint32"{{else if $field.IsUint32List}} hex:"[]uint32"{{end}}`
+	{{capitalise $field.Name}} {{$field.Type.GoType}} `json:"{{$field.Name}}"{{if $field.IsOptional}} hex:"optional"{{else if $field.IsBytesHex}} hex:"bytes16"{{else if $field.IsUint32}} hex:"uint32"{{else if $field.IsUint32List}} hex:"[]uint32"{{end}}`
 	{{- end}}
 }
 
@@ -359,7 +359,7 @@ func (t *{{capitalise .Name}}) UnmarshalHex(data string) error {
 type {{capitalise .Name}}MCMSParams struct {
 {{- range .Fields}}
 {{- if not (isCallerField .Name)}}
-	{{capitalise .Name}} {{.Type.GoType}} `json:"{{.Name}}"{{if .IsBytesHex}} hex:"bytes16"{{else if .IsUint32}} hex:"uint32"{{else if .IsUint32List}} hex:"[]uint32"{{end}}`
+	{{capitalise .Name}} {{.Type.GoType}} `json:"{{.Name}}"{{if .IsOptional}} hex:"optional"{{else if .IsBytesHex}} hex:"bytes16"{{else if .IsUint32}} hex:"uint32"{{else if .IsUint32List}} hex:"[]uint32"{{end}}`
 {{- end}}
 {{- end}}
 }

@@ -387,6 +387,20 @@ func (c *HexCodec) encodeStruct(rv reflect.Value) ([]byte, error) {
 			if err != nil {
 				return nil, fmt.Errorf("failed to encode bytes16 field %s: %w", fieldType.Name, err)
 			}
+		case "optional":
+			// hex:"optional" - encode Daml Optional type: 0x00 for None, 0x01 + value for Some
+			if field.Kind() != reflect.Ptr {
+				return nil, fmt.Errorf("hex:\"optional\" tag only valid on pointer fields, got %v", field.Kind())
+			}
+			if field.IsNil() {
+				encoded = []byte{0x00}
+			} else {
+				valueEncoded, encErr := c.encode(field.Elem().Interface())
+				if encErr != nil {
+					return nil, fmt.Errorf("failed to encode optional field %s: %w", fieldType.Name, encErr)
+				}
+				encoded = append([]byte{0x01}, valueEncoded...)
+			}
 		default:
 			// No tag or unknown tag - use default encoding
 			encoded, err = c.encode(field.Interface())
@@ -874,6 +888,27 @@ func (c *HexCodec) decodeStruct(data []byte, offset int, target reflect.Value) (
 			rawBytes := data[offset : offset+byteCount]
 			field.SetString(hex.EncodeToString(rawBytes))
 			offset += byteCount
+		case "optional":
+			// hex:"optional" - decode Daml Optional type: 0x00 for None, 0x01 + value for Some
+			if field.Kind() != reflect.Ptr {
+				return offset, fmt.Errorf("hex:\"optional\" tag only valid on pointer fields, got %v", field.Kind())
+			}
+			if offset >= len(data) {
+				return offset, fmt.Errorf("not enough data for optional flag at offset %d", offset)
+			}
+			flag := data[offset]
+			offset++
+			if flag == 0x01 {
+				newVal := reflect.New(field.Type().Elem())
+				offset, err = c.decodeValue(data, offset, newVal.Elem())
+				if err != nil {
+					return offset, fmt.Errorf("failed to decode optional field %s: %w", fieldType.Name, err)
+				}
+				field.Set(newVal)
+			} else if flag != 0x00 {
+				return offset, fmt.Errorf("invalid optional flag 0x%02x for field %s", flag, fieldType.Name)
+			}
+			// flag == 0x00: leave field as nil (zero value)
 		default:
 			// No tag or unknown tag - use default decoding
 			offset, err = c.decodeValue(data, offset, field)
