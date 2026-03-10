@@ -3,7 +3,7 @@ package astgen
 import (
 	"fmt"
 
-	"github.com/smartcontractkit/go-daml/codegen/astgen/v3"
+	v3 "github.com/smartcontractkit/go-daml/codegen/astgen/v3"
 	model2 "github.com/smartcontractkit/go-daml/codegen/model"
 )
 
@@ -18,10 +18,10 @@ type AstGen interface {
 	GetTemplateStructs(ifcByModule map[string]model2.InterfaceMap) (map[string]*model2.TmplStruct, model2.ExternalPackages, error)
 }
 
-func GetAstGenFromVersion(payload []byte, ext model2.ExternalPackages, ver string) (AstGen, error) {
+func GetAstGenFromVersion(payload []byte, ext model2.ExternalPackages, hints model2.FieldHints, ver string) (AstGen, error) {
 	switch ver {
 	case V3:
-		return v3.NewCodegenAst(payload, ext), nil
+		return v3.NewCodegenAst(payload, ext, hints), nil
 	default:
 		return nil, fmt.Errorf("none supported version")
 	}
