@@ -68,6 +68,18 @@ func (t BytesHex) IsBytesHex() bool {
 	return true
 }
 
+// ** Custom Bytes Length Mapping **
+
+// The Daml compiler erases type synonyms. When you define a field as BytesHex in Daml,
+// the compiler expands it to its underlying type (Text) in the compiled Daml-LF output.
+// By the time go-daml parses the .dalf files, all it sees is
+// signerAddress: Text
+// operationData: Text
+// root: Text
+// There's no way to distinguish which Text fields were originally BytesHex and require special encoding.
+// The hardcoded maps (BytesFieldNames, BytesHexFieldNames) work around this limitation by explicitly listing
+// field names that need hex encoding tags.
+
 // BytesHexFieldNames contains field names that should use uint16 length prefix
 // encoding (hex:"bytes16" tag) instead of the default uint8 length prefix.
 //
@@ -85,6 +97,21 @@ var BytesHexFieldNames = map[string]bool{
 	"operationData": true,
 	"predecessor":   true,
 	"salt":          true,
+}
+
+// BytesFieldNames contains field names that should use uint8 length prefix
+// encoding (hex:"bytes" tag). These are fixed-size hex fields ≤255 bytes.
+//
+// From MCMS/CCIP contracts:
+// - signerAddress: EVM signer address (20 bytes)
+// - chainFamilySelector: Chain family selector (4 bytes)
+// - root: Merkle root hash (32 bytes)
+// - newRoot: New merkle root hash (32 bytes)
+var BytesFieldNames = map[string]bool{
+	"signerAddress":       true,
+	"chainFamilySelector": true,
+	"root":                true,
+	"newRoot":             true,
 }
 
 // Uint32FieldNames contains field names where INT64 should encode as 4-byte uint32.
