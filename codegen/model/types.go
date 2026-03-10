@@ -80,65 +80,22 @@ func (t BytesHex) IsBytesHex() bool {
 // The hardcoded maps (BytesFieldNames, BytesHexFieldNames) work around this limitation by explicitly listing
 // field names that need hex encoding tags.
 
-// BytesHexFieldNames contains field names that should use uint16 length prefix
-// encoding (hex:"bytes16" tag) instead of the default uint8 length prefix.
+// FieldHints allows callers to declare which struct field names need non-default
+// hex encoding tags. Because the Daml compiler erases type synonyms (e.g. BytesHex
+// becomes Text in the compiled Daml-LF), go-daml cannot infer the correct encoding
+// from the .dalf alone. Callers that know the encoding semantics of their contracts
+// populate these maps and pass a FieldHints value to CodegenDalfs / GetAST.
 //
-// Background: The Daml BytesHex type synonym is expanded to Text by the compiler,
-// so we cannot detect it from the compiled Daml LF. Instead, we use a field name
-// allowlist for fields that are known to potentially exceed 255 bytes.
-//
-// Fields requiring bytes16 encoding (from MCMS/Codec.daml):
-// - operationData: Serialized choice parameters in TimelockCall (encodeUint16)
-// - predecessor: Hex hash in ScheduleBatchParams (encodeUint16)
-// - salt: Hex value in ScheduleBatchParams (encodeUint16)
-//
-// To add a new field: add its name (case-sensitive) as a key with value true.
-var BytesHexFieldNames = map[string]bool{
-	"operationData": true,
-	"predecessor":   true,
-	"salt":          true,
-}
-
-// BytesFieldNames contains field names that should use uint8 length prefix
-// encoding (hex:"bytes" tag). These are fixed-size hex fields ≤255 bytes.
-//
-// From MCMS/CCIP contracts:
-// - signerAddress: EVM signer address (20 bytes)
-// - chainFamilySelector: Chain family selector (4 bytes)
-// - root: Merkle root hash (32 bytes)
-// - newRoot: New merkle root hash (32 bytes)
-var BytesFieldNames = map[string]bool{
-	"signerAddress":       true,
-	"chainFamilySelector": true,
-	"root":                true,
-	"newRoot":             true,
-}
-
-// Uint32FieldNames contains field names where INT64 should encode as 4-byte uint32.
-// This matches the Daml MCMS/Codec.daml encoding which uses encodeUint32 for these fields.
-//
-// From MCMS/Codec.daml encodeSignerInfo:
-// - signerIndex: encodeUint32 (4 bytes)
-// - signerGroup: encodeUint32 (4 bytes)
-var Uint32FieldNames = map[string]bool{
-	"signerIndex": true,
-	"signerGroup": true,
-}
-
-// Uint32ListFieldNames contains field names where []INT64 should encode as
-// length + uint32 elements (4 bytes each) instead of uint64 elements (8 bytes).
-// This matches the Daml MCMS/Codec.daml encoding which uses encodeUint32 for each element.
-//
-// From MCMS/Codec.daml encodeSetConfigParams and encodeMultisigConfig:
-// - groupQuorums: list of encodeUint32 (4 bytes each)
-// - groupParents: list of encodeUint32 (4 bytes each)
-// - apGroupQuorums: used in AdminParams.AP_SetConfig
-// - apGroupParents: used in AdminParams.AP_SetConfig
-var Uint32ListFieldNames = map[string]bool{
-	"groupQuorums":   true,
-	"groupParents":   true,
-	"apGroupQuorums": true,
-	"apGroupParents": true,
+// An empty (zero-value) FieldHints is valid and means no special encoding is applied.
+type FieldHints struct {
+	// BytesFields: field names that should receive a hex:"bytes" tag (uint8 length prefix, ≤255 bytes).
+	BytesFields map[string]bool
+	// BytesHexFields: field names that should receive a hex:"bytes16" tag (uint16 length prefix).
+	BytesHexFields map[string]bool
+	// Uint32Fields: field names where INT64 should be encoded as a 4-byte uint32 (hex:"uint32" tag).
+	Uint32Fields map[string]bool
+	// Uint32ListFields: field names where []INT64 should be encoded as []uint32 (hex:"[]uint32" tag).
+	Uint32ListFields map[string]bool
 }
 
 type Int64 struct {

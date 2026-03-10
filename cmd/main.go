@@ -150,7 +150,7 @@ func runCodeGen(darFile, outputDir, pkgFile string, debugMode bool, generateHexC
 	dalfToProcess = append(dalfToProcess, manifest.MainDalf)
 	dalfToProcess = append(dalfToProcess, dalfs...)
 
-	result, err := codegen.CodegenDalfs(dalfToProcess, reader, pkgFile, dalfManifest, generateHexCodec, model2.ExternalPackages{})
+	result, err := codegen.CodegenDalfs(dalfToProcess, reader, pkgFile, dalfManifest, generateHexCodec, model2.ExternalPackages{}, model2.FieldHints{})
 	if err != nil {
 		return err
 	}

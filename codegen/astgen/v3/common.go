@@ -30,12 +30,15 @@ type codeGenAst struct {
 	// For keeping track of which packages have been imported, will start off empty and be populated as we process the
 	// DAML LF and encounter references to external packages. This allows us to include only the necessary imports in the generated code
 	importedPackages map[string]model.ExternalPackage
+	// Caller-supplied hints for fields that need non-default hex encoding tags
+	fieldHints model.FieldHints
 }
 
-func NewCodegenAst(payload []byte, externalPackages model.ExternalPackages) *codeGenAst {
+func NewCodegenAst(payload []byte, externalPackages model.ExternalPackages, fieldHints model.FieldHints) *codeGenAst {
 	return &codeGenAst{
 		payload:          payload,
 		externalPackages: externalPackages,
+		fieldHints:       fieldHints,
 	}
 }
 
@@ -216,10 +219,10 @@ func (c *codeGenAst) getTemplates(
 					RawType:      field.String(),
 					IsOptional:   isOptional,
 					IsEnum:       c.isEnumType(typeExtracted, pkg),
-					IsBytes:      model.BytesFieldNames[fieldExtracted],
-					IsBytesHex:   model.BytesHexFieldNames[fieldExtracted],
-					IsUint32:     model.Uint32FieldNames[fieldExtracted],
-					IsUint32List: model.Uint32ListFieldNames[fieldExtracted],
+					IsBytes:      c.fieldHints.BytesFields[fieldExtracted],
+					IsBytesHex:   c.fieldHints.BytesHexFields[fieldExtracted],
+					IsUint32:     c.fieldHints.Uint32Fields[fieldExtracted],
+					IsUint32List: c.fieldHints.Uint32ListFields[fieldExtracted],
 				})
 			}
 		default:
@@ -439,10 +442,10 @@ func (c *codeGenAst) getDataTypes(pkg *daml.Package, module *daml.Module, module
 					Type:         typeExtracted,
 					RawType:      field.String(),
 					IsOptional:   isOptional,
-					IsBytes:      model.BytesFieldNames[fieldExtracted],
-					IsBytesHex:   model.BytesHexFieldNames[fieldExtracted],
-					IsUint32:     model.Uint32FieldNames[fieldExtracted],
-					IsUint32List: model.Uint32ListFieldNames[fieldExtracted],
+					IsBytes:      c.fieldHints.BytesFields[fieldExtracted],
+					IsBytesHex:   c.fieldHints.BytesHexFields[fieldExtracted],
+					IsUint32:     c.fieldHints.Uint32Fields[fieldExtracted],
+					IsUint32List: c.fieldHints.Uint32ListFields[fieldExtracted],
 				})
 			}
 		case *daml.DefDataType_Variant:
@@ -457,10 +460,10 @@ func (c *codeGenAst) getDataTypes(pkg *daml.Package, module *daml.Module, module
 					Type:         typeExtracted,
 					RawType:      field.String(),
 					IsOptional:   true,
-					IsBytes:      model.BytesFieldNames[fieldExtracted],
-					IsBytesHex:   model.BytesHexFieldNames[fieldExtracted],
-					IsUint32:     model.Uint32FieldNames[fieldExtracted],
-					IsUint32List: model.Uint32ListFieldNames[fieldExtracted],
+					IsBytes:      c.fieldHints.BytesFields[fieldExtracted],
+					IsBytesHex:   c.fieldHints.BytesHexFields[fieldExtracted],
+					IsUint32:     c.fieldHints.Uint32Fields[fieldExtracted],
+					IsUint32List: c.fieldHints.Uint32ListFields[fieldExtracted],
 				})
 			}
 		case *daml.DefDataType_Enum:

@@ -62,7 +62,7 @@ func GetManifest(dar fs.FS) (*model2.Manifest, error) {
 	return manifest, nil
 }
 
-func CodegenDalfs(dalfToProcess []string, dar fs.FS, pkgFile string, dalfManifest *model2.Manifest, generateHexCodec bool, externalPackages model2.ExternalPackages) (map[string]string, error) {
+func CodegenDalfs(dalfToProcess []string, dar fs.FS, pkgFile string, dalfManifest *model2.Manifest, generateHexCodec bool, externalPackages model2.ExternalPackages, fieldHints model2.FieldHints) (map[string]string, error) {
 	//  ensure stable processing order across runs
 	sort.Strings(dalfToProcess)
 
@@ -137,7 +137,7 @@ func CodegenDalfs(dalfToProcess []string, dar fs.FS, pkgFile string, dalfManifes
 			continue
 		}
 
-		pkg, err := GetAST(dalfContent, dalfManifest, ifcByModule, externalPackages)
+		pkg, err := GetAST(dalfContent, dalfManifest, ifcByModule, externalPackages, fieldHints)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate AST: %w", err)
 		}
@@ -268,7 +268,7 @@ func GetInterfaces(payload []byte, manifest *model2.Manifest) (map[string]*model
 		return nil, fmt.Errorf("unsupported sdk version %s", manifest.SdkVersion)
 	}
 
-	gen, err := astgen.GetAstGenFromVersion(payload, model2.ExternalPackages{}, version)
+	gen, err := astgen.GetAstGenFromVersion(payload, model2.ExternalPackages{}, model2.FieldHints{}, version)
 	if err != nil {
 		return nil, err
 	}
@@ -276,7 +276,7 @@ func GetInterfaces(payload []byte, manifest *model2.Manifest) (map[string]*model
 	return gen.GetInterfaces()
 }
 
-func GetAST(payload []byte, manifest *model2.Manifest, ifcByModule map[string]model2.InterfaceMap, externalPackages model2.ExternalPackages) (*model2.Package, error) {
+func GetAST(payload []byte, manifest *model2.Manifest, ifcByModule map[string]model2.InterfaceMap, externalPackages model2.ExternalPackages, fieldHints model2.FieldHints) (*model2.Package, error) {
 	var version string
 	if strings.HasPrefix(manifest.SdkVersion, astgen.V3) {
 		version = astgen.V3
@@ -286,7 +286,7 @@ func GetAST(payload []byte, manifest *model2.Manifest, ifcByModule map[string]mo
 		return nil, fmt.Errorf("unsupported sdk version %s", manifest.SdkVersion)
 	}
 
-	gen, err := astgen.GetAstGenFromVersion(payload, externalPackages, version)
+	gen, err := astgen.GetAstGenFromVersion(payload, externalPackages, fieldHints, version)
 	if err != nil {
 		return nil, err
 	}

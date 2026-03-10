@@ -34,7 +34,7 @@ func TestGetMainDalfV3(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, dalfContent)
 
-	ast, err := GetAST(dalfContent, manifest, nil, model.ExternalPackages{})
+	ast, err := GetAST(dalfContent, manifest, nil, model.ExternalPackages{}, model.FieldHints{})
 	require.Nil(t, err)
 	require.NotEmpty(t, ast.Structs)
 

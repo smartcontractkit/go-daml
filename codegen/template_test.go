@@ -109,15 +109,29 @@ func TestDecapitalize(t *testing.T) {
 	}
 }
 
-func TestBytesHexFieldNames(t *testing.T) {
-	// Test that BytesHexFieldNames contains expected entries
-	if !model.BytesHexFieldNames["operationData"] {
-		t.Error("BytesHexFieldNames should contain 'operationData'")
+func TestFieldHints(t *testing.T) {
+	// An empty FieldHints should not match any field name
+	empty := model.FieldHints{}
+	if empty.BytesHexFields["operationData"] {
+		t.Error("empty FieldHints.BytesHexFields should not match any field")
+	}
+	if empty.BytesFields["signerAddress"] {
+		t.Error("empty FieldHints.BytesFields should not match any field")
 	}
 
-	// Test that non-BytesHex fields are not in the map
-	if model.BytesHexFieldNames["someOtherField"] {
-		t.Error("BytesHexFieldNames should not contain 'someOtherField'")
+	// A populated FieldHints should match exactly the configured fields
+	hints := model.FieldHints{
+		BytesHexFields: map[string]bool{"operationData": true},
+		BytesFields:    map[string]bool{"signerAddress": true},
+	}
+	if !hints.BytesHexFields["operationData"] {
+		t.Error("hints.BytesHexFields should contain 'operationData'")
+	}
+	if hints.BytesHexFields["someOtherField"] {
+		t.Error("hints.BytesHexFields should not contain 'someOtherField'")
+	}
+	if !hints.BytesFields["signerAddress"] {
+		t.Error("hints.BytesFields should contain 'signerAddress'")
 	}
 }
 
