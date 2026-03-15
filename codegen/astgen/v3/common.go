@@ -310,37 +310,25 @@ func (c *codeGenAst) getTemplates(
 					if interfaceStruct, exists := interfaces[ifcModuleName][interfaceName]; exists {
 						log.Debug().Msgf("found interface %s in map with %d choices", interfaceName, len(interfaceStruct.Choices))
 						for _, ifaceChoice := range interfaceStruct.Choices {
-							found := false
+							var existingChoice *model.TmplChoice
 							for _, tmplChoice := range tmplStruct.Choices {
 								if tmplChoice.Name == ifaceChoice.Name {
-									found = true
+									existingChoice = tmplChoice
 									break
 								}
 							}
-							if !found {
-								log.Debug().Msgf("adding interface choice %s to template %s", ifaceChoice.Name, templateName)
-								if extPkg != (model.ExternalPackage{}) {
-									log.Debug().Msg("Interface choice is from an external package, adding using imports")
-									tmplStruct.Choices = append(tmplStruct.Choices, &model.TmplChoice{
-										Name: ifaceChoice.Name,
-										ArgType: model.Imported{
-											Underlying:      ifaceChoice.ArgType,
-											ExternalPackage: extPkg,
-										},
-										// ReturnType:        ifaceChoice.ReturnType,
-										InterfaceName:     interfaceName,
-										InterfaceDAMLName: interfaceStruct.DAMLName,
-									})
-								} else {
-									tmplStruct.Choices = append(tmplStruct.Choices, &model.TmplChoice{
-										Name:    ifaceChoice.Name,
-										ArgType: ifaceChoice.ArgType,
-										// ReturnType:        ifaceChoice.ReturnType,
-										InterfaceName:     interfaceName,
-										InterfaceDAMLName: interfaceStruct.DAMLName,
-									})
-								}
+							if existingChoice != nil {
+								c.mergeInterfaceChoice(existingChoice, ifaceChoice, interfaceName, interfaceStruct.DAMLName, extPkg)
+								continue
 							}
+
+							log.Debug().Msgf("adding interface choice %s to template %s", ifaceChoice.Name, templateName)
+							tmplStruct.Choices = append(tmplStruct.Choices, &model.TmplChoice{
+								Name:              ifaceChoice.Name,
+								ArgType:           interfaceChoiceArgType(ifaceChoice, extPkg),
+								InterfaceName:     interfaceName,
+								InterfaceDAMLName: interfaceStruct.DAMLName,
+							})
 						}
 					}
 				}
@@ -351,6 +339,34 @@ func (c *codeGenAst) getTemplates(
 	}
 
 	return structs, nil
+}
+
+func (c *codeGenAst) mergeInterfaceChoice(
+	existingChoice *model.TmplChoice,
+	ifaceChoice *model.TmplChoice,
+	interfaceName string,
+	interfaceDAMLName string,
+	extPkg model.ExternalPackage,
+) {
+	existingChoice.InterfaceName = interfaceName
+	existingChoice.InterfaceDAMLName = interfaceDAMLName
+	if ifaceChoice.ArgType != nil {
+		existingChoice.ArgType = interfaceChoiceArgType(ifaceChoice, extPkg)
+	}
+}
+
+func interfaceChoiceArgType(ifaceChoice *model.TmplChoice, extPkg model.ExternalPackage) model.DamlType {
+	if ifaceChoice == nil || ifaceChoice.ArgType == nil {
+		return nil
+	}
+	if extPkg != (model.ExternalPackage{}) {
+		log.Debug().Msg("Interface choice is from an external package, adding using imports")
+		return model.Imported{
+			Underlying:      ifaceChoice.ArgType,
+			ExternalPackage: extPkg,
+		}
+	}
+	return ifaceChoice.ArgType
 }
 
 func (c *codeGenAst) getChoices(pkg *daml.Package, choices []*daml.TemplateChoice) []*model.TmplChoice {
