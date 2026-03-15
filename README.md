@@ -3,6 +3,8 @@
 
 # Go DAML SDK
 
+> This project is a fork of [noders-team/go-daml](https://github.com/noders-team/go-daml), originally developed by the Noders Team under the Apache 2.0 License.
+
 A comprehensive Go SDK for interacting with DAML ledgers, featuring a complete client library, service abstractions, and
 a powerful code generator for generating type-safe Go code from DAML (.dar) files.
 
