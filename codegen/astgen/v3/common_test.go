@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	daml "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/daml/lf/archive/daml_lf_2"
+	"github.com/smartcontractkit/go-daml/codegen/model"
 	"github.com/stretchr/testify/require"
 )
 
@@ -102,4 +103,44 @@ func TestParseKeyExpressionV3(t *testing.T) {
 		fieldNames := codeGen.parseKeyExpression(pkg, key)
 		require.Len(t, fieldNames, 0)
 	})
+}
+
+func TestMergeInterfaceChoiceUsesExternalSignature(t *testing.T) {
+	codeGen := &codeGenAst{}
+	existing := &model.TmplChoice{
+		Name:    "CalculateFee",
+		ArgType: model.Unknown{String: "ExecutorCalculateFee2"},
+	}
+	ifaceChoice := &model.TmplChoice{
+		Name:    "CalculateFee",
+		ArgType: model.Unknown{String: "ExecutorCalculateFee"},
+	}
+	extPkg := model.ExternalPackage{
+		Import: "github.com/smartcontractkit/chainlink-canton/bindings/generated/common",
+		Alias:  "common",
+	}
+
+	codeGen.mergeInterfaceChoice(existing, ifaceChoice, "IExecutor", "Executor", extPkg)
+
+	require.Equal(t, "IExecutor", existing.InterfaceName)
+	require.Equal(t, "Executor", existing.InterfaceDAMLName)
+	require.Equal(t, "common.ExecutorCalculateFee", existing.ArgType.GoType())
+}
+
+func TestMergeInterfaceChoiceUsesLocalSignature(t *testing.T) {
+	codeGen := &codeGenAst{}
+	existing := &model.TmplChoice{
+		Name:    "CalculateFee",
+		ArgType: model.Unknown{String: "ExecutorCalculateFee2"},
+	}
+	ifaceChoice := &model.TmplChoice{
+		Name:    "CalculateFee",
+		ArgType: model.Unknown{String: "ExecutorCalculateFee"},
+	}
+
+	codeGen.mergeInterfaceChoice(existing, ifaceChoice, "IExecutor", "Executor", model.ExternalPackage{})
+
+	require.Equal(t, "IExecutor", existing.InterfaceName)
+	require.Equal(t, "Executor", existing.InterfaceDAMLName)
+	require.Equal(t, "ExecutorCalculateFee", existing.ArgType.GoType())
 }
