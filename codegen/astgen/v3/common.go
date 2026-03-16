@@ -309,11 +309,37 @@ func (c *codeGenAst) getTemplates(
 
 					if interfaceStruct, exists := interfaces[ifcModuleName][interfaceName]; exists {
 						log.Debug().Msgf("found interface %s in map with %d choices", interfaceName, len(interfaceStruct.Choices))
+
+						// Extract the DAML interface name (remove "I" prefix that was added)
+						damlIfcName := strings.TrimPrefix(interfaceName, "I")
+						// For interfaces like IIExecutor (from IExecutor), remove both I's
+						if strings.HasPrefix(damlIfcName, "I") {
+							damlIfcName = strings.TrimPrefix(damlIfcName, "I")
+						}
+
 						for _, ifaceChoice := range interfaceStruct.Choices {
+							// Check if template already has a choice implementing this interface method
+							// Template choices follow naming convention: {InterfaceName}_{MethodName}
+							// e.g., interface method "CalculateFee" -> template choice "Executor_CalculateFee"
+							expectedTmplChoiceName := damlIfcName + "_" + ifaceChoice.Name
 							found := false
 							for _, tmplChoice := range tmplStruct.Choices {
-								if tmplChoice.Name == ifaceChoice.Name {
+								if tmplChoice.Name == ifaceChoice.Name || tmplChoice.Name == expectedTmplChoiceName {
 									found = true
+									// If this is an external interface, wrap the ArgType immediately
+									// Skip wrapping built-in types (Unit, etc.) and already-imported types
+									if extPkg != (model.ExternalPackage{}) {
+										if _, isImported := tmplChoice.ArgType.(model.Imported); !isImported {
+											if _, isUnit := tmplChoice.ArgType.(model.Unit); !isUnit {
+												tmplChoice.ArgType = model.Imported{
+													Underlying:      tmplChoice.ArgType,
+													ExternalPackage: extPkg,
+												}
+											}
+											tmplChoice.InterfaceName = interfaceName
+											tmplChoice.InterfaceDAMLName = damlIfcName
+										}
+									}
 									break
 								}
 							}
@@ -321,21 +347,24 @@ func (c *codeGenAst) getTemplates(
 								log.Debug().Msgf("adding interface choice %s to template %s", ifaceChoice.Name, templateName)
 								if extPkg != (model.ExternalPackage{}) {
 									log.Debug().Msg("Interface choice is from an external package, adding using imports")
-									tmplStruct.Choices = append(tmplStruct.Choices, &model.TmplChoice{
-										Name: ifaceChoice.Name,
-										ArgType: model.Imported{
+									// Only wrap non-Unit types
+									argType := ifaceChoice.ArgType
+									if _, isUnit := argType.(model.Unit); !isUnit {
+										argType = model.Imported{
 											Underlying:      ifaceChoice.ArgType,
 											ExternalPackage: extPkg,
-										},
-										// ReturnType:        ifaceChoice.ReturnType,
+										}
+									}
+									tmplStruct.Choices = append(tmplStruct.Choices, &model.TmplChoice{
+										Name:              ifaceChoice.Name,
+										ArgType:           argType,
 										InterfaceName:     interfaceName,
 										InterfaceDAMLName: interfaceStruct.DAMLName,
 									})
 								} else {
 									tmplStruct.Choices = append(tmplStruct.Choices, &model.TmplChoice{
-										Name:    ifaceChoice.Name,
-										ArgType: ifaceChoice.ArgType,
-										// ReturnType:        ifaceChoice.ReturnType,
+										Name:              ifaceChoice.Name,
+										ArgType:           ifaceChoice.ArgType,
 										InterfaceName:     interfaceName,
 										InterfaceDAMLName: interfaceStruct.DAMLName,
 									})
