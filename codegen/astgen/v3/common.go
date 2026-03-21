@@ -758,6 +758,8 @@ func (c *codeGenAst) handleConType(pkg *daml.Package, conType *daml.Type_Con) mo
 
 		// Special handling for certain stdlib/DA types
 		switch name {
+		case "RelTime":
+			return model.RelTime{}
 		case "Set":
 			return model.Set{}
 		default:
