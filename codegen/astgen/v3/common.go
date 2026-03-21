@@ -756,7 +756,7 @@ func (c *codeGenAst) handleConType(pkg *daml.Package, conType *daml.Type_Con) mo
 			}
 		}
 
-		// Special handling for certain stdlib/DA types
+		// Special handling for certain stdlib/DA types that have generated types
 		switch name {
 		case "RelTime":
 			return model.RelTime{}
