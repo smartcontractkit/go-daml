@@ -1215,12 +1215,15 @@ func TestConvertToRecordSET(t *testing.T) {
 		require.Len(t, record.Fields, 1)
 		require.Equal(t, "set", record.Fields[0].Label)
 
-		listValue := record.Fields[0].Value.GetList()
-		require.NotNil(t, listValue)
-		require.Len(t, listValue.Elements, 3)
-		require.Equal(t, "item1", listValue.Elements[0].GetText())
-		require.Equal(t, "item2", listValue.Elements[1].GetText())
-		require.Equal(t, "item3", listValue.Elements[2].GetText())
+		genMapValue := record.Fields[0].Value.GetRecord().GetFields()[0].GetValue().GetGenMap()
+		require.NotNil(t, genMapValue)
+		require.Len(t, genMapValue.Entries, 3)
+		require.Equal(t, "item1", genMapValue.Entries[0].GetKey().GetText())
+		require.NotNil(t, genMapValue.Entries[0].GetValue().GetUnit())
+		require.Equal(t, "item2", genMapValue.Entries[1].GetKey().GetText())
+		require.NotNil(t, genMapValue.Entries[1].GetValue().GetUnit())
+		require.Equal(t, "item3", genMapValue.Entries[2].GetKey().GetText())
+		require.NotNil(t, genMapValue.Entries[2].GetValue().GetUnit())
 	})
 
 	t.Run("SET type conversion - integers", func(t *testing.T) {
@@ -1235,12 +1238,15 @@ func TestConvertToRecordSET(t *testing.T) {
 		require.Len(t, record.Fields, 1)
 		require.Equal(t, "set", record.Fields[0].Label)
 
-		listValue := record.Fields[0].Value.GetList()
-		require.NotNil(t, listValue)
-		require.Len(t, listValue.Elements, 3)
-		require.Equal(t, int64(1), listValue.Elements[0].GetInt64())
-		require.Equal(t, int64(2), listValue.Elements[1].GetInt64())
-		require.Equal(t, int64(3), listValue.Elements[2].GetInt64())
+		genMapValue := record.Fields[0].Value.GetRecord().GetFields()[0].GetValue().GetGenMap()
+		require.NotNil(t, genMapValue)
+		require.Len(t, genMapValue.Entries, 3)
+		require.Equal(t, int64(1), genMapValue.Entries[0].GetKey().GetInt64())
+		require.NotNil(t, genMapValue.Entries[0].GetValue().GetUnit())
+		require.Equal(t, int64(2), genMapValue.Entries[1].GetKey().GetInt64())
+		require.NotNil(t, genMapValue.Entries[1].GetValue().GetUnit())
+		require.Equal(t, int64(3), genMapValue.Entries[2].GetKey().GetInt64())
+		require.NotNil(t, genMapValue.Entries[2].GetValue().GetUnit())
 	})
 
 	t.Run("SET type conversion - mixed types", func(t *testing.T) {
@@ -1255,12 +1261,12 @@ func TestConvertToRecordSET(t *testing.T) {
 		require.Len(t, record.Fields, 1)
 		require.Equal(t, "set", record.Fields[0].Label)
 
-		listValue := record.Fields[0].Value.GetList()
-		require.NotNil(t, listValue)
-		require.Len(t, listValue.Elements, 3)
-		require.Equal(t, "text", listValue.Elements[0].GetText())
-		require.Equal(t, int64(42), listValue.Elements[1].GetInt64())
-		require.Equal(t, true, listValue.Elements[2].GetBool())
+		genMapValue := record.Fields[0].Value.GetRecord().GetFields()[0].GetValue().GetGenMap()
+		require.NotNil(t, genMapValue)
+		require.Len(t, genMapValue.Entries, 3)
+		require.Equal(t, "text", genMapValue.Entries[0].GetKey().GetText())
+		require.Equal(t, int64(42), genMapValue.Entries[1].GetKey().GetInt64())
+		require.Equal(t, true, genMapValue.Entries[2].GetKey().GetBool())
 	})
 
 	t.Run("SET type conversion - empty set", func(t *testing.T) {
@@ -1275,9 +1281,9 @@ func TestConvertToRecordSET(t *testing.T) {
 		require.Len(t, record.Fields, 1)
 		require.Equal(t, "set", record.Fields[0].Label)
 
-		listValue := record.Fields[0].Value.GetList()
-		require.NotNil(t, listValue)
-		require.Len(t, listValue.Elements, 0)
+		genMapValue := record.Fields[0].Value.GetRecord().GetFields()[0].GetValue().GetGenMap()
+		require.NotNil(t, genMapValue)
+		require.Len(t, genMapValue.Entries, 0)
 	})
 
 	t.Run("SET in struct", func(t *testing.T) {
@@ -1315,19 +1321,19 @@ func TestConvertToRecordSET(t *testing.T) {
 		require.Equal(t, "alice", fieldMap["owner"].Value.GetParty())
 		require.Equal(t, "test set", fieldMap["name"].Value.GetText())
 
-		partiesSet := fieldMap["requiredParties"].Value.GetList()
+		partiesSet := fieldMap["requiredParties"].Value.GetRecord().GetFields()[0].GetValue().GetGenMap()
 		require.NotNil(t, partiesSet)
-		require.Len(t, partiesSet.Elements, 3)
-		require.Equal(t, "alice", partiesSet.Elements[0].GetText())
-		require.Equal(t, "bob", partiesSet.Elements[1].GetText())
-		require.Equal(t, "charlie", partiesSet.Elements[2].GetText())
+		require.Len(t, partiesSet.Entries, 3)
+		require.Equal(t, "alice", partiesSet.Entries[0].GetKey().GetText())
+		require.Equal(t, "bob", partiesSet.Entries[1].GetKey().GetText())
+		require.Equal(t, "charlie", partiesSet.Entries[2].GetKey().GetText())
 
-		valuesSet := fieldMap["allowedValues"].Value.GetList()
+		valuesSet := fieldMap["allowedValues"].Value.GetRecord().GetFields()[0].GetValue().GetGenMap()
 		require.NotNil(t, valuesSet)
-		require.Len(t, valuesSet.Elements, 3)
-		require.Equal(t, int64(1), valuesSet.Elements[0].GetInt64())
-		require.Equal(t, int64(2), valuesSet.Elements[1].GetInt64())
-		require.Equal(t, int64(3), valuesSet.Elements[2].GetInt64())
+		require.Len(t, valuesSet.Entries, 3)
+		require.Equal(t, int64(1), valuesSet.Entries[0].GetKey().GetInt64())
+		require.Equal(t, int64(2), valuesSet.Entries[1].GetKey().GetInt64())
+		require.Equal(t, int64(3), valuesSet.Entries[2].GetKey().GetInt64())
 	})
 
 	t.Run("SET with DAML types", func(t *testing.T) {
@@ -1346,12 +1352,12 @@ func TestConvertToRecordSET(t *testing.T) {
 		require.Len(t, record.Fields, 1)
 		require.Equal(t, "parties", record.Fields[0].Label)
 
-		listValue := record.Fields[0].Value.GetList()
-		require.NotNil(t, listValue)
-		require.Len(t, listValue.Elements, 3)
-		require.Equal(t, "alice", listValue.Elements[0].GetParty())
-		require.Equal(t, "bob", listValue.Elements[1].GetParty())
-		require.Equal(t, "charlie", listValue.Elements[2].GetParty())
+		genMapValue := record.Fields[0].Value.GetRecord().GetFields()[0].GetValue().GetGenMap()
+		require.NotNil(t, genMapValue)
+		require.Len(t, genMapValue.Entries, 3)
+		require.Equal(t, "alice", genMapValue.Entries[0].GetKey().GetParty())
+		require.Equal(t, "bob", genMapValue.Entries[1].GetKey().GetParty())
+		require.Equal(t, "charlie", genMapValue.Entries[2].GetKey().GetParty())
 	})
 }
 
@@ -1400,18 +1406,18 @@ func TestConvertToRecordRELTIMEAndSETIntegration(t *testing.T) {
 		require.Equal(t, "microseconds", fieldMap["maxProcessingTime"].Value.GetRecord().GetFields()[0].GetLabel())
 		require.Equal(t, int64(300000000), fieldMap["maxProcessingTime"].Value.GetRecord().GetFields()[0].GetValue().GetInt64())
 
-		partiesSet := fieldMap["requiredParties"].Value.GetList()
+		partiesSet := fieldMap["requiredParties"].Value.GetRecord().GetFields()[0].GetValue().GetGenMap()
 		require.NotNil(t, partiesSet)
-		require.Len(t, partiesSet.Elements, 3)
-		require.Equal(t, "alice", partiesSet.Elements[0].GetText())
-		require.Equal(t, "bob", partiesSet.Elements[1].GetText())
-		require.Equal(t, "charlie", partiesSet.Elements[2].GetText())
+		require.Len(t, partiesSet.Entries, 3)
+		require.Equal(t, "alice", partiesSet.Entries[0].GetKey().GetText())
+		require.Equal(t, "bob", partiesSet.Entries[1].GetKey().GetText())
+		require.Equal(t, "charlie", partiesSet.Entries[2].GetKey().GetText())
 
-		syncSet := fieldMap["allowedSynchronizers"].Value.GetList()
+		syncSet := fieldMap["allowedSynchronizers"].Value.GetRecord().GetFields()[0].GetValue().GetGenMap()
 		require.NotNil(t, syncSet)
-		require.Len(t, syncSet.Elements, 2)
-		require.Equal(t, "sync1", syncSet.Elements[0].GetText())
-		require.Equal(t, "sync2", syncSet.Elements[1].GetText())
+		require.Len(t, syncSet.Entries, 2)
+		require.Equal(t, "sync1", syncSet.Entries[0].GetKey().GetText())
+		require.Equal(t, "sync2", syncSet.Entries[1].GetKey().GetText())
 	})
 }
 
