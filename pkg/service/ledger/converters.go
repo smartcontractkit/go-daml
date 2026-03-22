@@ -524,13 +524,27 @@ func mapToValue(data interface{}) *v2.Value {
 			},
 		}
 	case types.SET:
-		elements := make([]*v2.Value, len(v))
+		entries := make([]*v2.GenMap_Entry, len(v))
 		for i, elem := range v {
-			elements[i] = mapToValue(elem)
+			entries[i] = &v2.GenMap_Entry{
+				Key: mapToValue(elem),
+				Value: &v2.Value{
+					Sum: &v2.Value_Unit{Unit: &emptypb.Empty{}},
+				},
+			}
 		}
 		return &v2.Value{
-			Sum: &v2.Value_List{
-				List: &v2.List{Elements: elements},
+			Sum: &v2.Value_Record{
+				Record: &v2.Record{
+					Fields: []*v2.RecordField{{
+						Label: "map",
+						Value: &v2.Value{
+							Sum: &v2.Value_GenMap{
+								GenMap: &v2.GenMap{Entries: entries},
+							},
+						},
+					}},
+				},
 			},
 		}
 	case []types.INT64, []types.TEXT, []types.BOOL, []int64, []string:
