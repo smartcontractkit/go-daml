@@ -96,6 +96,10 @@ type FieldHints struct {
 	Uint32Fields map[string]bool
 	// Uint32ListFields: field names where []INT64 should be encoded as []uint32 (hex:"[]uint32" tag).
 	Uint32ListFields map[string]bool
+	// VariantTagByteMap: maps fully-qualified variant type name (e.g. "Module.TypeName") to
+	// a map of constructor names to their numeric tag bytes for MCMS encoding.
+	// Example: {"MyModule.TransferTimeout": {"Indefinite": 0x00, "RelativeHours": 0x01}}
+	VariantTagByteMap map[string]map[string]byte
 }
 
 type Int64 struct {
@@ -235,7 +239,7 @@ type Set struct {
 }
 
 func (t Set) GoType() string {
-	return "SET"
+	return "types.SET"
 }
 
 type Enum struct {

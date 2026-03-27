@@ -76,6 +76,11 @@ func Bind(genPkg string, pkg *model.Package, sdkVersion string, isMainDalf bool,
 		"isCallerField": func(fieldName string) bool {
 			return strings.EqualFold(fieldName, "caller")
 		},
+		// hasKey checks if a key exists in a map[string]byte (for VariantTagMapping)
+		"hasKey": func(m map[string]byte, key string) bool {
+			_, ok := m[key]
+			return ok
+		},
 	}
 	tmpl := template.Must(template.New("").Funcs(funcs).Parse(tmplSource))
 	if err := tmpl.Execute(buffer, data); err != nil {

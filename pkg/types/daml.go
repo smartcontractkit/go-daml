@@ -43,6 +43,15 @@ type VARIANT interface {
 	GetVariantValue() interface{}
 }
 
+// VariantWithTagByte extends VARIANT with numeric tag byte encoding.
+// Variants implementing this interface will be encoded using a single
+// tag byte (0x00, 0x01, etc.) instead of length-prefixed string tags.
+// This is used for MCMS (Multi-Chain Multi-Sig) codec compatibility.
+type VariantWithTagByte interface {
+	VARIANT
+	GetVariantTagByte() byte
+}
+
 // ENUM represents a DAML enum type
 type ENUM interface {
 	GetEnumConstructor() string

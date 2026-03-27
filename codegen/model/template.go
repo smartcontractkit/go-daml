@@ -21,6 +21,9 @@ type TmplStruct struct {
 	Signatories []string
 	Observers   []string
 	Location    string
+	// VariantTagMapping maps variant field names to their numeric tag bytes for MCMS encoding.
+	// When set, codegen generates GetVariantTagByte() method implementing VariantWithTagByte interface.
+	VariantTagMapping map[string]byte
 }
 
 type TmplField struct {
