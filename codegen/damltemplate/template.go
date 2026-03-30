@@ -247,9 +247,9 @@ func getCodecFuncs(typeExpr string, customCodecs map[string]CustomCodec) (encode
 			return "encodePartyList", "decodePartyList", "MCMS.Codec"
 		}
 
-		// Generic list encoding
-		_, elemDec, mod := getCodecFuncs(elemType, customCodecs)
-		return "encodeList", elemDec, mod // encodeList needs the element encoder passed separately
+		// Generic list encoding - encodeList/decodeList come from MCMS.Codec
+		// The element encoder/decoder is tracked separately via trackImport in buildTemplateData
+		return "encodeList", "decodeList", "MCMS.Codec"
 	}
 
 	// Handle Optional types
@@ -332,6 +332,22 @@ func getElemDecodeFunc(typeExpr string, customCodecs map[string]CustomCodec) str
 		if codec, ok := customCodecs[shortName]; ok {
 			return codec.DecodeFunc
 		}
+	}
+
+	// Primitive types
+	switch elemType {
+	case "Int":
+		return "decodeInt64At"
+	case "Bool":
+		return "decodeBoolAt"
+	case "Text":
+		return "decodeTextAt"
+	case "Party":
+		return "decodePartyAt"
+	case "Numeric 0":
+		return "decodeNumeric0At"
+	case "BytesHex":
+		return "decodeBytesHexAt"
 	}
 
 	// Default: assume record type in same module
