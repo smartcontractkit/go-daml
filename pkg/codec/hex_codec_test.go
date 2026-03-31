@@ -919,6 +919,47 @@ func TestHexCodec_EncodeVARIANT_NilValue(t *testing.T) {
 	assert.Equal(t, "044e6f6e65", result)
 }
 
+// Test VariantWithTagByte interface encoding (MCMS numeric tag bytes)
+type TestVariantWithTagByte struct {
+	tagByte byte
+	tag     string
+	value   interface{}
+}
+
+func (v TestVariantWithTagByte) GetVariantTag() string        { return v.tag }
+func (v TestVariantWithTagByte) GetVariantValue() interface{} { return v.value }
+func (v TestVariantWithTagByte) GetVariantTagByte() byte      { return v.tagByte }
+
+func TestHexCodec_EncodeVariantWithTagByte(t *testing.T) {
+	c := NewHexCodec()
+	// Similar to TransferTimeout.RelativeHours - tag byte 0x01 + int64 value
+	variant := TestVariantWithTagByte{tagByte: 0x01, tag: "RelativeHours", value: int64(24)}
+	result, err := c.Marshal(variant)
+	require.NoError(t, err)
+	// tag byte (01) + int64(24) (0000000000000018)
+	assert.Equal(t, "010000000000000018", result)
+}
+
+func TestHexCodec_EncodeVariantWithTagByte_NilValue(t *testing.T) {
+	c := NewHexCodec()
+	// Similar to TransferTimeout.Indefinite - tag byte 0x00, no value
+	variant := TestVariantWithTagByte{tagByte: 0x00, tag: "Indefinite", value: nil}
+	result, err := c.Marshal(variant)
+	require.NoError(t, err)
+	// Just tag byte (00)
+	assert.Equal(t, "00", result)
+}
+
+func TestHexCodec_EncodeVariantWithTagByte_BackwardCompatibility(t *testing.T) {
+	c := NewHexCodec()
+	// Variant WITHOUT GetVariantTagByte should still use string encoding
+	variant := TestVariant{tag: "Some", value: int64(42)}
+	result, err := c.Marshal(variant)
+	require.NoError(t, err)
+	// Still uses string tag: "Some" (04536f6d65) + int64(42) (000000000000002a)
+	assert.Equal(t, "04536f6d65000000000000002a", result)
+}
+
 // Tests for bytes16 encoding (uint16 length prefix)
 
 type TestBytes16Struct struct {

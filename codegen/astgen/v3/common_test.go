@@ -4,8 +4,106 @@ import (
 	"testing"
 
 	daml "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/daml/lf/archive/daml_lf_2"
+	"github.com/smartcontractkit/go-daml/codegen/model"
 	"github.com/stretchr/testify/require"
 )
+
+func TestHandleConType_StdlibTypes(t *testing.T) {
+	codeGen := &codeGenAst{
+		externalPackages: model.ExternalPackages{
+			Packages: map[string]model.ExternalPackage{},
+		},
+		importedPackages: map[string]model.ExternalPackage{},
+	}
+
+	tests := []struct {
+		name         string
+		typeName     string
+		expectedType model.DamlType
+	}{
+		{"Set via InternedStr", "Set", model.Set{}},
+		{"RelTime via InternedStr", "RelTime", model.RelTime{}},
+		{"Unknown via InternedStr", "SomeOtherType", model.Unknown{String: "SomeOtherType"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pkg := &daml.Package{
+				InternedStrings: []string{"", "da-set-pkg-id", tt.typeName},
+				InternedDottedNames: []*daml.InternedDottedName{
+					{SegmentsInternedStr: []int32{2}},
+				},
+			}
+
+			conType := &daml.Type_Con{
+				Tycon: &daml.TypeConId{
+					Module: &daml.ModuleId{
+						PackageId: &daml.SelfOrImportedPackageId{
+							Sum: &daml.SelfOrImportedPackageId_ImportedPackageIdInternedStr{
+								ImportedPackageIdInternedStr: 1,
+							},
+						},
+					},
+					NameInternedDname: 0,
+				},
+			}
+
+			result := codeGen.handleConType(pkg, conType)
+			require.Equal(t, tt.expectedType, result)
+		})
+	}
+}
+
+func TestHandleConType_PackageImportId_StdlibTypes(t *testing.T) {
+	codeGen := &codeGenAst{
+		externalPackages: model.ExternalPackages{
+			Packages: map[string]model.ExternalPackage{},
+		},
+		importedPackages: map[string]model.ExternalPackage{},
+	}
+
+	tests := []struct {
+		name         string
+		typeName     string
+		expectedType model.DamlType
+	}{
+		{"Set via PackageImportId", "Set", model.Set{}},
+		{"RelTime via PackageImportId", "RelTime", model.RelTime{}},
+		{"Unknown via PackageImportId", "SomeOtherType", model.Unknown{String: "SomeOtherType"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pkg := &daml.Package{
+				InternedStrings: []string{"", tt.typeName},
+				InternedDottedNames: []*daml.InternedDottedName{
+					{SegmentsInternedStr: []int32{1}},
+				},
+				ImportsSum: &daml.Package_PackageImports{
+					PackageImports: &daml.PackageImports{
+						ImportedPackages: []string{"some-stdlib-package-id"},
+					},
+				},
+			}
+
+			conType := &daml.Type_Con{
+				Tycon: &daml.TypeConId{
+					Module: &daml.ModuleId{
+						PackageId: &daml.SelfOrImportedPackageId{
+							Sum: &daml.SelfOrImportedPackageId_PackageImportId{
+								PackageImportId: 0,
+							},
+						},
+					},
+					NameInternedDname: 0,
+				},
+			}
+
+			result := codeGen.handleConType(pkg, conType)
+			require.Equal(t, tt.expectedType, result)
+		})
+	}
+}
 
 func TestParseKeyExpressionV3(t *testing.T) {
 	codeGen := &codeGenAst{}

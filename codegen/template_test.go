@@ -65,6 +65,63 @@ func TestBind(t *testing.T) {
 	}
 }
 
+func TestBindWithSetField(t *testing.T) {
+	structs := map[string]*model.TmplStruct{
+		"MessageStore": {
+			Name:    "MessageStore",
+			RawType: "Record",
+			Fields: []*model.TmplField{
+				{Name: "owner", Type: model.Text{}},
+				{Name: "executedMessages", Type: model.Set{}},
+			},
+		},
+	}
+
+	pkg := &model.Package{
+		Name:    "test-package",
+		Structs: structs,
+	}
+
+	result, err := Bind("main", pkg, "2.0.0", true, false)
+	if err != nil {
+		t.Fatalf("Bind failed: %v", err)
+	}
+
+	if !strings.Contains(result, "ExecutedMessages types.SET") {
+		t.Errorf("Generated code should contain 'ExecutedMessages types.SET', got:\n%s", result)
+	}
+
+	if !strings.Contains(result, `json:"executedMessages"`) {
+		t.Error("Generated code should contain JSON tag for executedMessages")
+	}
+}
+
+func TestBindWithRelTimeField(t *testing.T) {
+	structs := map[string]*model.TmplStruct{
+		"Schedule": {
+			Name:    "Schedule",
+			RawType: "Record",
+			Fields: []*model.TmplField{
+				{Name: "duration", Type: model.RelTime{}},
+			},
+		},
+	}
+
+	pkg := &model.Package{
+		Name:    "test-package",
+		Structs: structs,
+	}
+
+	result, err := Bind("main", pkg, "2.0.0", true, false)
+	if err != nil {
+		t.Fatalf("Bind failed: %v", err)
+	}
+
+	if !strings.Contains(result, "Duration types.RELTIME") {
+		t.Errorf("Generated code should contain 'Duration types.RELTIME', got:\n%s", result)
+	}
+}
+
 func TestCapitalize(t *testing.T) {
 	tests := []struct {
 		input    string

@@ -472,12 +472,22 @@ func (c *HexCodec) encodeGenMap(m map[string]interface{}) ([]byte, error) {
 }
 
 func (c *HexCodec) encodeVariant(v types.VARIANT) ([]byte, error) {
-	tag := v.GetVariantTag()
-	value := v.GetVariantValue()
-	result, err := c.encodeText(tag)
-	if err != nil {
-		return nil, fmt.Errorf("failed to encode variant tag: %w", err)
+	var result []byte
+	var err error
+
+	// Check if variant supports numeric tag byte encoding (MCMS format)
+	if tagByteVariant, ok := v.(types.VariantWithTagByte); ok {
+		result = []byte{tagByteVariant.GetVariantTagByte()}
+	} else {
+		// Fall back to string tag (existing behavior)
+		tag := v.GetVariantTag()
+		result, err = c.encodeText(tag)
+		if err != nil {
+			return nil, fmt.Errorf("failed to encode variant tag: %w", err)
+		}
 	}
+
+	value := v.GetVariantValue()
 	if value != nil {
 		encoded, err := c.encode(value)
 		if err != nil {

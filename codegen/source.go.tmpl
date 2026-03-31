@@ -250,6 +250,20 @@ func (v {{capitalise .Name}}) GetVariantValue() any {
 
 var _ types.VARIANT = (*{{capitalise .Name}})(nil)
 
+{{if .VariantTagMapping}}
+// GetVariantTagByte implements types.VariantWithTagByte interface for MCMS numeric tag encoding
+func (v {{capitalise .Name}}) GetVariantTagByte() byte {
+	{{$tagMap := .VariantTagMapping}}{{range $field := .Fields}}{{if hasKey $tagMap $field.Name}}
+	if v.{{capitalise $field.Name}} != nil {
+		return {{index $tagMap $field.Name}}
+	}
+	{{end}}{{end}}
+	return 0xFF // Invalid/unknown variant
+}
+
+var _ types.VariantWithTagByte = (*{{capitalise .Name}})(nil)
+{{end}}
+
 {{else if eq .RawType "Enum"}}
 // {{capitalise .Name}} is an enum type
 type {{capitalise .Name}} string

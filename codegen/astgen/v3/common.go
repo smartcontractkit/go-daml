@@ -479,6 +479,11 @@ func (c *codeGenAst) getDataTypes(pkg *daml.Package, module *daml.Module, module
 			}
 		case *daml.DefDataType_Variant:
 			tmplStruct.RawType = RawTypeVariant
+			// Check if this variant type has numeric tag byte mapping configured
+			variantKey := moduleName + "." + name
+			if tagMap, exists := c.fieldHints.VariantTagByteMap[variantKey]; exists {
+				tmplStruct.VariantTagMapping = tagMap
+			}
 			for _, field := range v.Variant.Fields {
 				fieldExtracted, typeExtracted, err := c.extractField(pkg, field)
 				if err != nil {
@@ -732,6 +737,8 @@ func (c *codeGenAst) handleConType(pkg *daml.Package, conType *daml.Type_Con) mo
 		switch name {
 		case "RelTime":
 			return model.RelTime{}
+		case "Set":
+			return model.Set{}
 		default:
 			return model.Unknown{String: name}
 		}
@@ -749,7 +756,15 @@ func (c *codeGenAst) handleConType(pkg *daml.Package, conType *daml.Type_Con) mo
 			}
 		}
 
-		return model.Unknown{String: name}
+		// Special handling for certain stdlib/DA types
+		switch name {
+		case "RelTime":
+			return model.RelTime{}
+		case "Set":
+			return model.Set{}
+		default:
+			return model.Unknown{String: name}
+		}
 	}
 
 	/*if conType == nil || conType.Tycon == nil {
