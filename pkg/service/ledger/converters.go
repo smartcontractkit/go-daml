@@ -523,6 +523,8 @@ func mapToValue(data interface{}) *v2.Value {
 				},
 			},
 		}
+	case types.UNIT:
+		return &v2.Value{Sum: &v2.Value_Unit{Unit: &emptypb.Empty{}}}
 	case types.SET:
 		entries := make([]*v2.GenMap_Entry, len(v))
 		for i, elem := range v {
