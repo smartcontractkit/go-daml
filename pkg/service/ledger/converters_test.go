@@ -80,6 +80,38 @@ func (s StatusTest) GetEnumTypeID() string {
 }
 
 // VPairIntegration struct for integration tests (needs to be at package level for interface implementation)
+type RequestedFinalityTest struct {
+	WaitForFinality *types.UNIT  `json:"WaitForFinality,omitempty"`
+	WaitForSafe     *types.UNIT  `json:"WaitForSafe,omitempty"`
+	BlockDepth      *types.INT64 `json:"BlockDepth,omitempty"`
+}
+
+func (v RequestedFinalityTest) GetVariantTag() string {
+	if v.WaitForFinality != nil {
+		return "WaitForFinality"
+	}
+	if v.WaitForSafe != nil {
+		return "WaitForSafe"
+	}
+	if v.BlockDepth != nil {
+		return "BlockDepth"
+	}
+	return ""
+}
+
+func (v RequestedFinalityTest) GetVariantValue() interface{} {
+	if v.WaitForFinality != nil {
+		return v.WaitForFinality
+	}
+	if v.WaitForSafe != nil {
+		return v.WaitForSafe
+	}
+	if v.BlockDepth != nil {
+		return v.BlockDepth
+	}
+	return nil
+}
+
 type VPairIntegration struct {
 	Left  *interface{}      `json:"Left,omitempty"`
 	Right *interface{}      `json:"Right,omitempty"`
@@ -112,12 +144,20 @@ func (v VPairIntegration) GetVariantValue() interface{} {
 	return nil
 }
 
+func TestMapToValueVariantWithUnitPayload(t *testing.T) {
+	variant := RequestedFinalityTest{WaitForSafe: &types.UNIT{}}
+	value := mapToValue(variant)
+	require.Equal(t, "WaitForSafe", value.GetVariant().GetConstructor())
+	require.IsType(t, &v2.Value_Unit{}, value.GetVariant().GetValue().GetSum())
+}
+
 // Verify interface implementation
 var (
 	_ types.VARIANT = (*VPairTest)(nil)
 	_ types.ENUM    = ColorTest("")
 	_ types.ENUM    = StatusTest("")
 	_ types.VARIANT = (*VPairIntegration)(nil)
+	_ types.VARIANT = (*RequestedFinalityTest)(nil)
 )
 
 func TestConvertToRecordBasic(t *testing.T) {
