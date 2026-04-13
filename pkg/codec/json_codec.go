@@ -596,12 +596,12 @@ func (codec *JsonCodec) assignValue(jsonValue interface{}, target reflect.Value)
 		return codec.assignTuple3Value(jsonValue, target)
 	}
 
-	if target.Kind() == reflect.Struct {
-		return codec.assignStructValue(jsonValue, target)
-	}
-
 	if target.Type().Implements(reflect.TypeOf((*types.VARIANT)(nil)).Elem()) {
 		return codec.assignVariantValue(jsonValue, target)
+	}
+
+	if target.Kind() == reflect.Struct {
+		return codec.assignStructValue(jsonValue, target)
 	}
 
 	if target.Type().Implements(reflect.TypeOf((*types.ENUM)(nil)).Elem()) {
@@ -980,12 +980,21 @@ func (codec *JsonCodec) assignVariantValue(jsonValue interface{}, target reflect
 		}
 
 		// For other variant types, try to use built-in UnmarshalJSON if available
-		if target.Type().Implements(reflect.TypeOf((*json.Unmarshaler)(nil)).Elem()) {
-			jsonBytes, err := json.Marshal(jsonValue)
-			if err != nil {
-				return fmt.Errorf("failed to re-marshal variant for custom unmarshaling: %w", err)
-			}
+		jsonBytes, err := json.Marshal(jsonValue)
+		if err != nil {
+			return fmt.Errorf("failed to re-marshal variant for custom unmarshaling: %w", err)
+		}
 
+		if target.CanAddr() {
+			if unmarshaler, ok := target.Addr().Interface().(json.Unmarshaler); ok {
+				if err := unmarshaler.UnmarshalJSON(jsonBytes); err != nil {
+					return fmt.Errorf("custom variant unmarshaling failed: %w", err)
+				}
+				return nil
+			}
+		}
+
+		if target.Type().Implements(reflect.TypeOf((*json.Unmarshaler)(nil)).Elem()) {
 			newValue := reflect.New(target.Type())
 			if unmarshaler, ok := newValue.Interface().(json.Unmarshaler); ok {
 				if err := unmarshaler.UnmarshalJSON(jsonBytes); err != nil {

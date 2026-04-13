@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"math/big"
 	"reflect"
+	"strconv"
 	"testing"
 	"time"
 
@@ -803,3 +804,76 @@ func TestJsonCodec_RoundTrip_RELTIME_SET(t *testing.T) {
 // 	require.NoError(t, err)
 // 	assert.Equal(t, original, result)
 // }
+
+type testVariant struct {
+	Wait  *UNIT  `json:"Wait,omitempty"`
+	Depth *INT64 `json:"Depth,omitempty"`
+}
+
+func (v testVariant) GetVariantTag() string {
+	if v.Wait != nil {
+		return "Wait"
+	}
+	if v.Depth != nil {
+		return "Depth"
+	}
+	return ""
+}
+
+func (v testVariant) GetVariantValue() any {
+	if v.Wait != nil {
+		return v.Wait
+	}
+	if v.Depth != nil {
+		return v.Depth
+	}
+	return nil
+}
+
+func TestJsonCodec_Unmarshal_StructVariant(t *testing.T) {
+	codec := NewJsonCodec()
+
+	t.Run("unit variant", func(t *testing.T) {
+		var result testVariant
+		err := codec.Unmarshal([]byte(`{"tag":"Wait","value":{}}`), &result)
+		require.NoError(t, err)
+		require.NotNil(t, result.Wait)
+		assert.Nil(t, result.Depth)
+	})
+
+	t.Run("int64 variant", func(t *testing.T) {
+		var result testVariant
+		err := codec.Unmarshal([]byte(`{"tag":"Depth","value":"7"}`), &result)
+		require.NoError(t, err)
+		require.NotNil(t, result.Depth)
+		assert.Equal(t, INT64(7), *result.Depth)
+		assert.Nil(t, result.Wait)
+	})
+}
+
+func (v *testVariant) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		Tag   string          `json:"tag"`
+		Value json.RawMessage `json:"value"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	*v = testVariant{}
+	switch raw.Tag {
+	case "Wait":
+		v.Wait = &UNIT{}
+	case "Depth":
+		var depth string
+		if err := json.Unmarshal(raw.Value, &depth); err != nil {
+			return err
+		}
+		vv, err := strconv.ParseInt(depth, 10, 64)
+		if err != nil {
+			return err
+		}
+		parsed := INT64(vv)
+		v.Depth = &parsed
+	}
+	return nil
+}
