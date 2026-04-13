@@ -877,3 +877,44 @@ func (v *testVariant) UnmarshalJSON(data []byte) error {
 	}
 	return nil
 }
+
+type recursiveVariant struct {
+	Left *any              `json:"Left,omitempty"`
+	Both *recursiveVariant `json:"Both,omitempty"`
+}
+
+func (v recursiveVariant) GetVariantTag() string {
+	if v.Left != nil {
+		return "Left"
+	}
+	if v.Both != nil {
+		return "Both"
+	}
+	return ""
+}
+
+func (v recursiveVariant) GetVariantValue() any {
+	if v.Left != nil {
+		return v.Left
+	}
+	if v.Both != nil {
+		return v.Both
+	}
+	return nil
+}
+
+func (v *recursiveVariant) UnmarshalJSON(data []byte) error {
+	return NewJsonCodec().Unmarshal(data, v)
+}
+
+func TestJsonCodec_Unmarshal_GeneratedRecursiveVariant(t *testing.T) {
+	codec := NewJsonCodec()
+
+	var result recursiveVariant
+	err := codec.Unmarshal([]byte(`{"tag":"Both","value":{"tag":"Left","value":"x"}}`), &result)
+	require.NoError(t, err)
+	require.NotNil(t, result.Both)
+	require.NotNil(t, result.Both.Left)
+	require.Equal(t, "x", (*result.Both.Left).(string))
+	assert.Nil(t, result.Left)
+}
