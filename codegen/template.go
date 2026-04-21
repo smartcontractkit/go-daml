@@ -65,6 +65,10 @@ func Bind(genPkg string, pkg *model.Package, sdkVersion string, isMainDalf bool,
 		"stringsTrimPrefix": strings.TrimPrefix,
 		"stringsHasSuffix":  strings.HasSuffix,
 		"stringsTrimSuffix": strings.TrimSuffix,
+		"isGenMapType": func(t model.DamlType) bool {
+			_, ok := t.(model.GenMap)
+			return ok
+		},
 		"hasCallerField": func(s *model.TmplStruct) bool {
 			for _, f := range s.Fields {
 				if strings.EqualFold(f.Name, "caller") {

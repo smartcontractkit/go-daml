@@ -201,3 +201,67 @@ func TestParseKeyExpressionV3(t *testing.T) {
 		require.Len(t, fieldNames, 0)
 	})
 }
+
+func TestHandleBuiltinType_GenMapPreservesTypeArgs(t *testing.T) {
+	codeGen := &codeGenAst{}
+
+	got := codeGen.handleBuiltinType(nil, &daml.Type_Builtin{
+		Builtin: daml.BuiltinType_GENMAP,
+		Args: []*daml.Type{
+			{
+				Sum: &daml.Type_Builtin_{
+					Builtin: &daml.Type_Builtin{Builtin: daml.BuiltinType_TEXT},
+				},
+			},
+			{
+				Sum: &daml.Type_Builtin_{
+					Builtin: &daml.Type_Builtin{Builtin: daml.BuiltinType_NUMERIC},
+				},
+			},
+		},
+	})
+
+	require.Equal(t, model.GenMap{
+		Key:   model.Text{},
+		Value: model.Numeric{},
+	}, got)
+}
+
+func TestExtractTapp_CurriedGenMapPreservesTypeArgs(t *testing.T) {
+	codeGen := &codeGenAst{}
+
+	curried := &daml.Type{
+		Sum: &daml.Type_Tapp{
+			Tapp: &daml.Type_TApp{
+				Lhs: &daml.Type{
+					Sum: &daml.Type_Tapp{
+						Tapp: &daml.Type_TApp{
+							Lhs: &daml.Type{
+								Sum: &daml.Type_Builtin_{
+									Builtin: &daml.Type_Builtin{Builtin: daml.BuiltinType_GENMAP},
+								},
+							},
+							Rhs: &daml.Type{
+								Sum: &daml.Type_Builtin_{
+									Builtin: &daml.Type_Builtin{Builtin: daml.BuiltinType_TEXT},
+								},
+							},
+						},
+					},
+				},
+				Rhs: &daml.Type{
+					Sum: &daml.Type_Builtin_{
+						Builtin: &daml.Type_Builtin{Builtin: daml.BuiltinType_BOOL},
+					},
+				},
+			},
+		},
+	}
+
+	got := codeGen.extractType(nil, curried)
+
+	require.Equal(t, model.GenMap{
+		Key:   model.Text{},
+		Value: model.Bool{},
+	}, got)
+}

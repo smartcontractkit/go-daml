@@ -598,6 +598,18 @@ func (c *codeGenAst) extractTapp(pkg *daml.Package, tapp *daml.Type_TApp) model.
 	case model.Optional:
 		rhs := c.extractType(pkg, tapp.GetRhs())
 		return model.Optional{Inner: rhs}
+	case model.GenMap:
+		rhs := c.extractType(pkg, tapp.GetRhs())
+		genMap := lhs.(model.GenMap)
+		if genMap.Key == nil {
+			genMap.Key = rhs
+			return genMap
+		}
+		if genMap.Value == nil {
+			genMap.Value = rhs
+			return genMap
+		}
+		return genMap
 	case model.ContractId:
 		// ContractId X  -> CONTRACT_ID (don’t collapse to string)
 		// Don't extract rhs here, to prevent the referred package from being imported
@@ -687,7 +699,13 @@ func (c *codeGenAst) handleBuiltinType(pkg *daml.Package, b *daml.Type_Builtin) 
 			Inner: c.extractType(pkg, b.Args[0]),
 		}
 	case daml.BuiltinType_GENMAP:
-		return model.GenMap{}
+		if b.Args == nil || len(b.Args) < 2 {
+			return model.GenMap{}
+		}
+		return model.GenMap{
+			Key:   c.extractType(pkg, b.Args[0]),
+			Value: c.extractType(pkg, b.Args[1]),
+		}
 	case daml.BuiltinType_ANY:
 		return model.Any{}
 	case daml.BuiltinType_ANY_EXCEPTION:

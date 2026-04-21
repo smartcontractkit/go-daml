@@ -187,11 +187,31 @@ func (t ContractId) GoType() string {
 }
 
 type GenMap struct {
+	Key   DamlType
+	Value DamlType
 	noImport
 }
 
 func (t GenMap) GoType() string {
-	return "types.GENMAP"
+	if t.Key == nil || t.Value == nil {
+		return "types.GENMAP"
+	}
+	if !supportsTypedGenMapKey(t.Key) {
+		return "types.GENMAP"
+	}
+	return "map[" + t.Key.GoType() + "]" + t.Value.GoType()
+}
+
+func (t GenMap) GoImport() *ExternalPackage {
+	if t.Key != nil {
+		if pkg := t.Key.GoImport(); pkg != nil {
+			return pkg
+		}
+	}
+	if t.Value != nil {
+		return t.Value.GoImport()
+	}
+	return nil
 }
 
 type TextMap struct {
@@ -271,4 +291,15 @@ type Unknown struct {
 func (t Unknown) GoType() string {
 	// Retain previous behavior of stripping all underscores, matched what the `capitalise` function in the template does.
 	return strings.ReplaceAll(t.String, "_", "")
+}
+
+func supportsTypedGenMapKey(t DamlType) bool {
+	switch t.(type) {
+	case Party, Text, BytesHex, Int64, Bool, Numeric, ContractId, Enum:
+		return true
+	case Imported:
+		return false
+	default:
+		return false
+	}
 }

@@ -198,6 +198,23 @@ func TestHexCodec_EncodeStructWithSlice(t *testing.T) {
 	assert.Equal(t, "03636667"+"02"+"0000000a"+"00000014", result)
 }
 
+func TestHexCodec_EncodeDecodeTypedMap(t *testing.T) {
+	c := NewHexCodec()
+
+	input := map[types.TEXT]types.INT64{
+		types.TEXT("foo"): types.INT64(7),
+	}
+
+	encoded, err := c.Marshal(input)
+	require.NoError(t, err)
+	assert.Equal(t, "0103666f6f0000000000000007", encoded)
+
+	var output map[types.TEXT]types.INT64
+	err = c.Unmarshal(encoded, &output)
+	require.NoError(t, err)
+	assert.Equal(t, input, output)
+}
+
 // Decode tests
 
 func TestHexCodec_DecodeUint8(t *testing.T) {

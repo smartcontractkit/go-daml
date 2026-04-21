@@ -693,9 +693,7 @@ func mapToValue(data interface{}) *v2.Value {
 		}
 
 		if typeStr, ok := v["_type"].(string); ok && typeStr == "genmap" {
-			if mapValue, ok := v["value"].(map[string]interface{}); ok {
-				return getMapConvert(mapValue)
-			} else if genMapValue, ok := v["value"].(types.GENMAP); ok {
+			if genMapValue, ok := v["value"]; ok {
 				return getMapConvert(genMapValue)
 			}
 		}
@@ -780,25 +778,47 @@ func mapToValue(data interface{}) *v2.Value {
 	}
 }
 
-func getMapConvert(genMapValue map[string]interface{}) *v2.Value {
-	entries := make([]*v2.GenMap_Entry, 0, len(genMapValue))
-	for key, val := range genMapValue {
-		// If the key looks like a ledger numeric literal, encode as Numeric.
-		if s, ok := normalizeLedgerNumericLiteral(key); ok {
+func getMapConvert(genMapValue interface{}) *v2.Value {
+	switch v := genMapValue.(type) {
+	case map[string]interface{}:
+		entries := make([]*v2.GenMap_Entry, 0, len(v))
+		for key, val := range v {
+			// If the key looks like a ledger numeric literal, encode as Numeric.
+			if s, ok := normalizeLedgerNumericLiteral(key); ok {
+				entries = append(entries, &v2.GenMap_Entry{
+					Key:   &v2.Value{Sum: &v2.Value_Numeric{Numeric: s}},
+					Value: mapToValue(val),
+				})
+				continue
+			}
+
+			// Otherwise fall back to Text (covers GenMaps keyed by Text, Party, etc.)
 			entries = append(entries, &v2.GenMap_Entry{
-				Key:   &v2.Value{Sum: &v2.Value_Numeric{Numeric: s}},
+				Key:   &v2.Value{Sum: &v2.Value_Text{Text: key}},
 				Value: mapToValue(val),
 			})
-			continue
 		}
-
-		// Otherwise fall back to Text (covers GenMaps keyed by Text, Party, etc.)
-		entries = append(entries, &v2.GenMap_Entry{
-			Key:   &v2.Value{Sum: &v2.Value_Text{Text: key}},
-			Value: mapToValue(val),
-		})
+		return genMapEntriesValue(entries)
+	case types.GENMAP:
+		return getMapConvert(map[string]interface{}(v))
+	default:
+		rv := reflect.ValueOf(genMapValue)
+		if rv.IsValid() && rv.Kind() == reflect.Map {
+			entries := make([]*v2.GenMap_Entry, 0, rv.Len())
+			for _, key := range rv.MapKeys() {
+				entries = append(entries, &v2.GenMap_Entry{
+					Key:   mapToValue(key.Interface()),
+					Value: mapToValue(rv.MapIndex(key).Interface()),
+				})
+			}
+			return genMapEntriesValue(entries)
+		}
 	}
 
+	return nil
+}
+
+func genMapEntriesValue(entries []*v2.GenMap_Entry) *v2.Value {
 	return &v2.Value{
 		Sum: &v2.Value_GenMap{
 			GenMap: &v2.GenMap{Entries: entries},

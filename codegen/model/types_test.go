@@ -19,3 +19,27 @@ func TestRelTimeGoType(t *testing.T) {
 		t.Errorf("RelTime.GoType() = %q, want %q", got, "types.RELTIME")
 	}
 }
+
+func TestGenMapGoTypeTypedScalarKey(t *testing.T) {
+	gm := GenMap{
+		Key:   Text{},
+		Value: Numeric{},
+	}
+
+	got := gm.GoType()
+	if got != "map[types.TEXT]types.NUMERIC" {
+		t.Errorf("GenMap.GoType() = %q, want %q", got, "map[types.TEXT]types.NUMERIC")
+	}
+}
+
+func TestGenMapGoTypeUnsupportedKeyFallsBack(t *testing.T) {
+	gm := GenMap{
+		Key:   Date{},
+		Value: Text{},
+	}
+
+	got := gm.GoType()
+	if got != "types.GENMAP" {
+		t.Errorf("GenMap.GoType() = %q, want %q", got, "types.GENMAP")
+	}
+}

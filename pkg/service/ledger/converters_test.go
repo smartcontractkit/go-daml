@@ -2012,6 +2012,36 @@ func TestConvertToRecordGENMAP(t *testing.T) {
 		require.Equal(t, int64(30), entriesMap["age"].GetInt64())
 		require.Equal(t, true, entriesMap["active"].GetBool())
 	})
+
+	t.Run("GENMAP with typed Go map", func(t *testing.T) {
+		genMapData := map[string]interface{}{
+			"_type": "genmap",
+			"value": map[types.TEXT]types.INT64{
+				types.TEXT("count"): types.INT64(5),
+				types.TEXT("size"):  types.INT64(9),
+			},
+		}
+
+		data := map[string]interface{}{"genmap": genMapData}
+
+		record := convertToRecord(data)
+		require.NotNil(t, record)
+		require.Len(t, record.Fields, 1)
+
+		genMap := record.Fields[0].Value.GetGenMap()
+		require.NotNil(t, genMap)
+		require.Len(t, genMap.Entries, 2)
+
+		entriesMap := make(map[string]int64)
+		for _, entry := range genMap.Entries {
+			entriesMap[entry.Key.GetText()] = entry.Value.GetInt64()
+		}
+
+		require.Equal(t, map[string]int64{
+			"count": 5,
+			"size":  9,
+		}, entriesMap)
+	})
 }
 
 func TestConvertToRecordOptionalWithMaps(t *testing.T) {
