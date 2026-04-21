@@ -39,7 +39,7 @@ var (
   {{- else if eq $baseType "types.DATE" -}}*t.{{capitalise .Name}}
   {{- else if eq $baseType "types.TIMESTAMP" -}}*t.{{capitalise .Name}}
   {{- else if eq $baseType "types.UNIT" -}}map[string]any{"_type": "unit"}
-  {{- else -}}*t.{{capitalise .Name}}
+  {{- else -}}model.NestedToDAMLValue(*t.{{capitalise .Name}})
   {{- end -}}
 {{- else -}}
   {{- if eq .Type.GoType "types.PARTY" -}}t.{{capitalise .Name}}.ToMap()
@@ -72,12 +72,7 @@ var (
         {{- else if eq $elem "types.DECIMAL" -}}
           res = append(res, (*big.Int)(e))
         {{- else -}}
-          type mapper interface{ ToMap() map[string]any }
-          if m, ok := any(e).(mapper); ok {
-            res = append(res, m.ToMap())
-          } else {
-            res = append(res, e)
-          }
+          res = append(res, model.NestedToDAMLValue(e))
         {{- end -}}
       }
       return res
@@ -96,14 +91,7 @@ var (
   {{- else if eq .Type.GoType "types.MAP" -}}t.{{capitalise .Name}}
   {{- else if eq .Type.GoType "types.OPTIONAL" -}}t.{{capitalise .Name}}
   {{- else if eq .Type.GoType "string" -}}string(t.{{capitalise .Name}})
-  {{- else -}}
-    func() any {
-      type mapper interface{ ToMap() map[string]any }
-      if m, ok := any(t.{{capitalise .Name}}).(mapper); ok {
-        return m.ToMap()
-      }
-      return t.{{capitalise .Name}}
-    }()
+  {{- else -}}model.NestedToDAMLValue(t.{{capitalise .Name}})
   {{- end -}}
 {{- end -}}
 {{end}}
@@ -333,6 +321,7 @@ func (t {{capitalise .Name}}) ToMap() map[string]any {
 	} else {
 		m["{{$field.Name}}"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 	{{else}}
@@ -417,6 +406,7 @@ func (t {{capitalise .Name}}) CreateCommand() *model.CreateCommand {
 	} else {
 		args["{{$field.Name}}"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 	{{else if or $field.IsEnum (eq $field.Type.GoType "types.NUMERIC") (eq $field.Type.GoType "types.DECIMAL")}}
@@ -447,6 +437,7 @@ func (t {{capitalise .Name}}) CreateCommandWithPackageID(packageID string) *mode
 	} else {
 		args["{{$field.Name}}"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 	{{else if or $field.IsEnum (eq $field.Type.GoType "types.NUMERIC") (eq $field.Type.GoType "types.DECIMAL")}}

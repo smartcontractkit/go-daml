@@ -292,6 +292,7 @@ func (t OneOfEverything) CreateCommand() *model.CreateCommand {
 	} else {
 		args["someMaybe"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -303,6 +304,7 @@ func (t OneOfEverything) CreateCommand() *model.CreateCommand {
 	} else {
 		args["someMaybeNot"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -399,6 +401,7 @@ func (t OneOfEverything) CreateCommandWithPackageID(packageID string) *model.Cre
 	} else {
 		args["someMaybe"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
@@ -410,6 +413,7 @@ func (t OneOfEverything) CreateCommandWithPackageID(packageID string) *model.Cre
 	} else {
 		args["someMaybeNot"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 
