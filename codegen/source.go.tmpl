@@ -72,9 +72,9 @@ var (
         {{- else if eq $elem "types.DECIMAL" -}}
           res = append(res, (*big.Int)(e))
         {{- else -}}
-          type mapper interface{ toMap() map[string]any }
+          type mapper interface{ ToMap() map[string]any }
           if m, ok := any(e).(mapper); ok {
-            res = append(res, m.toMap())
+            res = append(res, m.ToMap())
           } else {
             res = append(res, e)
           }
@@ -98,9 +98,9 @@ var (
   {{- else if eq .Type.GoType "string" -}}string(t.{{capitalise .Name}})
   {{- else -}}
     func() any {
-      type mapper interface{ toMap() map[string]any }
+      type mapper interface{ ToMap() map[string]any }
       if m, ok := any(t.{{capitalise .Name}}).(mapper); ok {
-        return m.toMap()
+        return m.ToMap()
       }
       return t.{{capitalise .Name}}
     }()
@@ -126,9 +126,9 @@ var (
 {{- else if .IsEnum -}}t.{{capitalise .Name}} != ""
 {{- else -}}
   func() any {
-    type mapper interface{ toMap() map[string]any }
+    type mapper interface{ ToMap() map[string]any }
     if m, ok := any(t.{{capitalise .Name}}).(mapper); ok {
-      return m.toMap()
+      return m.ToMap()
     }
     return t.{{capitalise .Name}}
   }()
