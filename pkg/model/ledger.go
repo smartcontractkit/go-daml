@@ -68,6 +68,29 @@ type ExerciseByKeyCommand struct {
 
 func (ExerciseByKeyCommand) isCommandType() {}
 
+type damlMapper interface {
+	ToMap() map[string]any
+}
+
+type createCommander interface {
+	CreateCommand() *CreateCommand
+}
+
+// NestedToDAMLValue normalizes nested generated values for DAML command arguments.
+func NestedToDAMLValue(v any) any {
+	if mapper, ok := v.(damlMapper); ok {
+		return mapper.ToMap()
+	}
+
+	if creator, ok := v.(createCommander); ok {
+		if cmd := creator.CreateCommand(); cmd != nil {
+			return cmd.Arguments
+		}
+	}
+
+	return v
+}
+
 type CompletionStreamRequest struct {
 	UserID         string
 	Parties        []string

@@ -129,13 +129,7 @@ func (t MappyContract) CreateCommand() *model.CreateCommand {
 	args["operator"] = t.Operator.ToMap()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["value"] = func() any {
-		type mapper interface{ ToMap() map[string]any }
-		if m, ok := any(t.Value).(mapper); ok {
-			return m.ToMap()
-		}
-		return t.Value
-	}()
+	args["value"] = model.NestedToDAMLValue(t.Value)
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateID(),
@@ -151,13 +145,7 @@ func (t MappyContract) CreateCommandWithPackageID(packageID string) *model.Creat
 	args["operator"] = t.Operator.ToMap()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["value"] = func() any {
-		type mapper interface{ ToMap() map[string]any }
-		if m, ok := any(t.Value).(mapper); ok {
-			return m.ToMap()
-		}
-		return t.Value
-	}()
+	args["value"] = model.NestedToDAMLValue(t.Value)
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateIDWithPackageID(packageID),
@@ -208,21 +196,9 @@ type MyPair struct {
 func (t MyPair) ToMap() map[string]any {
 	m := make(map[string]any)
 
-	m["left"] = func() any {
-		type mapper interface{ ToMap() map[string]any }
-		if m, ok := any(t.Left).(mapper); ok {
-			return m.ToMap()
-		}
-		return t.Left
-	}()
+	m["left"] = model.NestedToDAMLValue(t.Left)
 
-	m["right"] = func() any {
-		type mapper interface{ ToMap() map[string]any }
-		if m, ok := any(t.Right).(mapper); ok {
-			return m.ToMap()
-		}
-		return t.Right
-	}()
+	m["right"] = model.NestedToDAMLValue(t.Right)
 
 	return m
 }
@@ -327,44 +303,20 @@ func (t OneOfEverything) CreateCommand() *model.CreateCommand {
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["someSimplePair"] = func() any {
-		type mapper interface{ ToMap() map[string]any }
-		if m, ok := any(t.SomeSimplePair).(mapper); ok {
-			return m.ToMap()
-		}
-		return t.SomeSimplePair
-	}()
+	args["someSimplePair"] = model.NestedToDAMLValue(t.SomeSimplePair)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["someNestedPair"] = func() any {
-		type mapper interface{ ToMap() map[string]any }
-		if m, ok := any(t.SomeNestedPair).(mapper); ok {
-			return m.ToMap()
-		}
-		return t.SomeNestedPair
-	}()
+	args["someNestedPair"] = model.NestedToDAMLValue(t.SomeNestedPair)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["someUglyNesting"] = func() any {
-		type mapper interface{ ToMap() map[string]any }
-		if m, ok := any(t.SomeUglyNesting).(mapper); ok {
-			return m.ToMap()
-		}
-		return t.SomeUglyNesting
-	}()
+	args["someUglyNesting"] = model.NestedToDAMLValue(t.SomeUglyNesting)
 
 	if t.SomeMeasurement != "" {
 		args["someMeasurement"] = t.SomeMeasurement
 	}
 
 	if t.SomeEnum != "" {
-		args["someEnum"] = func() any {
-			type mapper interface{ ToMap() map[string]any }
-			if m, ok := any(t.SomeEnum).(mapper); ok {
-				return m.ToMap()
-			}
-			return t.SomeEnum
-		}()
+		args["someEnum"] = model.NestedToDAMLValue(t.SomeEnum)
 	}
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
@@ -436,44 +388,20 @@ func (t OneOfEverything) CreateCommandWithPackageID(packageID string) *model.Cre
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["someSimplePair"] = func() any {
-		type mapper interface{ ToMap() map[string]any }
-		if m, ok := any(t.SomeSimplePair).(mapper); ok {
-			return m.ToMap()
-		}
-		return t.SomeSimplePair
-	}()
+	args["someSimplePair"] = model.NestedToDAMLValue(t.SomeSimplePair)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["someNestedPair"] = func() any {
-		type mapper interface{ ToMap() map[string]any }
-		if m, ok := any(t.SomeNestedPair).(mapper); ok {
-			return m.ToMap()
-		}
-		return t.SomeNestedPair
-	}()
+	args["someNestedPair"] = model.NestedToDAMLValue(t.SomeNestedPair)
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["someUglyNesting"] = func() any {
-		type mapper interface{ ToMap() map[string]any }
-		if m, ok := any(t.SomeUglyNesting).(mapper); ok {
-			return m.ToMap()
-		}
-		return t.SomeUglyNesting
-	}()
+	args["someUglyNesting"] = model.NestedToDAMLValue(t.SomeUglyNesting)
 
 	if t.SomeMeasurement != "" {
 		args["someMeasurement"] = t.SomeMeasurement
 	}
 
 	if t.SomeEnum != "" {
-		args["someEnum"] = func() any {
-			type mapper interface{ ToMap() map[string]any }
-			if m, ok := any(t.SomeEnum).(mapper); ok {
-				return m.ToMap()
-			}
-			return t.SomeEnum
-		}()
+		args["someEnum"] = model.NestedToDAMLValue(t.SomeEnum)
 	}
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
