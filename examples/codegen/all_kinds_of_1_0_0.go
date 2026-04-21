@@ -130,9 +130,9 @@ func (t MappyContract) CreateCommand() *model.CreateCommand {
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["value"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.Value).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.Value
 	}()
@@ -152,9 +152,9 @@ func (t MappyContract) CreateCommandWithPackageID(packageID string) *model.Creat
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["value"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.Value).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.Value
 	}()
@@ -209,17 +209,17 @@ func (t MyPair) ToMap() map[string]any {
 	m := make(map[string]any)
 
 	m["left"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.Left).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.Left
 	}()
 
 	m["right"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.Right).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.Right
 	}()
@@ -326,27 +326,27 @@ func (t OneOfEverything) CreateCommand() *model.CreateCommand {
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["someSimplePair"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.SomeSimplePair).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.SomeSimplePair
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["someNestedPair"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.SomeNestedPair).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.SomeNestedPair
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["someUglyNesting"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.SomeUglyNesting).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.SomeUglyNesting
 	}()
@@ -357,9 +357,9 @@ func (t OneOfEverything) CreateCommand() *model.CreateCommand {
 
 	if t.SomeEnum != "" {
 		args["someEnum"] = func() any {
-			type mapper interface{ toMap() map[string]any }
+			type mapper interface{ ToMap() map[string]any }
 			if m, ok := any(t.SomeEnum).(mapper); ok {
-				return m.toMap()
+				return m.ToMap()
 			}
 			return t.SomeEnum
 		}()
@@ -433,27 +433,27 @@ func (t OneOfEverything) CreateCommandWithPackageID(packageID string) *model.Cre
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["someSimplePair"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.SomeSimplePair).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.SomeSimplePair
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["someNestedPair"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.SomeNestedPair).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.SomeNestedPair
 	}()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
 	args["someUglyNesting"] = func() any {
-		type mapper interface{ toMap() map[string]any }
+		type mapper interface{ ToMap() map[string]any }
 		if m, ok := any(t.SomeUglyNesting).(mapper); ok {
-			return m.toMap()
+			return m.ToMap()
 		}
 		return t.SomeUglyNesting
 	}()
@@ -464,9 +464,9 @@ func (t OneOfEverything) CreateCommandWithPackageID(packageID string) *model.Cre
 
 	if t.SomeEnum != "" {
 		args["someEnum"] = func() any {
-			type mapper interface{ toMap() map[string]any }
+			type mapper interface{ ToMap() map[string]any }
 			if m, ok := any(t.SomeEnum).(mapper); ok {
-				return m.toMap()
+				return m.ToMap()
 			}
 			return t.SomeEnum
 		}()
