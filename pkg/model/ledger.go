@@ -116,7 +116,6 @@ func NestedToDAMLValue(v any) any {
 		}
 		return NestedToDAMLValue(rv.Elem().Interface())
 	}
-
 	return v
 }
 

@@ -123,9 +123,9 @@ var (
 {{- else if .IsEnum -}}t.{{capitalise .Name}} != ""
 {{- else -}}
   func() any {
-    type mapper interface{ toMap() map[string]any }
+    type mapper interface{ ToMap() map[string]any }
     if m, ok := any(t.{{capitalise .Name}}).(mapper); ok {
-      return m.toMap()
+      return m.ToMap()
     }
     return t.{{capitalise .Name}}
   }()
@@ -330,6 +330,7 @@ func (t {{capitalise .Name}}) ToMap() map[string]any {
 	} else {
 		m["{{$field.Name}}"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 	{{else}}
@@ -414,6 +415,7 @@ func (t {{capitalise .Name}}) CreateCommand() *model.CreateCommand {
 	} else {
 		args["{{$field.Name}}"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 	{{else if or $field.IsEnum (eq $field.Type.GoType "types.NUMERIC") (eq $field.Type.GoType "types.DECIMAL")}}
@@ -444,6 +446,7 @@ func (t {{capitalise .Name}}) CreateCommandWithPackageID(packageID string) *mode
 	} else {
 		args["{{$field.Name}}"] = map[string]any{
 			"_type": "optional",
+			"value": nil,
 		}
 	}
 	{{else if or $field.IsEnum (eq $field.Type.GoType "types.NUMERIC") (eq $field.Type.GoType "types.DECIMAL")}}

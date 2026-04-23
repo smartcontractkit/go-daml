@@ -96,6 +96,62 @@ func TestBindWithSetField(t *testing.T) {
 	}
 }
 
+func TestBindUsesSharedNestedToDAMLValueHelper(t *testing.T) {
+	structs := map[string]*model.TmplStruct{
+		"CommitteeVerifier": {
+			Name:       "CommitteeVerifier",
+			ModuleName: "CCIP",
+			RawType:    "Template",
+			IsTemplate: true,
+			Fields: []*model.TmplField{
+				{Name: "operator", Type: model.Party{}},
+			},
+		},
+		"DeployCommitteeVerifier": {
+			Name:       "DeployCommitteeVerifier",
+			ModuleName: "CCIP",
+			RawType:    "Record",
+			Fields: []*model.TmplField{
+				{Name: "contract", Type: model.Unknown{String: "CommitteeVerifier"}},
+			},
+		},
+		"CCIPFactory": {
+			Name:       "CCIPFactory",
+			ModuleName: "CCIP",
+			RawType:    "Template",
+			IsTemplate: true,
+			Fields: []*model.TmplField{
+				{Name: "operator", Type: model.Party{}},
+			},
+			Choices: []*model.TmplChoice{
+				{Name: "deployCommitteeVerifier", ArgType: model.Unknown{String: "DeployCommitteeVerifier"}},
+			},
+		},
+	}
+
+	pkg := &model.Package{
+		Name:    "test-package",
+		Structs: structs,
+	}
+
+	result, err := Bind("main", pkg, "2.0.0", true, false)
+	if err != nil {
+		t.Fatalf("Bind failed: %v", err)
+	}
+
+	if strings.Contains(result, "func nestedToDAMLValue(v any) any") {
+		t.Error("Generated code should not emit a per-package nested helper")
+	}
+
+	if !strings.Contains(result, "model.NestedToDAMLValue") {
+		t.Error("Generated code should use model.NestedToDAMLValue for nested values")
+	}
+
+	if !strings.Contains(result, `m["contract"] = model.NestedToDAMLValue(t.Contract)`) {
+		t.Error("Generated code should use shared helper for nested template fields")
+	}
+}
+
 func TestBindWithRelTimeField(t *testing.T) {
 	structs := map[string]*model.TmplStruct{
 		"Schedule": {
