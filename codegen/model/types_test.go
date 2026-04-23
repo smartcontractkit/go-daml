@@ -63,3 +63,30 @@ func TestTextMapGoTypeUntypedFallsBack(t *testing.T) {
 		t.Errorf("TextMap.GoType() = %q, want %q", got, "types.TEXTMAP")
 	}
 }
+
+func TestGenMapGoImportsIncludesKeyAndValueImports(t *testing.T) {
+	keyPkg := ExternalPackage{Import: "example.com/keypkg", Alias: "keypkg"}
+	valPkg := ExternalPackage{Import: "example.com/valpkg", Alias: "valpkg"}
+
+	gm := GenMap{
+		Key: Imported{
+			Underlying:      Unknown{String: "KeyType"},
+			ExternalPackage: keyPkg,
+		},
+		Value: Imported{
+			Underlying:      Unknown{String: "ValueType"},
+			ExternalPackage: valPkg,
+		},
+	}
+
+	got := gm.GoImports()
+	if len(got) != 2 {
+		t.Fatalf("GenMap.GoImports() len = %d, want 2", len(got))
+	}
+	if got[0] != keyPkg {
+		t.Fatalf("GenMap.GoImports()[0] = %+v, want %+v", got[0], keyPkg)
+	}
+	if got[1] != valPkg {
+		t.Fatalf("GenMap.GoImports()[1] = %+v, want %+v", got[1], valPkg)
+	}
+}

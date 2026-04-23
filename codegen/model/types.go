@@ -20,12 +20,12 @@ type ExternalPackage struct {
 
 type DamlType interface {
 	GoType() string
-	GoImport() *ExternalPackage
+	GoImports() []ExternalPackage
 }
 
 type noImport struct{}
 
-func (noImport) GoImport() *ExternalPackage { return nil }
+func (noImport) GoImports() []ExternalPackage { return nil }
 
 type List struct {
 	Inner DamlType
@@ -35,11 +35,11 @@ func (t List) GoType() string {
 	return "[]" + t.Inner.GoType()
 }
 
-func (t List) GoImport() *ExternalPackage {
+func (t List) GoImports() []ExternalPackage {
 	if t.Inner == nil {
 		return nil
 	}
-	return t.Inner.GoImport()
+	return t.Inner.GoImports()
 }
 
 type Party struct {
@@ -177,11 +177,11 @@ func (t Optional) GoType() string {
 	return "*" + t.Inner.GoType()
 }
 
-func (t Optional) GoImport() *ExternalPackage {
+func (t Optional) GoImports() []ExternalPackage {
 	if t.Inner == nil {
 		return nil
 	}
-	return t.Inner.GoImport()
+	return t.Inner.GoImports()
 }
 
 type ContractId struct {
@@ -208,16 +208,15 @@ func (t GenMap) GoType() string {
 	return "map[" + t.Key.GoType() + "]" + t.Value.GoType()
 }
 
-func (t GenMap) GoImport() *ExternalPackage {
+func (t GenMap) GoImports() []ExternalPackage {
+	var imports []ExternalPackage
 	if t.Key != nil {
-		if pkg := t.Key.GoImport(); pkg != nil {
-			return pkg
-		}
+		imports = append(imports, t.Key.GoImports()...)
 	}
 	if t.Value != nil {
-		return t.Value.GoImport()
+		imports = append(imports, t.Value.GoImports()...)
 	}
-	return nil
+	return imports
 }
 
 type TextMap struct {
@@ -232,9 +231,9 @@ func (t TextMap) GoType() string {
 	return "map[string]" + t.Value.GoType()
 }
 
-func (t TextMap) GoImport() *ExternalPackage {
+func (t TextMap) GoImports() []ExternalPackage {
 	if t.Value != nil {
-		return t.Value.GoImport()
+		return t.Value.GoImports()
 	}
 	return nil
 }
@@ -296,8 +295,8 @@ func (t Imported) GoType() string {
 	return t.ExternalPackage.Alias + "." + t.Underlying.GoType()
 }
 
-func (t Imported) GoImport() *ExternalPackage {
-	return &t.ExternalPackage
+func (t Imported) GoImports() []ExternalPackage {
+	return []ExternalPackage{t.ExternalPackage}
 }
 
 type Unknown struct {
