@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"reflect"
 	"time"
+
+	"github.com/smartcontractkit/go-daml/pkg/types"
 )
 
 type Commands struct {
@@ -82,6 +84,14 @@ type createCommander interface {
 func NestedToDAMLValue(v any) any {
 	if mapper, ok := v.(damlMapper); ok {
 		return mapper.ToMap()
+	}
+
+	if set, ok := v.(types.SET); ok {
+		res := make(types.SET, len(set))
+		for i, elem := range set {
+			res[i] = NestedToDAMLValue(elem)
+		}
+		return res
 	}
 
 	if creator, ok := v.(createCommander); ok {
