@@ -598,6 +598,13 @@ func (c *codeGenAst) extractTapp(pkg *daml.Package, tapp *daml.Type_TApp) model.
 	case model.Optional:
 		rhs := c.extractType(pkg, tapp.GetRhs())
 		return model.Optional{Inner: rhs}
+	case model.TextMap:
+		rhs := c.extractType(pkg, tapp.GetRhs())
+		textMap := lhs.(model.TextMap)
+		if textMap.Value == nil {
+			textMap.Value = rhs
+		}
+		return textMap
 	case model.GenMap:
 		rhs := c.extractType(pkg, tapp.GetRhs())
 		genMap := lhs.(model.GenMap)
@@ -719,7 +726,12 @@ func (c *codeGenAst) handleBuiltinType(pkg *daml.Package, b *daml.Type_Builtin) 
 	case daml.BuiltinType_FAILURE_CATEGORY:
 		return model.Unknown{}
 	case daml.BuiltinType_TEXTMAP:
-		return model.TextMap{}
+		if b.Args == nil || len(b.Args) == 0 {
+			return model.TextMap{}
+		}
+		return model.TextMap{
+			Value: c.extractType(pkg, b.Args[0]),
+		}
 	case daml.BuiltinType_BIGNUMERIC:
 		return model.BigNumeric{}
 	case daml.BuiltinType_ROUNDING_MODE:

@@ -39,7 +39,7 @@ var (
   {{- else if eq $baseType "types.DATE" -}}*t.{{capitalise .Name}}
   {{- else if eq $baseType "types.TIMESTAMP" -}}*t.{{capitalise .Name}}
   {{- else if eq $baseType "types.UNIT" -}}map[string]any{"_type": "unit"}
-  {{- else -}}*t.{{capitalise .Name}}
+  {{- else -}}model.NestedToDAMLValue(*t.{{capitalise .Name}})
   {{- end -}}
 {{- else -}}
   {{- if eq .Type.GoType "types.PARTY" -}}t.{{capitalise .Name}}.ToMap()
@@ -72,12 +72,7 @@ var (
         {{- else if eq $elem "types.DECIMAL" -}}
           res = append(res, (*big.Int)(e))
         {{- else -}}
-          type mapper interface{ toMap() map[string]any }
-          if m, ok := any(e).(mapper); ok {
-            res = append(res, m.toMap())
-          } else {
-            res = append(res, e)
-          }
+          res = append(res, model.NestedToDAMLValue(e))
         {{- end -}}
       }
       return res
@@ -93,17 +88,18 @@ var (
       return map[string]any{"_type": "genmap", "value": t.{{capitalise .Name}}}
     }()
 
+  {{- else if isTextMapType .Type -}}
+    func() any {
+      if t.{{capitalise .Name}} == nil {
+        return map[string]any{"_type": "textmap", "value": map[string]any{}}
+      }
+      return map[string]any{"_type": "textmap", "value": t.{{capitalise .Name}}}
+    }()
+
   {{- else if eq .Type.GoType "types.MAP" -}}t.{{capitalise .Name}}
   {{- else if eq .Type.GoType "types.OPTIONAL" -}}t.{{capitalise .Name}}
   {{- else if eq .Type.GoType "string" -}}string(t.{{capitalise .Name}})
-  {{- else -}}
-    func() any {
-      type mapper interface{ toMap() map[string]any }
-      if m, ok := any(t.{{capitalise .Name}}).(mapper); ok {
-        return m.toMap()
-      }
-      return t.{{capitalise .Name}}
-    }()
+  {{- else -}}model.NestedToDAMLValue(t.{{capitalise .Name}})
   {{- end -}}
 {{- end -}}
 {{end}}
@@ -120,6 +116,7 @@ var (
 {{- else if eq .Type.GoType "types.LIST" -}}len(t.{{capitalise .Name}}) > 0
 {{- else if stringsHasPrefix .Type.GoType "[]" -}}len(t.{{capitalise .Name}}) > 0
 {{- else if isGenMapType .Type -}}t.{{capitalise .Name}} != nil && len(t.{{capitalise .Name}}) > 0
+{{- else if isTextMapType .Type -}}t.{{capitalise .Name}} != nil && len(t.{{capitalise .Name}}) > 0
 {{- else if eq .Type.GoType "types.MAP" -}}t.{{capitalise .Name}} != nil && len(t.{{capitalise .Name}}) > 0
 {{- else if eq .Type.GoType "types.OPTIONAL" -}}t.{{capitalise .Name}} != nil
 {{- else if .IsOptional -}}t.{{capitalise .Name}} != nil

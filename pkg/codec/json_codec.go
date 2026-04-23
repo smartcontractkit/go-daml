@@ -871,6 +871,10 @@ func (codec *JsonCodec) assignReflectMapValue(jsonValue interface{}, target refl
 		return fmt.Errorf("expected object for map, got %T", jsonValue)
 	}
 
+	if typeStr, ok := m["_type"].(string); ok && typeStr == "genmap" {
+		return codec.assignGenMapEntriesValue(m["entries"], target)
+	}
+
 	result := reflect.MakeMapWithSize(target.Type(), len(m))
 	keyType := target.Type().Key()
 	elemType := target.Type().Elem()
@@ -886,6 +890,41 @@ func (codec *JsonCodec) assignReflectMapValue(jsonValue interface{}, target refl
 			elem.Set(reflect.Zero(elemType))
 		} else if err := codec.assignValue(rawValue, elem); err != nil {
 			return fmt.Errorf("failed to assign map value for key %q: %w", rawKey, err)
+		}
+
+		result.SetMapIndex(key, elem)
+	}
+
+	target.Set(result)
+	return nil
+}
+
+func (codec *JsonCodec) assignGenMapEntriesValue(jsonValue interface{}, target reflect.Value) error {
+	entries, ok := jsonValue.([]interface{})
+	if !ok {
+		return fmt.Errorf("expected entries array for genmap, got %T", jsonValue)
+	}
+
+	result := reflect.MakeMapWithSize(target.Type(), len(entries))
+	keyType := target.Type().Key()
+	elemType := target.Type().Elem()
+
+	for i, rawEntry := range entries {
+		entry, ok := rawEntry.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("expected object for genmap entry %d, got %T", i, rawEntry)
+		}
+
+		key := reflect.New(keyType).Elem()
+		if err := codec.assignValue(entry["key"], key); err != nil {
+			return fmt.Errorf("failed to assign genmap key %d: %w", i, err)
+		}
+
+		elem := reflect.New(elemType).Elem()
+		if rawValue, exists := entry["value"]; !exists || rawValue == nil {
+			elem.Set(reflect.Zero(elemType))
+		} else if err := codec.assignValue(rawValue, elem); err != nil {
+			return fmt.Errorf("failed to assign genmap value %d: %w", i, err)
 		}
 
 		result.SetMapIndex(key, elem)

@@ -2,6 +2,7 @@ package model
 
 import (
 	"fmt"
+	"reflect"
 	"time"
 )
 
@@ -67,6 +68,57 @@ type ExerciseByKeyCommand struct {
 }
 
 func (ExerciseByKeyCommand) isCommandType() {}
+
+type damlMapper interface {
+	ToMap() map[string]any
+}
+
+type createCommander interface {
+	CreateCommand() *CreateCommand
+}
+
+// NestedToDAMLValue preserves compatibility with bindings generated before the
+// inline conversion template replaced this helper.
+func NestedToDAMLValue(v any) any {
+	if mapper, ok := v.(damlMapper); ok {
+		return mapper.ToMap()
+	}
+
+	if creator, ok := v.(createCommander); ok {
+		if cmd := creator.CreateCommand(); cmd != nil {
+			return cmd.Arguments
+		}
+	}
+
+	rv := reflect.ValueOf(v)
+	if !rv.IsValid() {
+		return nil
+	}
+
+	switch rv.Kind() {
+	case reflect.Slice, reflect.Array:
+		res := make([]any, rv.Len())
+		for i := 0; i < rv.Len(); i++ {
+			res[i] = NestedToDAMLValue(rv.Index(i).Interface())
+		}
+		return res
+	case reflect.Map:
+		if rv.Type() == reflect.TypeOf(map[string]any{}) {
+			res := make(map[string]any, rv.Len())
+			for _, key := range rv.MapKeys() {
+				res[key.String()] = NestedToDAMLValue(rv.MapIndex(key).Interface())
+			}
+			return res
+		}
+	case reflect.Ptr:
+		if rv.IsNil() {
+			return nil
+		}
+		return NestedToDAMLValue(rv.Elem().Interface())
+	}
+
+	return v
+}
 
 type CompletionStreamRequest struct {
 	UserID         string

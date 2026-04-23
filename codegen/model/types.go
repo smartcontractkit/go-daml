@@ -36,6 +36,9 @@ func (t List) GoType() string {
 }
 
 func (t List) GoImport() *ExternalPackage {
+	if t.Inner == nil {
+		return nil
+	}
 	return t.Inner.GoImport()
 }
 
@@ -175,6 +178,9 @@ func (t Optional) GoType() string {
 }
 
 func (t Optional) GoImport() *ExternalPackage {
+	if t.Inner == nil {
+		return nil
+	}
 	return t.Inner.GoImport()
 }
 
@@ -215,11 +221,22 @@ func (t GenMap) GoImport() *ExternalPackage {
 }
 
 type TextMap struct {
+	Value DamlType
 	noImport
 }
 
 func (t TextMap) GoType() string {
-	return "types.TEXTMAP"
+	if t.Value == nil {
+		return "types.TEXTMAP"
+	}
+	return "map[string]" + t.Value.GoType()
+}
+
+func (t TextMap) GoImport() *ExternalPackage {
+	if t.Value != nil {
+		return t.Value.GoImport()
+	}
+	return nil
 }
 
 type BigNumeric struct {

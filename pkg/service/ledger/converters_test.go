@@ -2045,6 +2045,40 @@ func TestConvertToRecordGENMAP(t *testing.T) {
 }
 
 func TestConvertToRecordOptionalWithMaps(t *testing.T) {
+	t.Run("Optional with raw typed GenMap", func(t *testing.T) {
+		optionalData := map[string]interface{}{
+			"_type": "optional",
+			"value": map[types.INT64]types.BOOL{
+				1: true,
+				2: false,
+			},
+		}
+
+		data := map[string]interface{}{
+			"optionalMap": optionalData,
+		}
+
+		record := convertToRecord(data)
+
+		require.NotNil(t, record)
+		require.Len(t, record.Fields, 1)
+
+		optionalValue := record.Fields[0].Value.GetOptional()
+		require.NotNil(t, optionalValue)
+		require.NotNil(t, optionalValue.Value)
+
+		genMap := optionalValue.Value.GetGenMap()
+		require.NotNil(t, genMap)
+		require.Len(t, genMap.Entries, 2)
+
+		entriesMap := make(map[int64]bool)
+		for _, entry := range genMap.Entries {
+			entriesMap[entry.Key.GetInt64()] = entry.Value.GetBool()
+		}
+
+		require.Equal(t, map[int64]bool{1: true, 2: false}, entriesMap)
+	})
+
 	t.Run("Optional with GenMap", func(t *testing.T) {
 		optionalData := map[string]interface{}{
 			"_type": "optional",
@@ -2122,6 +2156,81 @@ func TestConvertToRecordOptionalWithMaps(t *testing.T) {
 
 		require.Equal(t, "value1", entriesMap["key1"])
 		require.Equal(t, "value2", entriesMap["key2"])
+	})
+
+	t.Run("Optional with raw typed TextMap", func(t *testing.T) {
+		optionalData := map[string]interface{}{
+			"_type": "optional",
+			"value": map[string]int64{
+				"key1": 1,
+				"key2": 2,
+			},
+		}
+
+		data := map[string]interface{}{
+			"optionalTextMap": optionalData,
+		}
+
+		record := convertToRecord(data)
+
+		require.NotNil(t, record)
+		require.Len(t, record.Fields, 1)
+
+		optionalValue := record.Fields[0].Value.GetOptional()
+		require.NotNil(t, optionalValue)
+		require.NotNil(t, optionalValue.Value)
+
+		textMap := optionalValue.Value.GetTextMap()
+		require.NotNil(t, textMap)
+		require.Len(t, textMap.Entries, 2)
+
+		entriesMap := make(map[string]int64)
+		for _, entry := range textMap.Entries {
+			entriesMap[entry.Key] = entry.Value.GetInt64()
+		}
+
+		require.Equal(t, map[string]int64{"key1": 1, "key2": 2}, entriesMap)
+	})
+
+	t.Run("Optional with typed TextMap", func(t *testing.T) {
+		textMapValue := map[string]int64{
+			"key1": 1,
+			"key2": 2,
+		}
+
+		optionalData := map[string]interface{}{
+			"_type": "optional",
+			"value": map[string]interface{}{
+				"_type": "textmap",
+				"value": textMapValue,
+			},
+		}
+
+		data := map[string]interface{}{
+			"optionalTextMap": optionalData,
+		}
+
+		record := convertToRecord(data)
+
+		require.NotNil(t, record)
+		require.Len(t, record.Fields, 1)
+		require.Equal(t, "optionalTextMap", record.Fields[0].Label)
+
+		optionalValue := record.Fields[0].Value.GetOptional()
+		require.NotNil(t, optionalValue)
+		require.NotNil(t, optionalValue.Value)
+
+		textMap := optionalValue.Value.GetTextMap()
+		require.NotNil(t, textMap)
+		require.Len(t, textMap.Entries, 2)
+
+		entriesMap := make(map[string]int64)
+		for _, entry := range textMap.Entries {
+			entriesMap[entry.Key] = entry.Value.GetInt64()
+		}
+
+		require.Equal(t, int64(1), entriesMap["key1"])
+		require.Equal(t, int64(2), entriesMap["key2"])
 	})
 
 	t.Run("Optional without map value (None)", func(t *testing.T) {
@@ -2214,6 +2323,63 @@ func TestConvertToRecordOptionalWithMaps(t *testing.T) {
 		optEmptyMap := fieldMap["maybeEmptyMap"].Value.GetOptional()
 		require.NotNil(t, optEmptyMap)
 		require.Nil(t, optEmptyMap.Value)
+	})
+}
+
+func TestConvertToRecordNestedRawTypedMaps(t *testing.T) {
+	t.Run("List of raw typed maps", func(t *testing.T) {
+		data := map[string]interface{}{
+			"maps": []interface{}{
+				map[string]int64{"a": 1},
+				map[types.INT64]types.TEXT{1: "one"},
+			},
+		}
+
+		record := convertToRecord(data)
+		require.NotNil(t, record)
+		require.Len(t, record.Fields, 1)
+
+		list := record.Fields[0].Value.GetList()
+		require.NotNil(t, list)
+		require.Len(t, list.Elements, 2)
+
+		firstTextMap := list.Elements[0].GetTextMap()
+		require.NotNil(t, firstTextMap)
+		require.Len(t, firstTextMap.Entries, 1)
+		require.Equal(t, "a", firstTextMap.Entries[0].Key)
+		require.Equal(t, int64(1), firstTextMap.Entries[0].Value.GetInt64())
+
+		secondGenMap := list.Elements[1].GetGenMap()
+		require.NotNil(t, secondGenMap)
+		require.Len(t, secondGenMap.Entries, 1)
+		require.Equal(t, int64(1), secondGenMap.Entries[0].Key.GetInt64())
+		require.Equal(t, "one", secondGenMap.Entries[0].Value.GetText())
+	})
+
+	t.Run("Nested raw typed map inside GenMap value", func(t *testing.T) {
+		data := map[string]interface{}{
+			"nested": map[string]interface{}{
+				"_type": "genmap",
+				"value": map[types.INT64]interface{}{
+					1: map[string]int64{"count": 3},
+				},
+			},
+		}
+
+		record := convertToRecord(data)
+		require.NotNil(t, record)
+		require.Len(t, record.Fields, 1)
+
+		genMap := record.Fields[0].Value.GetGenMap()
+		require.NotNil(t, genMap)
+		require.Len(t, genMap.Entries, 1)
+		require.Equal(t, int64(1), genMap.Entries[0].Key.GetInt64())
+
+		nestedTextMap := genMap.Entries[0].Value.GetTextMap()
+		require.NotNil(t, nestedTextMap)
+		require.Len(t, nestedTextMap.Entries, 1)
+		require.Equal(t, "count", nestedTextMap.Entries[0].Key)
+		require.Equal(t, int64(3), nestedTextMap.Entries[0].Value.GetInt64())
 	})
 }
 
@@ -2646,6 +2812,44 @@ func TestValueFromProto(t *testing.T) {
 		require.True(t, ok)
 		require.Equal(t, "first", resultMap["1"])
 		require.Equal(t, "second", resultMap["2"])
+	})
+
+	t.Run("RecordToStruct with typed GenMap preserves key types", func(t *testing.T) {
+		type holder struct {
+			Values map[types.INT64]types.TEXT `json:"values"`
+		}
+
+		record := &v2.Record{
+			Fields: []*v2.RecordField{
+				{
+					Label: "values",
+					Value: &v2.Value{
+						Sum: &v2.Value_GenMap{
+							GenMap: &v2.GenMap{
+								Entries: []*v2.GenMap_Entry{
+									{
+										Key:   &v2.Value{Sum: &v2.Value_Int64{Int64: 1}},
+										Value: &v2.Value{Sum: &v2.Value_Text{Text: "first"}},
+									},
+									{
+										Key:   &v2.Value{Sum: &v2.Value_Int64{Int64: 2}},
+										Value: &v2.Value{Sum: &v2.Value_Text{Text: "second"}},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+
+		var out holder
+		err := RecordToStruct(record, &out)
+		require.NoError(t, err)
+		require.Equal(t, map[types.INT64]types.TEXT{
+			1: "first",
+			2: "second",
+		}, out.Values)
 	})
 
 	t.Run("Nil value", func(t *testing.T) {

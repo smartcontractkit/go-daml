@@ -107,3 +107,17 @@ func TestRenameTypeRefs_RenamesNestedGenMapValue(t *testing.T) {
 		Value: model.Unknown{String: "DestChainConfig2"},
 	}, got)
 }
+
+func TestRenameTypeRefs_RenamesNestedTextMapValue(t *testing.T) {
+	renamedStructs := map[string]*model.TmplStruct{
+		"DestChainConfig": {Name: "DestChainConfig2"},
+	}
+
+	got := renameTypeRefs(model.TextMap{
+		Value: model.Unknown{String: "DestChainConfig"},
+	}, renamedStructs)
+
+	require.Equal(t, model.TextMap{
+		Value: model.Unknown{String: "DestChainConfig2"},
+	}, got)
+}

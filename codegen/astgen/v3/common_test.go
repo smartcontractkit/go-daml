@@ -265,3 +265,49 @@ func TestExtractTapp_CurriedGenMapPreservesTypeArgs(t *testing.T) {
 		Value: model.Bool{},
 	}, got)
 }
+
+func TestHandleBuiltinType_TextMapPreservesTypeArg(t *testing.T) {
+	codeGen := &codeGenAst{}
+
+	got := codeGen.handleBuiltinType(nil, &daml.Type_Builtin{
+		Builtin: daml.BuiltinType_TEXTMAP,
+		Args: []*daml.Type{
+			{
+				Sum: &daml.Type_Builtin_{
+					Builtin: &daml.Type_Builtin{Builtin: daml.BuiltinType_NUMERIC},
+				},
+			},
+		},
+	})
+
+	require.Equal(t, model.TextMap{
+		Value: model.Numeric{},
+	}, got)
+}
+
+func TestExtractTapp_CurriedTextMapPreservesTypeArg(t *testing.T) {
+	codeGen := &codeGenAst{}
+
+	curried := &daml.Type{
+		Sum: &daml.Type_Tapp{
+			Tapp: &daml.Type_TApp{
+				Lhs: &daml.Type{
+					Sum: &daml.Type_Builtin_{
+						Builtin: &daml.Type_Builtin{Builtin: daml.BuiltinType_TEXTMAP},
+					},
+				},
+				Rhs: &daml.Type{
+					Sum: &daml.Type_Builtin_{
+						Builtin: &daml.Type_Builtin{Builtin: daml.BuiltinType_BOOL},
+					},
+				},
+			},
+		},
+	}
+
+	got := codeGen.extractType(nil, curried)
+
+	require.Equal(t, model.TextMap{
+		Value: model.Bool{},
+	}, got)
+}

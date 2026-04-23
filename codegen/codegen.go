@@ -349,6 +349,11 @@ func renameTypeRefs(t model2.DamlType, renamedStructs map[string]*model2.TmplStr
 			v.Value = renameTypeRefs(v.Value, renamedStructs)
 		}
 		return v
+	case model2.TextMap:
+		if v.Value != nil {
+			v.Value = renameTypeRefs(v.Value, renamedStructs)
+		}
+		return v
 	case model2.Imported:
 		if v.Underlying != nil {
 			v.Underlying = renameTypeRefs(v.Underlying, renamedStructs)

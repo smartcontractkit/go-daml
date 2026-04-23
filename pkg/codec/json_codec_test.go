@@ -588,6 +588,25 @@ func TestJsonCodec_RoundTrip_WithNumericAsNumber(t *testing.T) {
 	assert.Nil(t, result.Optional)
 }
 
+func TestJsonCodec_Unmarshal_GenMapEntriesToTypedMap(t *testing.T) {
+	codec := NewJsonCodec()
+
+	var result map[INT64]BOOL
+	err := codec.Unmarshal([]byte(`{
+		"_type": "genmap",
+		"entries": [
+			{"key": 1, "value": true},
+			{"key": 2, "value": false}
+		]
+	}`), &result)
+	require.NoError(t, err)
+
+	require.Equal(t, map[INT64]BOOL{
+		INT64(1): BOOL(true),
+		INT64(2): BOOL(false),
+	}, result)
+}
+
 func TestJsonCodec_Marshal_RELTIME(t *testing.T) {
 	codec := NewJsonCodec()
 
