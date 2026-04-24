@@ -168,7 +168,7 @@ func TestGenerateWithCustomTypes(t *testing.T) {
 // 3. List fields use "decodeList encoded offset decodeXAt" not "decodeXAt encoded offset"
 func TestGenerateGenericListAndCustomDecode(t *testing.T) {
 	module := &damlparser.ParsedModule{
-		ModuleName: "Test.FeeQuoterTypes",
+		ModuleName: "Test.PricingTypes",
 		Records: []damlparser.ParsedRecord{
 			{
 				Name: "PriceUpdates",
@@ -187,7 +187,7 @@ func TestGenerateGenericListAndCustomDecode(t *testing.T) {
 			{
 				Name: "GasPriceUpdate",
 				Fields: []damlparser.ParsedField{
-					{Name: "destChainSelector", TypeExpr: "Numeric 0"},
+					{Name: "routeSelector", TypeExpr: "Numeric 0"},
 					{Name: "usdPerUnitGas", TypeExpr: "Numeric 0"},
 				},
 			},
@@ -195,8 +195,8 @@ func TestGenerateGenericListAndCustomDecode(t *testing.T) {
 	}
 
 	config := DamlCodecConfig{
-		ModuleName:  "Test.FeeQuoterCodecGen",
-		TypesModule: "Test.FeeQuoterTypes",
+		ModuleName:  "Test.PricingCodecGen",
+		TypesModule: "Test.PricingTypes",
 		CustomTypeCodecs: map[string]CustomCodec{
 			"InstrumentId": {
 				EncodeFunc:     "encodeInstrumentId",

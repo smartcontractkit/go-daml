@@ -103,6 +103,10 @@ type FieldHints struct {
 	// a map of constructor names to their numeric tag bytes for MCMS encoding.
 	// Example: {"MyModule.TransferTimeout": {"Indefinite": 0x00, "RelativeHours": 0x01}}
 	VariantTagByteMap map[string]map[string]byte
+	// ChoiceParamEncoderNames: function/choice names whose corresponding <Name>Params record
+	// should get a typed encoder even when <Name> is not a Daml template choice.
+	// This is useful for dispatcher-style operationData payloads.
+	ChoiceParamEncoderNames map[string]bool
 }
 
 type Int64 struct {
