@@ -167,6 +167,10 @@ func (c *HexCodec) encode(value interface{}) ([]byte, error) {
 		return c.encodeSlice(rv)
 	}
 
+	if rv.Kind() == reflect.Map {
+		return c.encodeReflectMap(rv)
+	}
+
 	return nil, fmt.Errorf("unsupported type for hex encoding: %T", value)
 }
 
@@ -471,6 +475,30 @@ func (c *HexCodec) encodeGenMap(m map[string]interface{}) ([]byte, error) {
 	return result, nil
 }
 
+func (c *HexCodec) encodeReflectMap(rv reflect.Value) ([]byte, error) {
+	length := rv.Len()
+	if length > 255 {
+		return nil, fmt.Errorf("map length %d exceeds max 255", length)
+	}
+
+	result := []byte{byte(length)}
+	for _, key := range rv.MapKeys() {
+		keyEncoded, err := c.encode(key.Interface())
+		if err != nil {
+			return nil, fmt.Errorf("failed to encode map key %v: %w", key.Interface(), err)
+		}
+		result = append(result, keyEncoded...)
+
+		valueEncoded, err := c.encode(rv.MapIndex(key).Interface())
+		if err != nil {
+			return nil, fmt.Errorf("failed to encode map value for key %v: %w", key.Interface(), err)
+		}
+		result = append(result, valueEncoded...)
+	}
+
+	return result, nil
+}
+
 func (c *HexCodec) encodeVariant(v types.VARIANT) ([]byte, error) {
 	var result []byte
 	var err error
@@ -722,6 +750,9 @@ func (c *HexCodec) decodeValue(data []byte, offset int, target reflect.Value) (i
 	case reflect.Slice:
 		return c.decodeSlice(data, offset, target)
 
+	case reflect.Map:
+		return c.decodeMap(data, offset, target)
+
 	case reflect.Struct:
 		return c.decodeStruct(data, offset, target)
 
@@ -760,6 +791,39 @@ func (c *HexCodec) decodeSlice(data []byte, offset int, target reflect.Value) (i
 		}
 	}
 	target.Set(slice)
+	return offset, nil
+}
+
+func (c *HexCodec) decodeMap(data []byte, offset int, target reflect.Value) (int, error) {
+	if offset >= len(data) {
+		return offset, fmt.Errorf("not enough data for map length at offset %d", offset)
+	}
+	if target.Type().Elem().Kind() == reflect.Interface {
+		return offset, fmt.Errorf("cannot decode map with interface values without concrete type information: %v", target.Type())
+	}
+
+	length := int(data[offset])
+	offset++
+
+	result := reflect.MakeMapWithSize(target.Type(), length)
+	for i := 0; i < length; i++ {
+		key := reflect.New(target.Type().Key()).Elem()
+		var err error
+		offset, err = c.decodeValue(data, offset, key)
+		if err != nil {
+			return offset, fmt.Errorf("failed to decode map key %d: %w", i, err)
+		}
+
+		value := reflect.New(target.Type().Elem()).Elem()
+		offset, err = c.decodeValue(data, offset, value)
+		if err != nil {
+			return offset, fmt.Errorf("failed to decode map value %d: %w", i, err)
+		}
+
+		result.SetMapIndex(key, value)
+	}
+
+	target.Set(result)
 	return offset, nil
 }
 

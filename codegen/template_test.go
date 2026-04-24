@@ -178,6 +178,77 @@ func TestBindWithRelTimeField(t *testing.T) {
 	}
 }
 
+func TestBindWithTypedGenMapField(t *testing.T) {
+	structs := map[string]*model.TmplStruct{
+		"MapHolder": {
+			Name:    "MapHolder",
+			RawType: "Record",
+			Fields: []*model.TmplField{
+				{
+					Name: "values",
+					Type: model.GenMap{
+						Key:   model.Text{},
+						Value: model.Numeric{},
+					},
+				},
+			},
+		},
+	}
+
+	pkg := &model.Package{
+		Name:    "test-package",
+		Structs: structs,
+	}
+
+	result, err := Bind("main", pkg, "2.0.0", true, false)
+	if err != nil {
+		t.Fatalf("Bind failed: %v", err)
+	}
+
+	if !strings.Contains(result, "Values map[types.TEXT]types.NUMERIC") {
+		t.Fatalf("generated code should contain typed GENMAP field, got:\n%s", result)
+	}
+
+	if !strings.Contains(result, `"genmap"`) || !strings.Contains(result, `"value": t.Values`) {
+		t.Fatalf("generated code should wrap typed GENMAP fields for DAML encoding, got:\n%s", result)
+	}
+}
+
+func TestBindWithTypedTextMapField(t *testing.T) {
+	structs := map[string]*model.TmplStruct{
+		"MapHolder": {
+			Name:    "MapHolder",
+			RawType: "Record",
+			Fields: []*model.TmplField{
+				{
+					Name: "values",
+					Type: model.TextMap{
+						Value: model.Numeric{},
+					},
+				},
+			},
+		},
+	}
+
+	pkg := &model.Package{
+		Name:    "test-package",
+		Structs: structs,
+	}
+
+	result, err := Bind("main", pkg, "2.0.0", true, false)
+	if err != nil {
+		t.Fatalf("Bind failed: %v", err)
+	}
+
+	if !strings.Contains(result, "Values map[string]types.NUMERIC") {
+		t.Fatalf("generated code should contain typed TEXTMAP field, got:\n%s", result)
+	}
+
+	if !strings.Contains(result, `"textmap"`) || !strings.Contains(result, `"value": t.Values`) {
+		t.Fatalf("generated code should wrap typed TEXTMAP fields for DAML encoding, got:\n%s", result)
+	}
+}
+
 func TestCapitalize(t *testing.T) {
 	tests := []struct {
 		input    string

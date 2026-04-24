@@ -107,8 +107,8 @@ var _ types.ENUM = Color("")
 
 // MappyContract is a Template type
 type MappyContract struct {
-	Operator types.PARTY   `json:"operator"`
-	Value    types.TEXTMAP `json:"value"`
+	Operator types.PARTY           `json:"operator"`
+	Value    map[string]types.TEXT `json:"value"`
 }
 
 // GetTemplateID returns the template ID for this template using the package name
@@ -129,7 +129,12 @@ func (t MappyContract) CreateCommand() *model.CreateCommand {
 	args["operator"] = t.Operator.ToMap()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["value"] = model.NestedToDAMLValue(t.Value)
+	args["value"] = func() any {
+		if t.Value == nil {
+			return map[string]any{"_type": "textmap", "value": map[string]any{}}
+		}
+		return map[string]any{"_type": "textmap", "value": t.Value}
+	}()
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateID(),
@@ -145,7 +150,12 @@ func (t MappyContract) CreateCommandWithPackageID(packageID string) *model.Creat
 	args["operator"] = t.Operator.ToMap()
 
 	// IMPORTANT: always include non-optional fields (GENMAP/MAP/LIST/[] etc), even if empty
-	args["value"] = model.NestedToDAMLValue(t.Value)
+	args["value"] = func() any {
+		if t.Value == nil {
+			return map[string]any{"_type": "textmap", "value": map[string]any{}}
+		}
+		return map[string]any{"_type": "textmap", "value": t.Value}
+	}()
 
 	return &model.CreateCommand{
 		TemplateID: t.GetTemplateIDWithPackageID(packageID),

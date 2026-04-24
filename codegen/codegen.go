@@ -227,20 +227,11 @@ func CodegenDalfs(dalfToProcess []string, dar fs.FS, pkgFile string, dalfManifes
 		// Update references (unchanged)
 		for _, structDef := range pkg.Structs {
 			for _, field := range structDef.Fields {
-				if renamed, exists := renamedStructs[field.Type.GoType()]; exists {
-					field.Type = model2.Unknown{String: renamed.Name}
-				}
-				trimmedType := strings.TrimPrefix(field.Type.GoType(), "*")
-				trimmedType = strings.TrimPrefix(trimmedType, "[]")
-				if renamed, exists := renamedStructs[trimmedType]; exists {
-					field.Type = model2.Unknown{String: strings.Replace(field.Type.GoType(), trimmedType, renamed.Name, 1)}
-				}
+				field.Type = renameTypeRefs(field.Type, renamedStructs)
 			}
 
 			for _, choice := range structDef.Choices {
-				if renamed, exists := renamedStructs[choice.ArgType.GoType()]; exists {
-					choice.ArgType = model2.Unknown{String: renamed.Name}
-				}
+				choice.ArgType = renameTypeRefs(choice.ArgType, renamedStructs)
 				// if renamed, exists := renamedStructs[choice.ReturnType.GoType()]; exists {
 				// 	choice.ReturnType = model2.Unknown{String: renamed.Name}
 				// }
@@ -340,6 +331,48 @@ func stripVersionFromPackageName(name string) string {
 	// Pattern: hyphen followed by digits and dots (version number)
 	versionPattern := regexp.MustCompile(`-\d+(\.\d+)*$`)
 	return versionPattern.ReplaceAllString(name, "")
+}
+
+func renameTypeRefs(t model2.DamlType, renamedStructs map[string]*model2.TmplStruct) model2.DamlType {
+	switch v := t.(type) {
+	case model2.List:
+		v.Inner = renameTypeRefs(v.Inner, renamedStructs)
+		return v
+	case model2.Optional:
+		v.Inner = renameTypeRefs(v.Inner, renamedStructs)
+		return v
+	case model2.GenMap:
+		if v.Key != nil {
+			v.Key = renameTypeRefs(v.Key, renamedStructs)
+		}
+		if v.Value != nil {
+			v.Value = renameTypeRefs(v.Value, renamedStructs)
+		}
+		return v
+	case model2.TextMap:
+		if v.Value != nil {
+			v.Value = renameTypeRefs(v.Value, renamedStructs)
+		}
+		return v
+	case model2.Imported:
+		if v.Underlying != nil {
+			v.Underlying = renameTypeRefs(v.Underlying, renamedStructs)
+		}
+		return v
+	case model2.Unknown:
+		if renamed, exists := renamedStructs[v.String]; exists {
+			return model2.Unknown{String: renamed.Name}
+		}
+
+		trimmedType := strings.TrimPrefix(v.String, "*")
+		trimmedType = strings.TrimPrefix(trimmedType, "[]")
+		if renamed, exists := renamedStructs[trimmedType]; exists {
+			return model2.Unknown{String: strings.Replace(v.String, trimmedType, renamed.Name, 1)}
+		}
+		return v
+	default:
+		return t
+	}
 }
 
 func GetPackageName(dalf string) string {

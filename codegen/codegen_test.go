@@ -91,3 +91,33 @@ func TestGetPackageName(t *testing.T) {
 	require.Equal(t, "my-package",
 		GetPackageName("My-Package-1.0.0-1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef.dalf"))
 }
+
+func TestRenameTypeRefs_RenamesNestedGenMapValue(t *testing.T) {
+	renamedStructs := map[string]*model.TmplStruct{
+		"DestChainConfig": {Name: "DestChainConfig2"},
+	}
+
+	got := renameTypeRefs(model.GenMap{
+		Key:   model.Numeric{},
+		Value: model.Unknown{String: "DestChainConfig"},
+	}, renamedStructs)
+
+	require.Equal(t, model.GenMap{
+		Key:   model.Numeric{},
+		Value: model.Unknown{String: "DestChainConfig2"},
+	}, got)
+}
+
+func TestRenameTypeRefs_RenamesNestedTextMapValue(t *testing.T) {
+	renamedStructs := map[string]*model.TmplStruct{
+		"DestChainConfig": {Name: "DestChainConfig2"},
+	}
+
+	got := renameTypeRefs(model.TextMap{
+		Value: model.Unknown{String: "DestChainConfig"},
+	}, renamedStructs)
+
+	require.Equal(t, model.TextMap{
+		Value: model.Unknown{String: "DestChainConfig2"},
+	}, got)
+}

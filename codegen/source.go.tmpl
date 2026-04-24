@@ -80,12 +80,20 @@ var (
 
   {{- else if eq .Type.GoType "types.LIST" -}}t.{{capitalise .Name}}
 
-  {{- else if eq .Type.GoType "types.GENMAP" -}}
+  {{- else if isGenMapType .Type -}}
     func() any {
       if t.{{capitalise .Name}} == nil {
         return map[string]any{"_type": "genmap", "value": types.GENMAP{}}
       }
       return map[string]any{"_type": "genmap", "value": t.{{capitalise .Name}}}
+    }()
+
+  {{- else if isTextMapType .Type -}}
+    func() any {
+      if t.{{capitalise .Name}} == nil {
+        return map[string]any{"_type": "textmap", "value": map[string]any{}}
+      }
+      return map[string]any{"_type": "textmap", "value": t.{{capitalise .Name}}}
     }()
 
   {{- else if eq .Type.GoType "types.MAP" -}}t.{{capitalise .Name}}
@@ -107,7 +115,8 @@ var (
 {{- else if eq .Type.GoType "types.TIMESTAMP" -}}!t.{{capitalise .Name}}.IsZero()
 {{- else if eq .Type.GoType "types.LIST" -}}len(t.{{capitalise .Name}}) > 0
 {{- else if stringsHasPrefix .Type.GoType "[]" -}}len(t.{{capitalise .Name}}) > 0
-{{- else if eq .Type.GoType "types.GENMAP" -}}t.{{capitalise .Name}} != nil && len(t.{{capitalise .Name}}) > 0
+{{- else if isGenMapType .Type -}}t.{{capitalise .Name}} != nil && len(t.{{capitalise .Name}}) > 0
+{{- else if isTextMapType .Type -}}t.{{capitalise .Name}} != nil && len(t.{{capitalise .Name}}) > 0
 {{- else if eq .Type.GoType "types.MAP" -}}t.{{capitalise .Name}} != nil && len(t.{{capitalise .Name}}) > 0
 {{- else if eq .Type.GoType "types.OPTIONAL" -}}t.{{capitalise .Name}} != nil
 {{- else if .IsOptional -}}t.{{capitalise .Name}} != nil

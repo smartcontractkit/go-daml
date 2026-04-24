@@ -20,12 +20,12 @@ type ExternalPackage struct {
 
 type DamlType interface {
 	GoType() string
-	GoImport() *ExternalPackage
+	GoImports() []ExternalPackage
 }
 
 type noImport struct{}
 
-func (noImport) GoImport() *ExternalPackage { return nil }
+func (noImport) GoImports() []ExternalPackage { return nil }
 
 type List struct {
 	Inner DamlType
@@ -35,8 +35,11 @@ func (t List) GoType() string {
 	return "[]" + t.Inner.GoType()
 }
 
-func (t List) GoImport() *ExternalPackage {
-	return t.Inner.GoImport()
+func (t List) GoImports() []ExternalPackage {
+	if t.Inner == nil {
+		return nil
+	}
+	return t.Inner.GoImports()
 }
 
 type Party struct {
@@ -174,8 +177,11 @@ func (t Optional) GoType() string {
 	return "*" + t.Inner.GoType()
 }
 
-func (t Optional) GoImport() *ExternalPackage {
-	return t.Inner.GoImport()
+func (t Optional) GoImports() []ExternalPackage {
+	if t.Inner == nil {
+		return nil
+	}
+	return t.Inner.GoImports()
 }
 
 type ContractId struct {
@@ -187,19 +193,49 @@ func (t ContractId) GoType() string {
 }
 
 type GenMap struct {
+	Key   DamlType
+	Value DamlType
 	noImport
 }
 
 func (t GenMap) GoType() string {
-	return "types.GENMAP"
+	if t.Key == nil || t.Value == nil {
+		return "types.GENMAP"
+	}
+	if !supportsTypedGenMapKey(t.Key) {
+		return "types.GENMAP"
+	}
+	return "map[" + t.Key.GoType() + "]" + t.Value.GoType()
+}
+
+func (t GenMap) GoImports() []ExternalPackage {
+	var imports []ExternalPackage
+	if t.Key != nil {
+		imports = append(imports, t.Key.GoImports()...)
+	}
+	if t.Value != nil {
+		imports = append(imports, t.Value.GoImports()...)
+	}
+	return imports
 }
 
 type TextMap struct {
+	Value DamlType
 	noImport
 }
 
 func (t TextMap) GoType() string {
-	return "types.TEXTMAP"
+	if t.Value == nil {
+		return "types.TEXTMAP"
+	}
+	return "map[string]" + t.Value.GoType()
+}
+
+func (t TextMap) GoImports() []ExternalPackage {
+	if t.Value != nil {
+		return t.Value.GoImports()
+	}
+	return nil
 }
 
 type BigNumeric struct {
@@ -259,8 +295,8 @@ func (t Imported) GoType() string {
 	return t.ExternalPackage.Alias + "." + t.Underlying.GoType()
 }
 
-func (t Imported) GoImport() *ExternalPackage {
-	return &t.ExternalPackage
+func (t Imported) GoImports() []ExternalPackage {
+	return []ExternalPackage{t.ExternalPackage}
 }
 
 type Unknown struct {
@@ -271,4 +307,15 @@ type Unknown struct {
 func (t Unknown) GoType() string {
 	// Retain previous behavior of stripping all underscores, matched what the `capitalise` function in the template does.
 	return strings.ReplaceAll(t.String, "_", "")
+}
+
+func supportsTypedGenMapKey(t DamlType) bool {
+	switch t.(type) {
+	case Party, Text, BytesHex, Int64, Bool, Numeric, ContractId, Enum:
+		return true
+	case Imported:
+		return false
+	default:
+		return false
+	}
 }

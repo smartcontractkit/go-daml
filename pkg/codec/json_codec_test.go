@@ -268,6 +268,10 @@ type ComplexRecord struct {
 	Config   TestRecord             `json:"config"`
 }
 
+type TypedGenMapRecord struct {
+	Values map[TEXT]INT64 `json:"values"`
+}
+
 func TestJsonCodec_Marshal_ComplexNested(t *testing.T) {
 	codec := NewJsonCodec()
 
@@ -308,6 +312,45 @@ func TestJsonCodec_Marshal_ComplexNested(t *testing.T) {
 	assert.Equal(t, true, config["active"])
 	assert.Equal(t, "2000", config["balance"])
 	assert.Equal(t, "nested", config["optional"])
+}
+
+func TestJsonCodec_RoundTrip_TypedGenMap(t *testing.T) {
+	codec := NewJsonCodec()
+	input := TypedGenMapRecord{
+		Values: map[TEXT]INT64{
+			TEXT("alpha"): INT64(1),
+			TEXT("beta"):  INT64(2),
+		},
+	}
+
+	data, err := codec.Marshal(input)
+	require.NoError(t, err)
+
+	var intermediate map[string]interface{}
+	require.NoError(t, json.Unmarshal(data, &intermediate))
+	require.Equal(t, map[string]interface{}{
+		"alpha": "1",
+		"beta":  "2",
+	}, intermediate["values"])
+
+	var output TypedGenMapRecord
+	require.NoError(t, codec.Unmarshal(data, &output))
+	require.Equal(t, input, output)
+}
+
+func TestJsonCodec_Unmarshal_TypedInt64KeyMap(t *testing.T) {
+	codec := NewJsonCodec()
+
+	var target struct {
+		Values map[INT64]TEXT `json:"values"`
+	}
+
+	err := codec.Unmarshal([]byte(`{"values":{"7":"seven","42":"forty-two"}}`), &target)
+	require.NoError(t, err)
+	require.Equal(t, map[INT64]TEXT{
+		INT64(7):  TEXT("seven"),
+		INT64(42): TEXT("forty-two"),
+	}, target.Values)
 }
 
 // ========== UNMARSHAL TESTS ==========
@@ -543,6 +586,25 @@ func TestJsonCodec_RoundTrip_WithNumericAsNumber(t *testing.T) {
 	assert.Equal(t, original.Active, result.Active)
 	assert.Equal(t, string(original.Balance), string(result.Balance))
 	assert.Nil(t, result.Optional)
+}
+
+func TestJsonCodec_Unmarshal_GenMapEntriesToTypedMap(t *testing.T) {
+	codec := NewJsonCodec()
+
+	var result map[INT64]BOOL
+	err := codec.Unmarshal([]byte(`{
+		"_type": "genmap",
+		"entries": [
+			{"key": 1, "value": true},
+			{"key": 2, "value": false}
+		]
+	}`), &result)
+	require.NoError(t, err)
+
+	require.Equal(t, map[INT64]BOOL{
+		INT64(1): BOOL(true),
+		INT64(2): BOOL(false),
+	}, result)
 }
 
 func TestJsonCodec_Marshal_RELTIME(t *testing.T) {

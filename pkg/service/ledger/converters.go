@@ -436,6 +436,69 @@ func valueFromProto(pb *v2.Value) interface{} {
 	}
 }
 
+func valueFromProtoForStruct(pb *v2.Value) interface{} {
+	if pb == nil {
+		return nil
+	}
+
+	switch v := pb.Sum.(type) {
+	case *v2.Value_Optional:
+		if v.Optional == nil || v.Optional.Value == nil {
+			return nil
+		}
+		return valueFromProtoForStruct(v.Optional.Value)
+	case *v2.Value_List:
+		if v.List == nil {
+			return nil
+		}
+		result := make([]interface{}, len(v.List.Elements))
+		for i, elem := range v.List.Elements {
+			result[i] = valueFromProtoForStruct(elem)
+		}
+		return result
+	case *v2.Value_Record:
+		if v.Record == nil {
+			return nil
+		}
+		record := make(map[string]interface{})
+		for _, field := range v.Record.Fields {
+			record[field.Label] = valueFromProtoForStruct(field.Value)
+		}
+		return record
+	case *v2.Value_TextMap:
+		if v.TextMap == nil {
+			return nil
+		}
+		result := make(map[string]interface{})
+		for _, entry := range v.TextMap.Entries {
+			result[entry.Key] = valueFromProtoForStruct(entry.Value)
+		}
+		return result
+	case *v2.Value_Variant:
+		if v.Variant == nil {
+			return nil
+		}
+		return map[string]interface{}{
+			"tag":   v.Variant.Constructor,
+			"value": valueFromProtoForStruct(v.Variant.Value),
+		}
+	case *v2.Value_GenMap:
+		entries := make([]interface{}, 0, len(v.GenMap.Entries))
+		for _, entry := range v.GenMap.Entries {
+			entries = append(entries, map[string]interface{}{
+				"key":   valueFromProtoForStruct(entry.Key),
+				"value": valueFromProtoForStruct(entry.Value),
+			})
+		}
+		return map[string]interface{}{
+			"_type":   "genmap",
+			"entries": entries,
+		}
+	default:
+		return valueFromProto(pb)
+	}
+}
+
 func normalizeLedgerNumericLiteral(s string) (string, bool) {
 	s = strings.TrimSpace(s)
 	if s == "" {
@@ -693,31 +756,17 @@ func mapToValue(data interface{}) *v2.Value {
 		}
 
 		if typeStr, ok := v["_type"].(string); ok && typeStr == "genmap" {
-			if mapValue, ok := v["value"].(map[string]interface{}); ok {
-				return getMapConvert(mapValue)
-			} else if genMapValue, ok := v["value"].(types.GENMAP); ok {
+			if genMapEntries, ok := v["entries"]; ok {
+				return getMapEntriesConvert(genMapEntries)
+			}
+			if genMapValue, ok := v["value"]; ok {
 				return getMapConvert(genMapValue)
 			}
 		}
 
 		if typeStr, ok := v["_type"].(string); ok && typeStr == "textmap" {
-			switch mv := v["value"].(type) {
-			case map[string]interface{}:
-				return getTextMapConvert(mv)
-			case map[string]string:
-				// promote to map[string]interface{}
-				tmp := make(map[string]interface{}, len(mv))
-				for k, val := range mv {
-					tmp[k] = val
-				}
-				return getTextMapConvert(tmp)
-			case types.TEXTMAP:
-				// TEXTMAP is a map-like alias; convert it
-				tmp := make(map[string]interface{}, len(mv))
-				for k, val := range mv {
-					tmp[k] = val
-				}
-				return getTextMapConvert(tmp)
+			if textMapValue, ok := v["value"]; ok {
+				return getTextMapConvert(textMapValue)
 			}
 		}
 
@@ -764,6 +813,10 @@ func mapToValue(data interface{}) *v2.Value {
 			}
 		}
 
+		if rv.Kind() == reflect.Map {
+			return rawMapFromReflectValue(rv)
+		}
+
 		// Check if the value has a ToMap() method
 		method := reflect.ValueOf(v).MethodByName("ToMap")
 		if method.IsValid() && method.Type().NumIn() == 0 && method.Type().NumOut() == 1 {
@@ -780,25 +833,61 @@ func mapToValue(data interface{}) *v2.Value {
 	}
 }
 
-func getMapConvert(genMapValue map[string]interface{}) *v2.Value {
-	entries := make([]*v2.GenMap_Entry, 0, len(genMapValue))
-	for key, val := range genMapValue {
-		// If the key looks like a ledger numeric literal, encode as Numeric.
-		if s, ok := normalizeLedgerNumericLiteral(key); ok {
+func getMapConvert(genMapValue interface{}) *v2.Value {
+	switch v := genMapValue.(type) {
+	case map[string]interface{}:
+		entries := make([]*v2.GenMap_Entry, 0, len(v))
+		for key, val := range v {
+			// If the key looks like a ledger numeric literal, encode as Numeric.
+			if s, ok := normalizeLedgerNumericLiteral(key); ok {
+				entries = append(entries, &v2.GenMap_Entry{
+					Key:   &v2.Value{Sum: &v2.Value_Numeric{Numeric: s}},
+					Value: mapToValue(val),
+				})
+				continue
+			}
+
+			// Otherwise fall back to Text (covers GenMaps keyed by Text, Party, etc.)
 			entries = append(entries, &v2.GenMap_Entry{
-				Key:   &v2.Value{Sum: &v2.Value_Numeric{Numeric: s}},
+				Key:   &v2.Value{Sum: &v2.Value_Text{Text: key}},
 				Value: mapToValue(val),
 			})
-			continue
 		}
+		return genMapEntriesValue(entries)
+	case types.GENMAP:
+		return getMapConvert(map[string]interface{}(v))
+	default:
+		rv := reflect.ValueOf(genMapValue)
+		if rv.IsValid() && rv.Kind() == reflect.Map {
+			return genMapFromReflectValue(rv)
+		}
+	}
 
-		// Otherwise fall back to Text (covers GenMaps keyed by Text, Party, etc.)
-		entries = append(entries, &v2.GenMap_Entry{
-			Key:   &v2.Value{Sum: &v2.Value_Text{Text: key}},
-			Value: mapToValue(val),
+	return nil
+}
+
+func getMapEntriesConvert(genMapEntries interface{}) *v2.Value {
+	entries, ok := genMapEntries.([]interface{})
+	if !ok {
+		return nil
+	}
+
+	result := make([]*v2.GenMap_Entry, 0, len(entries))
+	for _, rawEntry := range entries {
+		entry, ok := rawEntry.(map[string]interface{})
+		if !ok {
+			return nil
+		}
+		result = append(result, &v2.GenMap_Entry{
+			Key:   mapToValue(entry["key"]),
+			Value: mapToValue(entry["value"]),
 		})
 	}
 
+	return genMapEntriesValue(result)
+}
+
+func genMapEntriesValue(entries []*v2.GenMap_Entry) *v2.Value {
 	return &v2.Value{
 		Sum: &v2.Value_GenMap{
 			GenMap: &v2.GenMap{Entries: entries},
@@ -806,14 +895,92 @@ func getMapConvert(genMapValue map[string]interface{}) *v2.Value {
 	}
 }
 
-func getTextMapConvert(values map[string]interface{}) *v2.Value {
-	entries := make([]*v2.TextMap_Entry, 0, len(values))
-	for key, val := range values {
-		entries = append(entries, &v2.TextMap_Entry{
-			Key:   key,
-			Value: mapToValue(val),
+func rawMapFromReflectValue(rv reflect.Value) *v2.Value {
+	if !rv.IsValid() || rv.Kind() != reflect.Map {
+		return nil
+	}
+
+	if rv.Type().Key() == reflect.TypeOf("") {
+		return textMapFromReflectValue(rv)
+	}
+
+	return genMapFromReflectValue(rv)
+}
+
+func genMapFromReflectValue(rv reflect.Value) *v2.Value {
+	if !rv.IsValid() || rv.Kind() != reflect.Map {
+		return nil
+	}
+
+	entries := make([]*v2.GenMap_Entry, 0, rv.Len())
+	for _, key := range rv.MapKeys() {
+		entries = append(entries, &v2.GenMap_Entry{
+			Key:   mapToValue(key.Interface()),
+			Value: mapToValue(rv.MapIndex(key).Interface()),
 		})
 	}
+	return genMapEntriesValue(entries)
+}
+
+func textMapFromReflectValue(rv reflect.Value) *v2.Value {
+	if !rv.IsValid() || rv.Kind() != reflect.Map || rv.Type().Key() != reflect.TypeOf("") {
+		return nil
+	}
+
+	entries := make([]*v2.TextMap_Entry, 0, rv.Len())
+	for _, key := range rv.MapKeys() {
+		entries = append(entries, &v2.TextMap_Entry{
+			Key:   key.String(),
+			Value: mapToValue(rv.MapIndex(key).Interface()),
+		})
+	}
+	return textMapEntriesValue(entries)
+}
+
+func getTextMapConvert(textMapValue interface{}) *v2.Value {
+	switch v := textMapValue.(type) {
+	case map[string]interface{}:
+		entries := make([]*v2.TextMap_Entry, 0, len(v))
+		for key, val := range v {
+			entries = append(entries, &v2.TextMap_Entry{
+				Key:   key,
+				Value: mapToValue(val),
+			})
+		}
+		return textMapEntriesValue(entries)
+	case map[string]string:
+		entries := make([]*v2.TextMap_Entry, 0, len(v))
+		for key, val := range v {
+			entries = append(entries, &v2.TextMap_Entry{
+				Key:   key,
+				Value: mapToValue(val),
+			})
+		}
+		return textMapEntriesValue(entries)
+	case types.TEXTMAP:
+		return getTextMapConvert(map[string]interface{}(v))
+	default:
+		rv := reflect.ValueOf(textMapValue)
+		if rv.IsValid() && rv.Kind() == reflect.Map {
+			if rv.Type().Key().Kind() != reflect.String {
+				return nil
+			}
+
+			entries := make([]*v2.TextMap_Entry, 0, rv.Len())
+			for _, key := range rv.MapKeys() {
+				entries = append(entries, &v2.TextMap_Entry{
+					Key:   key.String(),
+					Value: mapToValue(rv.MapIndex(key).Interface()),
+				})
+			}
+			return textMapEntriesValue(entries)
+		}
+	}
+
+	return nil
+}
+
+func textMapEntriesValue(entries []*v2.TextMap_Entry) *v2.Value {
 	return &v2.Value{
 		Sum: &v2.Value_TextMap{
 			TextMap: &v2.TextMap{
@@ -966,7 +1133,7 @@ func valueFromRecord(record *v2.Record) map[string]interface{} {
 
 	result := make(map[string]interface{})
 	for _, field := range record.Fields {
-		result[field.Label] = valueFromProto(field.Value)
+		result[field.Label] = valueFromProtoForStruct(field.Value)
 	}
 	return result
 }

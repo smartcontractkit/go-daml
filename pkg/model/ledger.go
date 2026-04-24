@@ -2,7 +2,10 @@ package model
 
 import (
 	"fmt"
+	"reflect"
 	"time"
+
+	"github.com/smartcontractkit/go-daml/pkg/types"
 )
 
 type Commands struct {
@@ -76,10 +79,19 @@ type createCommander interface {
 	CreateCommand() *CreateCommand
 }
 
-// NestedToDAMLValue normalizes nested generated values for DAML command arguments.
+// NestedToDAMLValue preserves compatibility with bindings generated before the
+// inline conversion template replaced this helper.
 func NestedToDAMLValue(v any) any {
 	if mapper, ok := v.(damlMapper); ok {
 		return mapper.ToMap()
+	}
+
+	if set, ok := v.(types.SET); ok {
+		res := make(types.SET, len(set))
+		for i, elem := range set {
+			res[i] = NestedToDAMLValue(elem)
+		}
+		return res
 	}
 
 	if creator, ok := v.(createCommander); ok {
@@ -88,6 +100,32 @@ func NestedToDAMLValue(v any) any {
 		}
 	}
 
+	rv := reflect.ValueOf(v)
+	if !rv.IsValid() {
+		return nil
+	}
+
+	switch rv.Kind() {
+	case reflect.Slice, reflect.Array:
+		res := make([]any, rv.Len())
+		for i := 0; i < rv.Len(); i++ {
+			res[i] = NestedToDAMLValue(rv.Index(i).Interface())
+		}
+		return res
+	case reflect.Map:
+		if rv.Type() == reflect.TypeOf(map[string]any{}) {
+			res := make(map[string]any, rv.Len())
+			for _, key := range rv.MapKeys() {
+				res[key.String()] = NestedToDAMLValue(rv.MapIndex(key).Interface())
+			}
+			return res
+		}
+	case reflect.Ptr:
+		if rv.IsNil() {
+			return nil
+		}
+		return NestedToDAMLValue(rv.Elem().Interface())
+	}
 	return v
 }
 

@@ -372,7 +372,10 @@ func (codec *JsonCodec) listToDynamicValueFromReflect(rv reflect.Value) (interfa
 func (codec *JsonCodec) mapToDynamicValueFromReflect(rv reflect.Value) (interface{}, error) {
 	result := make(map[string]interface{})
 	for _, key := range rv.MapKeys() {
-		keyStr := fmt.Sprintf("%v", key.Interface())
+		keyStr, err := stringifyDynamicMapKey(key)
+		if err != nil {
+			return nil, err
+		}
 		value := rv.MapIndex(key).Interface()
 		converted, err := codec.toDynamicValue(value)
 		if err != nil {
@@ -381,6 +384,29 @@ func (codec *JsonCodec) mapToDynamicValueFromReflect(rv reflect.Value) (interfac
 		result[keyStr] = converted
 	}
 	return result, nil
+}
+
+func stringifyDynamicMapKey(key reflect.Value) (string, error) {
+	if !key.IsValid() {
+		return "", fmt.Errorf("invalid map key")
+	}
+
+	if enum, ok := key.Interface().(types.ENUM); ok {
+		return enum.GetEnumConstructor(), nil
+	}
+
+	switch key.Kind() {
+	case reflect.String:
+		return key.String(), nil
+	case reflect.Bool:
+		return strconv.FormatBool(key.Bool()), nil
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return strconv.FormatInt(key.Int(), 10), nil
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return strconv.FormatUint(key.Uint(), 10), nil
+	default:
+		return "", fmt.Errorf("unsupported map key type: %v", key.Type())
+	}
 }
 
 // recordToDynamicValue handles struct conversion following transcode record pattern
@@ -500,6 +526,10 @@ func (codec *JsonCodec) assignValue(jsonValue interface{}, target reflect.Value)
 			target.Set(reflect.Zero(target.Type()))
 			return nil
 		}
+		if target.Kind() == reflect.Map || target.Kind() == reflect.Slice || target.Kind() == reflect.Interface {
+			target.Set(reflect.Zero(target.Type()))
+			return nil
+		}
 		return fmt.Errorf("cannot assign nil to non-pointer type %v", target.Type())
 	}
 
@@ -587,6 +617,10 @@ func (codec *JsonCodec) assignValue(jsonValue interface{}, target reflect.Value)
 
 	if target.Kind() == reflect.Slice {
 		return codec.assignSliceValue(jsonValue, target)
+	}
+
+	if target.Kind() == reflect.Map {
+		return codec.assignReflectMapValue(jsonValue, target)
 	}
 
 	if isTuple2(target) {
@@ -829,6 +863,110 @@ func (codec *JsonCodec) assignListValue(jsonValue interface{}, target reflect.Va
 		return nil
 	}
 	return fmt.Errorf("expected array for LIST, got %T", jsonValue)
+}
+
+func (codec *JsonCodec) assignReflectMapValue(jsonValue interface{}, target reflect.Value) error {
+	m, ok := jsonValue.(map[string]interface{})
+	if !ok {
+		return fmt.Errorf("expected object for map, got %T", jsonValue)
+	}
+
+	if typeStr, ok := m["_type"].(string); ok && typeStr == "genmap" {
+		return codec.assignGenMapEntriesValue(m["entries"], target)
+	}
+
+	result := reflect.MakeMapWithSize(target.Type(), len(m))
+	keyType := target.Type().Key()
+	elemType := target.Type().Elem()
+
+	for rawKey, rawValue := range m {
+		key := reflect.New(keyType).Elem()
+		if err := assignMapKeyFromString(rawKey, key); err != nil {
+			return fmt.Errorf("failed to parse map key %q as %v: %w", rawKey, keyType, err)
+		}
+
+		elem := reflect.New(elemType).Elem()
+		if rawValue == nil {
+			elem.Set(reflect.Zero(elemType))
+		} else if err := codec.assignValue(rawValue, elem); err != nil {
+			return fmt.Errorf("failed to assign map value for key %q: %w", rawKey, err)
+		}
+
+		result.SetMapIndex(key, elem)
+	}
+
+	target.Set(result)
+	return nil
+}
+
+func (codec *JsonCodec) assignGenMapEntriesValue(jsonValue interface{}, target reflect.Value) error {
+	entries, ok := jsonValue.([]interface{})
+	if !ok {
+		return fmt.Errorf("expected entries array for genmap, got %T", jsonValue)
+	}
+
+	result := reflect.MakeMapWithSize(target.Type(), len(entries))
+	keyType := target.Type().Key()
+	elemType := target.Type().Elem()
+
+	for i, rawEntry := range entries {
+		entry, ok := rawEntry.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("expected object for genmap entry %d, got %T", i, rawEntry)
+		}
+
+		key := reflect.New(keyType).Elem()
+		if err := codec.assignValue(entry["key"], key); err != nil {
+			return fmt.Errorf("failed to assign genmap key %d: %w", i, err)
+		}
+
+		elem := reflect.New(elemType).Elem()
+		if rawValue, exists := entry["value"]; !exists || rawValue == nil {
+			elem.Set(reflect.Zero(elemType))
+		} else if err := codec.assignValue(rawValue, elem); err != nil {
+			return fmt.Errorf("failed to assign genmap value %d: %w", i, err)
+		}
+
+		result.SetMapIndex(key, elem)
+	}
+
+	target.Set(result)
+	return nil
+}
+
+func assignMapKeyFromString(raw string, target reflect.Value) error {
+	if !target.CanSet() {
+		return fmt.Errorf("map key target %v is not settable", target.Type())
+	}
+
+	switch target.Kind() {
+	case reflect.String:
+		target.SetString(raw)
+		return nil
+	case reflect.Bool:
+		parsed, err := strconv.ParseBool(raw)
+		if err != nil {
+			return err
+		}
+		target.SetBool(parsed)
+		return nil
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		parsed, err := strconv.ParseInt(raw, 10, target.Type().Bits())
+		if err != nil {
+			return err
+		}
+		target.SetInt(parsed)
+		return nil
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		parsed, err := strconv.ParseUint(raw, 10, target.Type().Bits())
+		if err != nil {
+			return err
+		}
+		target.SetUint(parsed)
+		return nil
+	default:
+		return fmt.Errorf("unsupported map key type %v", target.Type())
+	}
 }
 
 func (codec *JsonCodec) assignReltimeValue(jsonValue interface{}, target reflect.Value) error {
