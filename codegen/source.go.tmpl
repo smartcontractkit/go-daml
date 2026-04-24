@@ -597,23 +597,26 @@ func {{capitalise $interfaceName}}InterfaceIDWithPackageID(packageID string) str
 {{if and .IsMainDalf .GenerateHexCodec}}
 {{$structs4 := .Structs}}
 {{$choiceArgTypes := .ChoiceArgTypes}}
+{{$choiceArgChoices := .ChoiceArgChoices}}
+{{$paramEncoderNames := .ParamEncoderNames}}
+{{$encoderMethodNames := .EncoderMethodNames}}
 // MCMSEncoder interface for typed encoding methods.
 // Implemented by Encoder for method-based encoding.
 type MCMSEncoder interface {
 {{- range $structs4}}
-{{- $isChoiceArgType := index $choiceArgTypes (capitalise .Name)}}
-{{- $isParamsType := stringsHasSuffix .Name "Params"}}
-{{- $baseNameForParams := stringsTrimSuffix .Name "Params"}}
-{{- $hasCorrespondingChoiceArgType := and $isParamsType (index $choiceArgTypes $baseNameForParams)}}
-{{- if and (not .IsInterface) (not .IsTemplate) (eq .RawType "Record") (or $isChoiceArgType $isParamsType)}}
+{{- $goName := capitalise .Name}}
+{{- $damlName := damlName .}}
+{{- $isChoiceArgType := index $choiceArgTypes $goName}}
+{{- $isParamsType := stringsHasSuffix $damlName "Params"}}
+{{- $baseNameForParams := stringsTrimSuffix $damlName "Params"}}
+{{- $hasParamEncoder := and $isParamsType (index $paramEncoderNames $baseNameForParams)}}
+{{- if and (not .IsInterface) (not .IsTemplate) (eq .RawType "Record") (or $isChoiceArgType $hasParamEncoder)}}
 {{- /* Generate encoder for all choice types and *Params types */}}
-{{- $hasParamsSuffix := stringsHasSuffix .Name "Params"}}
-{{- $methodName := .Name}}
-{{- /* For *Params with corresponding choice, keep full name to avoid collision; otherwise strip Params suffix */}}
-{{- if and $hasParamsSuffix (not $hasCorrespondingChoiceArgType)}}{{$methodName = stringsTrimSuffix (capitalise .Name) "Params"}}{{else}}{{$methodName = capitalise .Name}}{{end}}
-	{{$methodName}}(args {{capitalise .Name}}) (*bind.EncodedChoice, error)
+{{- $methodName := index $encoderMethodNames $goName}}
+{{- if eq $methodName ""}}{{$methodName = $goName}}{{end}}
+	{{$methodName}}(args {{$goName}}) (*bind.EncodedChoice, error)
 {{- if and $isChoiceArgType (hasCallerField .)}}
-	{{$methodName}}MCMSParams(args {{capitalise .Name}}MCMSParams) (*bind.EncodedChoice, error)
+	{{$methodName}}MCMSParams(args {{$goName}}MCMSParams) (*bind.EncodedChoice, error)
 {{- end}}
 {{- end}}
 {{- end}}
@@ -648,28 +651,27 @@ func (c *Contract) Encoder() MCMSEncoder {
 
 {{range $structs4}}
 {{- /* Only generate encoder methods, no standalone Encode functions */}}
-{{- $isChoiceArgType := index $choiceArgTypes (capitalise .Name)}}
-{{- $isParamsType := stringsHasSuffix .Name "Params"}}
-{{- $baseNameForParams := stringsTrimSuffix .Name "Params"}}
-{{- $hasCorrespondingChoiceArgType := and $isParamsType (index $choiceArgTypes $baseNameForParams)}}
-{{- if and (not .IsInterface) (not .IsTemplate) (eq .RawType "Record") (or $isChoiceArgType $isParamsType)}}
+{{- $goName := capitalise .Name}}
+{{- $damlName := damlName .}}
+{{- $isChoiceArgType := index $choiceArgTypes $goName}}
+{{- $isParamsType := stringsHasSuffix $damlName "Params"}}
+{{- $baseNameForParams := stringsTrimSuffix $damlName "Params"}}
+{{- $hasParamEncoder := and $isParamsType (index $paramEncoderNames $baseNameForParams)}}
+{{- if and (not .IsInterface) (not .IsTemplate) (eq .RawType "Record") (or $isChoiceArgType $hasParamEncoder)}}
 {{- /* Generate encoder for all choice types and *Params types */}}
-{{- $hasParamsSuffix := stringsHasSuffix .Name "Params"}}
-{{- $methodName := .Name}}
-{{- /* For *Params with corresponding choice, keep full name to avoid collision; otherwise strip Params suffix */}}
-{{- if and $hasParamsSuffix (not $hasCorrespondingChoiceArgType)}}{{$methodName = stringsTrimSuffix (capitalise .Name) "Params"}}{{else}}{{$methodName = capitalise .Name}}{{end}}
-{{- /* Choice name is always the base name (strip Params if present) */}}
-{{- $choiceName := $methodName}}
-{{- if $hasParamsSuffix}}{{$choiceName = stringsTrimSuffix (capitalise .Name) "Params"}}{{end}}
+{{- $methodName := index $encoderMethodNames $goName}}
+{{- if eq $methodName ""}}{{$methodName = $goName}}{{end}}
+{{- $choiceName := index $choiceArgChoices $goName}}
+{{- if and $isParamsType (not $isChoiceArgType)}}{{$choiceName = $baseNameForParams}}{{end}}
 
 // {{$methodName}} encodes parameters for the {{$choiceName}} choice.
-func (e *encoder) {{$methodName}}(args {{capitalise .Name}}) (*bind.EncodedChoice, error) {
+func (e *encoder) {{$methodName}}(args {{$goName}}) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("{{$choiceName}}", args)
 }
 {{- if and $isChoiceArgType (hasCallerField .)}}
 
 // {{$methodName}}MCMSParams encodes MCMS parameters (without Caller) for the {{$choiceName}} choice.
-func (e *encoder) {{$methodName}}MCMSParams(args {{capitalise .Name}}MCMSParams) (*bind.EncodedChoice, error) {
+func (e *encoder) {{$methodName}}MCMSParams(args {{$goName}}MCMSParams) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("{{$choiceName}}", args)
 }
 {{- end}}

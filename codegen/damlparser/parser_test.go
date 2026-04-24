@@ -120,7 +120,7 @@ data TransferTimeout
 }
 
 func TestParseMultipleTypes(t *testing.T) {
-	source := `module Test.FeeQuoterTypes where
+	source := `module Test.PricingTypes where
 
 import Splice.Api.Token.HoldingV1
 
@@ -138,7 +138,7 @@ data TokenPriceUpdate = TokenPriceUpdate
 
 data GasPriceUpdate = GasPriceUpdate
     with
-        destChainSelector : Numeric 0
+        routeSelector : Numeric 0
         usdPerUnitGas : Numeric 0
     deriving (Eq, Show)
 `
@@ -161,14 +161,14 @@ data GasPriceUpdate = GasPriceUpdate
 }
 
 func TestParseOptionalFields(t *testing.T) {
-	source := `module Test.TokenAdminRegistryTypes where
+	source := `module Test.RegistryTypes where
 
-data TokenConfig = TokenConfig
+data RegistrationConfig = RegistrationConfig
     with
         instrumentId : Splice.Api.Token.HoldingV1.InstrumentId
-        admin : Optional Party
-        pendingAdmin : Optional Party
-        tokenPool : Optional PoolRegistration
+        owner : Optional Party
+        pendingOwner : Optional Party
+        serviceEndpoint : Optional ServiceEndpoint
     deriving (Eq, Show)
 `
 
@@ -187,9 +187,9 @@ data TokenConfig = TokenConfig
 		typeExpr string
 	}{
 		{"instrumentId", "Splice.Api.Token.HoldingV1.InstrumentId"},
-		{"admin", "Optional Party"},
-		{"pendingAdmin", "Optional Party"},
-		{"tokenPool", "Optional PoolRegistration"},
+		{"owner", "Optional Party"},
+		{"pendingOwner", "Optional Party"},
+		{"serviceEndpoint", "Optional ServiceEndpoint"},
 	}
 
 	if len(rec.Fields) != len(expectedFields) {
@@ -239,9 +239,9 @@ data SetDepsParams = SetDepsParams
 func TestParseWithInlineComment(t *testing.T) {
 	source := `module Test.GlobalConfigTypes where
 
-data DestChainConfigArgs = DestChainConfigArgs
+data RouteConfigArgs = RouteConfigArgs
     with
-        destChainSelector : Numeric 0           -- Destination chain selector
+        routeSelector : Numeric 0               -- Route selector
         isEnabled : Bool                        -- Flag whether enabled
         addressBytesLength : Int                -- Length in bytes
     deriving (Eq, Show)
@@ -274,15 +274,15 @@ data DestChainConfigArgs = DestChainConfigArgs
 }
 
 func TestParseNestedRecordType(t *testing.T) {
-	source := `module Test.FeeQuoterTypes where
+	source := `module Test.ConfigurationTypes where
 
-data DestChainConfigArgs = DestChainConfigArgs
+data RouteConfigArgs = RouteConfigArgs
     with
-        destChainSelector : Numeric 0
-        destChainConfig : DestChainConfig
+        routeSelector : Numeric 0
+        routeConfig : RouteConfig
     deriving (Eq, Show)
 
-data DestChainConfig = DestChainConfig
+data RouteConfig = RouteConfig
     with
         isEnabled : Bool
         maxDataBytes : Int
@@ -298,9 +298,9 @@ data DestChainConfig = DestChainConfig
 		t.Fatalf("len(Records) = %d, want 2", len(module.Records))
 	}
 
-	// First record should have DestChainConfig as a field type
-	if module.Records[0].Fields[1].TypeExpr != "DestChainConfig" {
-		t.Errorf("Fields[1].TypeExpr = %q, want %q", module.Records[0].Fields[1].TypeExpr, "DestChainConfig")
+	// First record should have RouteConfig as a field type
+	if module.Records[0].Fields[1].TypeExpr != "RouteConfig" {
+		t.Errorf("Fields[1].TypeExpr = %q, want %q", module.Records[0].Fields[1].TypeExpr, "RouteConfig")
 	}
 }
 

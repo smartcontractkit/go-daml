@@ -98,33 +98,33 @@ func TestBindWithSetField(t *testing.T) {
 
 func TestBindUsesSharedNestedToDAMLValueHelper(t *testing.T) {
 	structs := map[string]*model.TmplStruct{
-		"CommitteeVerifier": {
-			Name:       "CommitteeVerifier",
-			ModuleName: "CCIP",
+		"DocumentVerifier": {
+			Name:       "DocumentVerifier",
+			ModuleName: "Example",
 			RawType:    "Template",
 			IsTemplate: true,
 			Fields: []*model.TmplField{
 				{Name: "operator", Type: model.Party{}},
 			},
 		},
-		"DeployCommitteeVerifier": {
-			Name:       "DeployCommitteeVerifier",
-			ModuleName: "CCIP",
+		"DeployDocumentVerifier": {
+			Name:       "DeployDocumentVerifier",
+			ModuleName: "Example",
 			RawType:    "Record",
 			Fields: []*model.TmplField{
-				{Name: "contract", Type: model.Unknown{String: "CommitteeVerifier"}},
+				{Name: "contract", Type: model.Unknown{String: "DocumentVerifier"}},
 			},
 		},
-		"CCIPFactory": {
-			Name:       "CCIPFactory",
-			ModuleName: "CCIP",
+		"ExampleFactory": {
+			Name:       "ExampleFactory",
+			ModuleName: "Example",
 			RawType:    "Template",
 			IsTemplate: true,
 			Fields: []*model.TmplField{
 				{Name: "operator", Type: model.Party{}},
 			},
 			Choices: []*model.TmplChoice{
-				{Name: "deployCommitteeVerifier", ArgType: model.Unknown{String: "DeployCommitteeVerifier"}},
+				{Name: "deployDocumentVerifier", ArgType: model.Unknown{String: "DeployDocumentVerifier"}},
 			},
 		},
 	}
@@ -384,5 +384,252 @@ func TestBindWithoutBytesHexField(t *testing.T) {
 	// Check that no fields have hex:"bytes16" tag
 	if strings.Contains(result, `hex:"bytes16"`) {
 		t.Error("Generated code should NOT contain hex:\"bytes16\" tag when IsBytesHex is false")
+	}
+}
+
+func TestBindChoiceEncoderUsesDAMLChoiceNamesForDedupedTypes(t *testing.T) {
+	structs := map[string]*model.TmplStruct{
+		"Workflow": {
+			Name:       "Workflow",
+			DAMLName:   "Workflow",
+			RawType:    "Template",
+			IsTemplate: true,
+			Choices: []*model.TmplChoice{
+				{Name: "ApproveTransfer", ArgType: model.Unknown{String: "ApproveTransfer2"}},
+				{Name: "ApplyConfiguration", ArgType: model.Unknown{String: "ApplyConfiguration2"}},
+				{Name: "AssignHandler", ArgType: model.Unknown{String: "AssignHandler"}},
+			},
+		},
+		"ApproveTransfer2": {
+			Name:     "ApproveTransfer2",
+			DAMLName: "ApproveTransfer",
+			RawType:  "Record",
+			Fields: []*model.TmplField{
+				{Name: "caller", Type: model.Party{}},
+			},
+		},
+		"ApplyConfiguration2": {
+			Name:     "ApplyConfiguration2",
+			DAMLName: "ApplyConfiguration",
+			RawType:  "Record",
+			Fields: []*model.TmplField{
+				{Name: "caller", Type: model.Party{}},
+			},
+		},
+		"ApplyConfigurationParams2": {
+			Name:     "ApplyConfigurationParams2",
+			DAMLName: "ApplyConfigurationParams",
+			RawType:  "Record",
+			Fields: []*model.TmplField{
+				{Name: "value", Type: model.Text{}},
+			},
+		},
+		"AssignHandler": {
+			Name:     "AssignHandler",
+			DAMLName: "AssignHandler",
+			RawType:  "Record",
+			Fields: []*model.TmplField{
+				{Name: "caller", Type: model.Party{}},
+			},
+		},
+		"AssignHandlerParams": {
+			Name:     "AssignHandlerParams",
+			DAMLName: "AssignHandlerParams",
+			RawType:  "Record",
+			Fields: []*model.TmplField{
+				{Name: "value", Type: model.Text{}},
+			},
+		},
+		"UnusedActionParams": {
+			Name:     "UnusedActionParams",
+			DAMLName: "UnusedActionParams",
+			RawType:  "Record",
+			Fields: []*model.TmplField{
+				{Name: "value", Type: model.Text{}},
+			},
+		},
+	}
+
+	pkg := &model.Package{
+		Name:    "test-workflow",
+		Structs: structs,
+	}
+
+	result, err := Bind("workflow", pkg, "3.4.10", true, true)
+	if err != nil {
+		t.Fatalf("Bind failed: %v", err)
+	}
+
+	if !strings.Contains(result, `func (e *encoder) ApproveTransfer(args ApproveTransfer2) (*bind.EncodedChoice, error)`) {
+		t.Error("Generated code should prefer the original DAML choice name for the encoder method")
+	}
+	if !strings.Contains(result, `func (e *encoder) ApproveTransferMCMSParams(args ApproveTransfer2MCMSParams) (*bind.EncodedChoice, error)`) {
+		t.Error("Generated code should use the original DAML choice name for MCMSParams helpers")
+	}
+	if !strings.Contains(result, `return e.EncodeChoiceArgs("ApproveTransfer", args)`) {
+		t.Error("Generated code should encode the original DAML choice name")
+	}
+	if strings.Contains(result, `return e.EncodeChoiceArgs("ApproveTransfer2", args)`) {
+		t.Error("Generated code should not encode the deduped Go method name")
+	}
+	if !strings.Contains(result, `func (e *encoder) ApplyConfiguration(args ApplyConfiguration2) (*bind.EncodedChoice, error)`) {
+		t.Error("Generated code should use the original DAML choice name for deduped direct choice args")
+	}
+	if !strings.Contains(result, `func (e *encoder) ApplyConfigurationParams(args ApplyConfigurationParams2) (*bind.EncodedChoice, error)`) {
+		t.Error("Generated code should keep Params in the method name when the clean choice method is already used")
+	}
+	if strings.Contains(result, `return e.EncodeChoiceArgs("ApplyConfiguration2", args)`) {
+		t.Error("Generated code should not encode deduped choice names")
+	}
+	if !strings.Contains(result, `func (e *encoder) AssignHandlerParams(args AssignHandlerParams) (*bind.EncodedChoice, error)`) {
+		t.Error("Generated code should keep Params in the method name when a direct choice-arg method exists")
+	}
+	if strings.Contains(result, `func (e *encoder) UnusedAction(`) {
+		t.Error("Generated code should not create Params encoders for non-choice names")
+	}
+}
+
+func TestBindChoiceEncoderKeepsHintedParamHelpers(t *testing.T) {
+	structs := map[string]*model.TmplStruct{
+		"Dispatcher": {
+			Name:       "Dispatcher",
+			DAMLName:   "Dispatcher",
+			RawType:    "Template",
+			IsTemplate: true,
+			Choices: []*model.TmplChoice{
+				{Name: "ExecuteOperation", ArgType: model.Unknown{String: "ExecuteOperation"}},
+			},
+		},
+		"ExecuteOperation": {
+			Name:     "ExecuteOperation",
+			DAMLName: "ExecuteOperation",
+			RawType:  "Record",
+			Fields: []*model.TmplField{
+				{Name: "submitter", Type: model.Party{}},
+			},
+		},
+		"ProcessBatchParams": {
+			Name:     "ProcessBatchParams",
+			DAMLName: "ProcessBatchParams",
+			RawType:  "Record",
+			Fields: []*model.TmplField{
+				{Name: "salt", Type: model.Text{}},
+			},
+		},
+		"CancelOperationParams": {
+			Name:     "CancelOperationParams",
+			DAMLName: "CancelOperationParams",
+			RawType:  "Record",
+			Fields: []*model.TmplField{
+				{Name: "opId", Type: model.Text{}},
+			},
+		},
+		"ExecuteQueuedOperationsParams": {
+			Name:     "ExecuteQueuedOperationsParams",
+			DAMLName: "ExecuteQueuedOperationsParams",
+			RawType:  "Record",
+			Fields: []*model.TmplField{
+				{Name: "calls", Type: model.List{Inner: model.Text{}}},
+			},
+		},
+		"NotAFunctionParams": {
+			Name:     "NotAFunctionParams",
+			DAMLName: "NotAFunctionParams",
+			RawType:  "Record",
+			Fields: []*model.TmplField{
+				{Name: "value", Type: model.Text{}},
+			},
+		},
+	}
+
+	pkg := &model.Package{
+		Name:    "test-package",
+		Structs: structs,
+	}
+
+	result, err := Bind("dispatcher", pkg, "3.4.10", true, true, model.FieldHints{
+		ChoiceParamEncoderNames: map[string]bool{
+			"ProcessBatch":             true,
+			"CancelOperation":          true,
+			"ExecuteQueuedOperations":  true,
+			"DisabledDispatcherAction": false,
+		},
+	})
+	if err != nil {
+		t.Fatalf("Bind failed: %v", err)
+	}
+
+	for _, name := range []string{"ProcessBatch", "CancelOperation", "ExecuteQueuedOperations"} {
+		if !strings.Contains(result, `func (e *encoder) `+name+`(`) {
+			t.Errorf("Generated code should keep %s dispatcher params encoder", name)
+		}
+		if !strings.Contains(result, `return e.EncodeChoiceArgs("`+name+`", args)`) {
+			t.Errorf("Generated code should encode dispatcher function %s", name)
+		}
+	}
+	if strings.Contains(result, `func (e *encoder) NotAFunction(`) {
+		t.Error("Generated code should not create arbitrary Params encoders for unhinted records")
+	}
+	if strings.Contains(result, `func (e *encoder) DisabledDispatcherAction(`) {
+		t.Error("Generated code should ignore disabled ChoiceParamEncoderNames hints")
+	}
+}
+
+func TestBindChoiceEncoderFallsBackForDuplicateChoiceNames(t *testing.T) {
+	structs := map[string]*model.TmplStruct{
+		"FirstTemplate": {
+			Name:       "FirstTemplate",
+			DAMLName:   "FirstTemplate",
+			RawType:    "Template",
+			IsTemplate: true,
+			Choices: []*model.TmplChoice{
+				{Name: "Get", ArgType: model.Unknown{String: "Get"}},
+			},
+		},
+		"SecondTemplate": {
+			Name:       "SecondTemplate",
+			DAMLName:   "SecondTemplate",
+			RawType:    "Template",
+			IsTemplate: true,
+			Choices: []*model.TmplChoice{
+				{Name: "Get", ArgType: model.Unknown{String: "Get2"}},
+			},
+		},
+		"Get": {
+			Name:     "Get",
+			DAMLName: "Get",
+			RawType:  "Record",
+			Fields: []*model.TmplField{
+				{Name: "caller", Type: model.Party{}},
+			},
+		},
+		"Get2": {
+			Name:     "Get2",
+			DAMLName: "Get",
+			RawType:  "Record",
+			Fields: []*model.TmplField{
+				{Name: "caller", Type: model.Party{}},
+			},
+		},
+	}
+
+	pkg := &model.Package{
+		Name:    "test-package",
+		Structs: structs,
+	}
+
+	result, err := Bind("test", pkg, "3.4.10", true, true)
+	if err != nil {
+		t.Fatalf("Bind failed: %v", err)
+	}
+
+	if !strings.Contains(result, `func (e *encoder) Get(args Get) (*bind.EncodedChoice, error)`) {
+		t.Error("Generated code should use the non-deduped Go method when available")
+	}
+	if !strings.Contains(result, `func (e *encoder) Get2(args Get2) (*bind.EncodedChoice, error)`) {
+		t.Error("Generated code should fall back to the deduped Go method name for duplicate Daml choices")
+	}
+	if strings.Count(result, `return e.EncodeChoiceArgs("Get", args)`) != 4 {
+		t.Error("Generated code should still encode the original duplicate Daml choice name")
 	}
 }

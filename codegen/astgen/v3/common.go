@@ -199,6 +199,7 @@ func (c *codeGenAst) getTemplates(
 
 		tmplStruct := model.TmplStruct{
 			Name:       templateName,
+			DAMLName:   templateName,
 			ModuleName: moduleName,
 			RawType:    RawTypeTemplate,
 			IsTemplate: true,
@@ -454,6 +455,7 @@ func (c *codeGenAst) getDataTypes(pkg *daml.Package, module *daml.Module, module
 		name := c.getName(pkg, dataType.GetNameInternedDname())
 		tmplStruct := model.TmplStruct{
 			Name:       name,
+			DAMLName:   name,
 			ModuleName: moduleName,
 		}
 

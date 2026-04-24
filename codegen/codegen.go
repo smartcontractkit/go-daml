@@ -238,7 +238,7 @@ func CodegenDalfs(dalfToProcess []string, dar fs.FS, pkgFile string, dalfManifes
 			}
 		}
 
-		code, err := Bind(pkgFile, pkg, dalfManifest.SdkVersion, dalf == dalfManifest.MainDalf, generateHexCodec)
+		code, err := Bind(pkgFile, pkg, dalfManifest.SdkVersion, dalf == dalfManifest.MainDalf, generateHexCodec, fieldHints)
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate Go code: %w", err)
 		}
