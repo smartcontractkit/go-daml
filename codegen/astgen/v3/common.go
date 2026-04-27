@@ -3,8 +3,8 @@ package v3
 import (
 	"errors"
 	"fmt"
+	"go/token"
 	"strings"
-	"unicode"
 
 	damlcommon "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/daml/lf/archive"
 	daml "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/daml/lf/archive/daml_lf_2"
@@ -302,9 +302,7 @@ func (c *codeGenAst) GetConsts() ([]*model.TmplConst, error) {
 			// Skip all names that contain invalid characters
 			// expressions can contain more than just literal values, e.g. selectors
 			name := c.getName(&pkg, dataType.GetNameWithType().GetNameInternedDname())
-			if strings.ContainsFunc(name, func(r rune) bool {
-				return !unicode.IsLetter(r)
-			}) {
+			if !token.IsIdentifier(name) {
 				continue
 			}
 			exp, err := c.extractExpression(&pkg, dataType.GetExpr())
