@@ -281,6 +281,11 @@ func GetAST(payload []byte, manifest *model2.Manifest, ifcByModule map[string]mo
 	if err != nil {
 		return nil, err
 	}
+	consts, err := gen.GetConsts()
+	if err != nil {
+		return nil, err
+	}
+
 	structs, importedPackages, err := gen.GetTemplateStructs(ifcByModule)
 	if err != nil {
 		return nil, err
@@ -310,6 +315,7 @@ func GetAST(payload []byte, manifest *model2.Manifest, ifcByModule map[string]mo
 		Name:             packageName,
 		PackageID:        packageID,
 		Structs:          structs,
+		Consts:           consts,
 		ImportedPackages: importedPackagesSlice,
 	}, nil
 }
