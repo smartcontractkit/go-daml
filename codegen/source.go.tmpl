@@ -162,6 +162,14 @@ type {{capitalise .Name}} interface {
 {{end}}
 {{end}}
 
+{{- if gt (len .Consts) 0}}
+const (
+{{- range .Consts}}
+	{{capitalise .Name}} = {{.Expression.GoDef}}
+{{- end}}
+)
+{{- end}}
+
 {{if .IsMainDalf}}
 func argsToMap(args any) map[string]any {
 	if args == nil {

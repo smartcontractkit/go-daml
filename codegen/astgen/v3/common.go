@@ -3,6 +3,7 @@ package v3
 import (
 	"errors"
 	"fmt"
+	"go/token"
 	"strings"
 
 	damlcommon "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/daml/lf/archive"
@@ -60,6 +61,96 @@ func (c *codeGenAst) isEnumType(typeName model.DamlType, pkg *daml.Package) bool
 	return false
 }
 
+// This unmangles a list of strings, e.g. all interned strings
+// ref: https://docs.digitalasset.com/build/3.4/reference/damllf/daml-lf-translation.html#names-with-special-characters
+func unmangleIdentifiers(ids []string) []string {
+	result := make([]string, len(ids))
+	for i, id := range ids {
+		unmangled, err := unmangleIdentifier(id)
+		if err != nil {
+			// If unmangling fails, keep the original identifier
+			result[i] = id
+		} else {
+			result[i] = unmangled
+		}
+	}
+	return result
+}
+
+// unmangleIdentifier reverses the Daml-LF name mangling scheme:
+//   - $$ becomes $
+//   - $uABCD becomes the Unicode codepoint U+ABCD (4 hex digits, lowercase a-f)
+//   - $UABCD1234 becomes the Unicode codepoint U+ABCD1234 (8 hex digits, lowercase a-f)
+//   - ASCII letters, digits, and _ are passed through unchanged
+func unmangleIdentifier(s string) (string, error) {
+	if len(s) == 0 {
+		return "", fmt.Errorf("empty identifier")
+	}
+
+	var b strings.Builder
+	i := 0
+	for i < len(s) {
+		if s[i] == '$' {
+			i++
+			if i >= len(s) {
+				return "", fmt.Errorf("control character $ at end of identifier %q", s)
+			}
+			switch s[i] {
+			case '$':
+				b.WriteByte('$')
+				i++
+			case 'u':
+				i++
+				if i+4 > len(s) {
+					return "", fmt.Errorf("expected 4 hex digits after $u in %q, but got %d", s, len(s)-i)
+				}
+				hex := s[i : i+4]
+				cp, err := parseHexCodepoint(hex)
+				if err != nil {
+					return "", fmt.Errorf("invalid escape sequence $u%s in %q: %w", hex, s, err)
+				}
+				b.WriteRune(rune(cp))
+				i += 4
+			case 'U':
+				i++
+				if i+8 > len(s) {
+					return "", fmt.Errorf("expected 8 hex digits after $U in %q, but got %d", s, len(s)-i)
+				}
+				hex := s[i : i+8]
+				cp, err := parseHexCodepoint(hex)
+				if err != nil {
+					return "", fmt.Errorf("invalid escape sequence $U%s in %q: %w", hex, s, err)
+				}
+				b.WriteRune(rune(cp))
+				i += 8
+			default:
+				return "", fmt.Errorf("control character $ should be followed by $, u or U in %q", s)
+			}
+		} else {
+			b.WriteByte(s[i])
+			i++
+		}
+	}
+	return b.String(), nil
+}
+
+// parseHexCodepoint parses a string of lowercase hex digits into a codepoint value.
+func parseHexCodepoint(hex string) (int64, error) {
+	var val int64
+	for _, c := range hex {
+		val <<= 4
+		switch {
+		case c >= '0' && c <= '9':
+			val |= int64(c - '0')
+		case c >= 'a' && c <= 'f':
+			val |= int64(c-'a') + 10
+		default:
+			return 0, fmt.Errorf("expected only lowercase hex digits (0-9, a-f), but got %q", string(c))
+		}
+	}
+	return val, nil
+}
+
 func (c *codeGenAst) GetInterfaces() (map[string]*model.TmplStruct, error) {
 	interfaceMap := make(map[string]*model.TmplStruct)
 
@@ -85,6 +176,8 @@ func (c *codeGenAst) GetInterfaces() (map[string]*model.TmplStruct, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	damlLf.InternedStrings = unmangleIdentifiers(damlLf.InternedStrings)
 
 	for _, module := range damlLf.Modules {
 		if len(damlLf.InternedStrings) == 0 {
@@ -133,6 +226,8 @@ func (c *codeGenAst) GetTemplateStructs(ifcByModule map[string]model.InterfaceMa
 		return nil, model.ExternalPackages{}, err
 	}
 
+	damlLf.InternedStrings = unmangleIdentifiers(damlLf.InternedStrings)
+
 	for _, module := range damlLf.Modules {
 		if len(damlLf.InternedStrings) == 0 {
 			continue
@@ -166,6 +261,64 @@ func (c *codeGenAst) GetTemplateStructs(ifcByModule map[string]model.InterfaceMa
 	c.importedPackages = nil
 
 	return structs, importedPackages, nil
+}
+
+func (c *codeGenAst) GetConsts() ([]*model.TmplConst, error) {
+	var archive damlcommon.Archive
+	err := proto.Unmarshal(c.payload, &archive)
+	if err != nil {
+		return nil, err
+	}
+
+	var payloadMapped damlcommon.ArchivePayload
+	err = proto.Unmarshal(archive.Payload, &payloadMapped)
+	if err != nil {
+		return nil, err
+	}
+
+	damlLfBytes := payloadMapped.GetDamlLf_2()
+	if damlLfBytes == nil {
+		return nil, errors.New("unsupported daml version")
+	}
+
+	var pkg daml.Package
+	err = proto.Unmarshal(damlLfBytes, &pkg)
+	if err != nil {
+		return nil, err
+	}
+
+	pkg.InternedStrings = unmangleIdentifiers(pkg.InternedStrings)
+
+	var exprs []*model.TmplConst
+	for _, module := range pkg.Modules {
+		if len(pkg.InternedStrings) == 0 {
+			continue
+		}
+
+		moduleName := c.getDottedName(&pkg, module.GetNameInternedDname())
+		log.Info().Msgf("processing module %s for consts", moduleName)
+
+		for _, dataType := range module.GetValues() {
+			// Skip all names that contain invalid characters
+			// expressions can contain more than just literal values, e.g. selectors
+			name := c.getName(&pkg, dataType.GetNameWithType().GetNameInternedDname())
+			if !token.IsIdentifier(name) {
+				continue
+			}
+			exp, err := c.extractExpression(&pkg, dataType.GetExpr())
+			if err != nil {
+				// Ignore all errors for now, not all possible types are handled yet
+				continue
+			}
+			exprs = append(exprs, &model.TmplConst{
+				Name:       name,
+				Expression: exp,
+			})
+		}
+
+	}
+
+	return exprs, nil
 }
 
 func (c *codeGenAst) getName(pkg *daml.Package, id int32) string {

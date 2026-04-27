@@ -7,6 +7,11 @@ import (
 
 type InterfaceMap map[string]*TmplStruct
 
+type TmplConst struct {
+	Name       string
+	Expression DamlExpression
+}
+
 type TmplStruct struct {
 	Name        string
 	DAMLName    string
@@ -52,6 +57,7 @@ type Package struct {
 	Version          string
 	PackageID        string
 	Structs          map[string]*TmplStruct
+	Consts           []*TmplConst
 	Metadata         *Metadata
 	ImportedPackages []ExternalPackage
 }

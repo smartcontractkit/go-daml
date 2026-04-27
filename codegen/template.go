@@ -18,6 +18,7 @@ type tmplData struct {
 	PackageName        string
 	SdkVersion         string
 	Structs            map[string]*model.TmplStruct
+	Consts             []*model.TmplConst
 	IsMainDalf         bool
 	GenerateHexCodec   bool
 	ChoiceArgTypes     map[string]bool // Types used as choice arguments (for Encode functions)
@@ -72,6 +73,7 @@ func Bind(genPkg string, pkg *model.Package, sdkVersion string, isMainDalf bool,
 		PackageName:        pkg.Name,
 		SdkVersion:         sdkVersion,
 		Structs:            pkg.Structs,
+		Consts:             pkg.Consts,
 		IsMainDalf:         isMainDalf,
 		GenerateHexCodec:   generateHexCodec,
 		ChoiceArgTypes:     choiceArgTypes,

@@ -1,6 +1,7 @@
 package v3
 
 import (
+	"reflect"
 	"testing"
 
 	daml "github.com/digital-asset/dazl-client/v8/go/api/com/digitalasset/daml/lf/archive/daml_lf_2"
@@ -310,4 +311,81 @@ func TestExtractTapp_CurriedTextMapPreservesTypeArg(t *testing.T) {
 	require.Equal(t, model.TextMap{
 		Value: model.Bool{},
 	}, got)
+}
+
+func Test_unmangleIdentifiers(t *testing.T) {
+	tests := []struct {
+		name string
+		ids  []string
+		want []string
+	}{
+		{
+			name: "plain identifier unchanged",
+			ids:  []string{"message"},
+			want: []string{"message"},
+		},
+		{
+			name: "underscores unchanged",
+			ids:  []string{"Foo_bar"},
+			want: []string{"Foo_bar"},
+		},
+		{
+			name: "single quote unmangled",
+			ids:  []string{"baz$u0027"},
+			want: []string{"baz'"},
+		},
+		{
+			name: "all special chars",
+			ids:  []string{"$u003a$u002b$u003a"},
+			want: []string{":+:"},
+		},
+		{
+			name: "accented chars",
+			ids:  []string{"na$u00efvet$u00e9"},
+			want: []string{"naïveté"},
+		},
+		{
+			name: "emoji with 8-digit escape",
+			ids:  []string{"$u003a$U0001f642$u003a"},
+			want: []string{":🙂:"},
+		},
+		{
+			name: "escaped dollar sign",
+			ids:  []string{"foo$$bar"},
+			want: []string{"foo$bar"},
+		},
+		{
+			name: "multiple identifiers",
+			ids:  []string{"plain", "baz$u0027", "na$u00efvet$u00e9"},
+			want: []string{"plain", "baz'", "naïveté"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := unmangleIdentifiers(tt.ids); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("unmangleIdentifiers() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func Test_unmangleIdentifier_errors(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{"empty string", ""},
+		{"trailing dollar", "foo$"},
+		{"invalid escape char", "foo$x"},
+		{"short u escape", "foo$u00"},
+		{"short U escape", "foo$U001234"},
+		{"uppercase hex in u escape", "foo$u00AB"},
+		{"uppercase hex in U escape", "foo$U0001F642"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := unmangleIdentifier(tt.input)
+			require.Error(t, err)
+		})
+	}
 }
