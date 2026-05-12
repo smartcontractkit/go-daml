@@ -130,8 +130,8 @@ func TestHexCodec_EncodeDAMLNumeric_ChainSelector_RoundTrip(t *testing.T) {
 	sel := types.NUMERIC("16015286601757825753")
 	result, err := c.Marshal(sel)
 	require.NoError(t, err)
-	// Prefix must be UTF-8 length (0x14 = 20), not hex-string length (40), or Daml parseNumeric0 overflows.
-	assert.Equal(t, "1431363031323532383636303137373537383235373533", hex.EncodeToString([]byte(result)))
+	// NUMERIC encodes like encodeText: uint8(utf8-len) + UTF-8 of decimal string (20 bytes -> 0x14).
+	assert.Equal(t, "143136303135323836363031373537383235373533", hex.EncodeToString([]byte(result)))
 
 	var decoded types.NUMERIC
 	err = c.Unmarshal(hex.EncodeToString([]byte(result)), &decoded)
@@ -168,7 +168,7 @@ func TestHexCodec_EncodeStruct(t *testing.T) {
 	require.NoError(t, err)
 	// Name: len=4 + "test" (04 74657374)
 	// Value: int32 = 42 (0000002a)
-	assert.Equal(t, "0474657374"+"0000002a", result)
+	assert.Equal(t, "04746573740000002a", hex.EncodeToString([]byte(result)))
 }
 
 func TestHexCodec_EncodeNestedStruct(t *testing.T) {
@@ -193,7 +193,7 @@ func TestHexCodec_EncodeNestedStruct(t *testing.T) {
 	// Name: len=1 + "a" (0161)
 	// Inner.X: int32 = 1 (00000001)
 	// Inner.Y: int32 = 2 (00000002)
-	assert.Equal(t, "0161"+"00000001"+"00000002", result)
+	assert.Equal(t, "01610000000100000002", hex.EncodeToString([]byte(result)))
 }
 
 func TestHexCodec_EncodeStructWithSlice(t *testing.T) {
@@ -210,7 +210,7 @@ func TestHexCodec_EncodeStructWithSlice(t *testing.T) {
 	require.NoError(t, err)
 	// Name: len=3 + "cfg" (03 636667)
 	// Values: len=2 + 10 + 20 (02 0000000a 00000014)
-	assert.Equal(t, "03636667"+"02"+"0000000a"+"00000014", result)
+	assert.Equal(t, "03636667020000000a00000014", hex.EncodeToString([]byte(result)))
 }
 
 func TestHexCodec_EncodeDecodeTypedMap(t *testing.T) {
@@ -366,7 +366,7 @@ func TestHexCodec_RoundTrip_Struct(t *testing.T) {
 	require.NoError(t, err)
 
 	var decoded Config
-	err = c.Unmarshal(encoded, &decoded)
+	err = c.Unmarshal(hex.EncodeToString([]byte(encoded)), &decoded)
 	require.NoError(t, err)
 
 	assert.Equal(t, original, decoded)
@@ -393,7 +393,7 @@ func TestHexCodec_RoundTrip_SliceOfStructs(t *testing.T) {
 	require.NoError(t, err)
 
 	var decoded Container
-	err = c.Unmarshal(encoded, &decoded)
+	err = c.Unmarshal(hex.EncodeToString([]byte(encoded)), &decoded)
 	require.NoError(t, err)
 
 	assert.Equal(t, original, decoded)
@@ -470,7 +470,7 @@ func TestHexCodec_SetConfigParams_Format(t *testing.T) {
 		"02" + "00000001" + "00000000" + // group quorums
 		"02" + "00000000" + "00000000" + // group parents
 		"00" // clearRoot
-	assert.Equal(t, expected, result)
+	assert.Equal(t, expected, hex.EncodeToString([]byte(result)))
 }
 
 func TestHexCodec_InvalidHex(t *testing.T) {
@@ -626,7 +626,7 @@ func TestHexCodec_HexBytesTag_SetConfigParams(t *testing.T) {
 		"02" + "00000001" + "00000000" +
 		"02" + "00000000" + "00000000" +
 		"00"
-	assert.Equal(t, expected, result)
+	assert.Equal(t, expected, hex.EncodeToString([]byte(result)))
 }
 
 func TestHexCodec_HexBytesTag_InvalidHex(t *testing.T) {
@@ -681,7 +681,7 @@ func TestHexCodec_EncodeEnum_AllValues(t *testing.T) {
 		t.Run(string(tt.role), func(t *testing.T) {
 			result, err := c.Marshal(tt.role)
 			require.NoError(t, err)
-			assert.Equal(t, tt.expected, result)
+			assert.Equal(t, tt.expected, hex.EncodeToString([]byte(result)))
 		})
 	}
 }
@@ -705,7 +705,7 @@ func TestHexCodec_RoundTrip_Enum(t *testing.T) {
 			require.NoError(t, err)
 
 			var decoded TestRole
-			err = c.Unmarshal(encoded, &decoded)
+			err = c.Unmarshal(hex.EncodeToString([]byte(encoded)), &decoded)
 			require.NoError(t, err)
 
 			assert.Equal(t, role, decoded)
@@ -748,7 +748,7 @@ func TestHexCodec_RoundTrip_StructWithEnum(t *testing.T) {
 	require.NoError(t, err)
 
 	var decoded SetConfig
-	err = c.Unmarshal(encoded, &decoded)
+	err = c.Unmarshal(hex.EncodeToString([]byte(encoded)), &decoded)
 	require.NoError(t, err)
 
 	assert.Equal(t, original, decoded)
@@ -783,7 +783,7 @@ func TestHexCodec_RoundTrip_RELTIME(t *testing.T) {
 	require.NoError(t, err)
 
 	var decoded types.RELTIME
-	err = c.Unmarshal(encoded, &decoded)
+	err = c.Unmarshal(hex.EncodeToString([]byte(encoded)), &decoded)
 	require.NoError(t, err)
 
 	assert.Equal(t, original, decoded)
@@ -810,8 +810,8 @@ func TestHexCodec_EncodeTIMESTAMP(t *testing.T) {
 	ts := types.TIMESTAMP(time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC))
 	result, err := c.Marshal(ts)
 	require.NoError(t, err)
-	// Should encode as microseconds since epoch
-	assert.Len(t, result, 16) // 8 bytes in hex
+	// Should encode as microseconds since epoch (8 raw bytes; 16 hex chars on the wire).
+	assert.Len(t, result, 8)
 }
 
 func TestHexCodec_RoundTrip_TIMESTAMP(t *testing.T) {
@@ -823,7 +823,7 @@ func TestHexCodec_RoundTrip_TIMESTAMP(t *testing.T) {
 	require.NoError(t, err)
 
 	var decoded types.TIMESTAMP
-	err = c.Unmarshal(encoded, &decoded)
+	err = c.Unmarshal(hex.EncodeToString([]byte(encoded)), &decoded)
 	require.NoError(t, err)
 
 	// Compare truncated to microseconds
@@ -848,7 +848,7 @@ func TestHexCodec_RoundTrip_DATE(t *testing.T) {
 	require.NoError(t, err)
 
 	var decoded types.DATE
-	err = c.Unmarshal(encoded, &decoded)
+	err = c.Unmarshal(hex.EncodeToString([]byte(encoded)), &decoded)
 	require.NoError(t, err)
 
 	// DATE only preserves day precision
@@ -880,7 +880,7 @@ func TestHexCodec_RoundTrip_DECIMAL(t *testing.T) {
 	require.NoError(t, err)
 
 	var decoded types.DECIMAL
-	err = c.Unmarshal(encoded, &decoded)
+	err = c.Unmarshal(hex.EncodeToString([]byte(encoded)), &decoded)
 	require.NoError(t, err)
 
 	assert.Equal(t, (*big.Int)(original).String(), (*big.Int)(decoded).String())
@@ -1037,7 +1037,7 @@ func TestHexCodec_EncodeBytes16_Short(t *testing.T) {
 	// OperationData: byteCount=3 as uint16 (0003) + raw bytes [0xaa, 0xbb, 0xcc]
 	//   After hex encoding: "aabbcc"
 	//   Full: "0003aabbcc"
-	assert.Equal(t, "0474657374"+"0003aabbcc", result)
+	assert.Equal(t, "04746573740003aabbcc", hex.EncodeToString([]byte(result)))
 }
 
 func TestHexCodec_EncodeBytes16_Empty(t *testing.T) {
@@ -1071,8 +1071,8 @@ func TestHexCodec_EncodeBytes16_LongString(t *testing.T) {
 	// Name: len=1 (01) + "t" (74) = 0174
 	// OperationData: byteCount=300 as uint16 (012c) + 600 hex chars
 	assert.True(t, len(result) > 0)
-	// Verify the uint16 length prefix is correct (012c = 300 bytes)
-	assert.Equal(t, "0174012c", result[:8])
+	// Verify the uint16 length prefix is correct (012c = 300 bytes): 01 74 01 2c
+	assert.Equal(t, "0174012c", hex.EncodeToString([]byte(result)[:4]))
 }
 
 func TestHexCodec_DecodeBytes16_Short(t *testing.T) {
@@ -1116,9 +1116,9 @@ func TestHexCodec_DecodeBytes16_LongString(t *testing.T) {
 	hexStr, err := c.Marshal(s)
 	require.NoError(t, err)
 
-	// Then decode
+	// Then decode (Marshal returns raw bytes; Unmarshal expects hex)
 	var decoded TestBytes16Struct
-	err = c.Unmarshal(hexStr, &decoded)
+	err = c.Unmarshal(hex.EncodeToString([]byte(hexStr)), &decoded)
 	require.NoError(t, err)
 	assert.Equal(t, "t", decoded.Name)
 	assert.Equal(t, string(longHexString), decoded.OperationData)
@@ -1164,7 +1164,7 @@ func TestHexCodec_RoundTrip_Bytes16(t *testing.T) {
 			require.NoError(t, err)
 
 			var decoded TestBytes16Struct
-			err = c.Unmarshal(hexStr, &decoded)
+			err = c.Unmarshal(hex.EncodeToString([]byte(hexStr)), &decoded)
 			require.NoError(t, err)
 			assert.Equal(t, tc.Name, decoded.Name)
 			assert.Equal(t, tc.OperationData, decoded.OperationData)
@@ -1189,7 +1189,7 @@ func TestHexCodec_EncodeOptional_Nil(t *testing.T) {
 	require.NoError(t, err)
 	// Name: len=4 (04) + "test" (74657374) = 0474657374
 	// Value: None = 00
-	assert.Equal(t, "0474657374"+"00", result)
+	assert.Equal(t, "047465737400", hex.EncodeToString([]byte(result)))
 }
 
 func TestHexCodec_EncodeOptional_Some(t *testing.T) {
@@ -1203,7 +1203,7 @@ func TestHexCodec_EncodeOptional_Some(t *testing.T) {
 	require.NoError(t, err)
 	// Name: len=4 (04) + "test" (74657374) = 0474657374
 	// Value: Some = 01 + int32(42) (0000002a) = 010000002a
-	assert.Equal(t, "0474657374"+"01"+"0000002a", result)
+	assert.Equal(t, "0474657374010000002a", hex.EncodeToString([]byte(result)))
 }
 
 func TestHexCodec_DecodeOptional_Nil(t *testing.T) {
@@ -1242,7 +1242,7 @@ func TestHexCodec_RoundTrip_Optional_Nil(t *testing.T) {
 	require.NoError(t, err)
 
 	var decoded TestOptionalStruct
-	err = c.Unmarshal(encoded, &decoded)
+	err = c.Unmarshal(hex.EncodeToString([]byte(encoded)), &decoded)
 	require.NoError(t, err)
 
 	assert.Equal(t, original.Name, decoded.Name)
@@ -1261,7 +1261,7 @@ func TestHexCodec_RoundTrip_Optional_Some(t *testing.T) {
 	require.NoError(t, err)
 
 	var decoded TestOptionalStruct
-	err = c.Unmarshal(encoded, &decoded)
+	err = c.Unmarshal(hex.EncodeToString([]byte(encoded)), &decoded)
 	require.NoError(t, err)
 
 	assert.Equal(t, original.Name, decoded.Name)
@@ -1285,7 +1285,7 @@ func TestHexCodec_EncodeOptional_Party_Nil(t *testing.T) {
 	require.NoError(t, err)
 	// Owner: len=5 (05) + "alice" (616c696365) = 05616c696365
 	// Admin: None = 00
-	assert.Equal(t, "05616c696365"+"00", result)
+	assert.Equal(t, "05616c69636500", hex.EncodeToString([]byte(result)))
 }
 
 func TestHexCodec_EncodeOptional_Party_Some(t *testing.T) {
@@ -1299,7 +1299,7 @@ func TestHexCodec_EncodeOptional_Party_Some(t *testing.T) {
 	require.NoError(t, err)
 	// Owner: len=5 (05) + "alice" (616c696365) = 05616c696365
 	// Admin: Some = 01 + len=3 (03) + "bob" (626f62) = 0103626f62
-	assert.Equal(t, "05616c696365"+"01"+"03626f62", result)
+	assert.Equal(t, "05616c6963650103626f62", hex.EncodeToString([]byte(result)))
 }
 
 func TestHexCodec_RoundTrip_Optional_Party(t *testing.T) {
@@ -1314,7 +1314,7 @@ func TestHexCodec_RoundTrip_Optional_Party(t *testing.T) {
 	require.NoError(t, err)
 
 	var decoded TestOptionalPartyStruct
-	err = c.Unmarshal(encoded, &decoded)
+	err = c.Unmarshal(hex.EncodeToString([]byte(encoded)), &decoded)
 	require.NoError(t, err)
 
 	assert.Equal(t, original.Owner, decoded.Owner)
@@ -1338,7 +1338,7 @@ func TestHexCodec_EncodeOptional_INT64_Nil(t *testing.T) {
 	require.NoError(t, err)
 	// Count: int64(100) = 0000000000000064
 	// Limit: None = 00
-	assert.Equal(t, "0000000000000064"+"00", result)
+	assert.Equal(t, "000000000000006400", hex.EncodeToString([]byte(result)))
 }
 
 func TestHexCodec_EncodeOptional_INT64_Some(t *testing.T) {
@@ -1352,7 +1352,7 @@ func TestHexCodec_EncodeOptional_INT64_Some(t *testing.T) {
 	require.NoError(t, err)
 	// Count: int64(100) = 0000000000000064
 	// Limit: Some = 01 + int64(500) = 0100000000000001f4
-	assert.Equal(t, "0000000000000064"+"01"+"00000000000001f4", result)
+	assert.Equal(t, "00000000000000640100000000000001f4", hex.EncodeToString([]byte(result)))
 }
 
 func TestHexCodec_RoundTrip_Optional_INT64(t *testing.T) {
@@ -1367,7 +1367,7 @@ func TestHexCodec_RoundTrip_Optional_INT64(t *testing.T) {
 	require.NoError(t, err)
 
 	var decoded TestOptionalInt64Struct
-	err = c.Unmarshal(encoded, &decoded)
+	err = c.Unmarshal(hex.EncodeToString([]byte(encoded)), &decoded)
 	require.NoError(t, err)
 
 	assert.Equal(t, original.Count, decoded.Count)
@@ -1393,7 +1393,7 @@ func TestHexCodec_RoundTrip_Optional_TEXT(t *testing.T) {
 	require.NoError(t, err)
 
 	var decoded TestOptionalTextStruct
-	err = c.Unmarshal(encoded, &decoded)
+	err = c.Unmarshal(hex.EncodeToString([]byte(encoded)), &decoded)
 	require.NoError(t, err)
 
 	assert.Equal(t, original.Title, decoded.Title)
@@ -1422,7 +1422,7 @@ func TestHexCodec_EncodeOptional_NestedStruct_Nil(t *testing.T) {
 	require.NoError(t, err)
 	// Name: len=1 (01) + "a" (61) = 0161
 	// Inner: None = 00
-	assert.Equal(t, "0161"+"00", result)
+	assert.Equal(t, "016100", hex.EncodeToString([]byte(result)))
 }
 
 func TestHexCodec_EncodeOptional_NestedStruct_Some(t *testing.T) {
@@ -1438,7 +1438,7 @@ func TestHexCodec_EncodeOptional_NestedStruct_Some(t *testing.T) {
 	require.NoError(t, err)
 	// Name: len=1 (01) + "a" (61) = 0161
 	// Inner: Some = 01 + X(0000000a) + Y(00000014) = 010000000a00000014
-	assert.Equal(t, "0161"+"01"+"0000000a"+"00000014", result)
+	assert.Equal(t, "0161010000000a00000014", hex.EncodeToString([]byte(result)))
 }
 
 func TestHexCodec_RoundTrip_Optional_NestedStruct(t *testing.T) {
@@ -1455,7 +1455,7 @@ func TestHexCodec_RoundTrip_Optional_NestedStruct(t *testing.T) {
 	require.NoError(t, err)
 
 	var decoded TestOptionalNestedStruct
-	err = c.Unmarshal(encoded, &decoded)
+	err = c.Unmarshal(hex.EncodeToString([]byte(encoded)), &decoded)
 	require.NoError(t, err)
 
 	assert.Equal(t, original.Name, decoded.Name)
@@ -1480,7 +1480,7 @@ func TestHexCodec_EncodeOptional_Slice_Nil(t *testing.T) {
 	require.NoError(t, err)
 	// Name: len=1 (01) + "s" (73) = 0173
 	// Items: None = 00
-	assert.Equal(t, "0173"+"00", result)
+	assert.Equal(t, "017300", hex.EncodeToString([]byte(result)))
 }
 
 func TestHexCodec_EncodeOptional_Slice_Some(t *testing.T) {
@@ -1494,7 +1494,7 @@ func TestHexCodec_EncodeOptional_Slice_Some(t *testing.T) {
 	require.NoError(t, err)
 	// Name: len=1 (01) + "s" (73) = 0173
 	// Items: Some = 01 + len=3 (03) + 1 + 2 + 3 = 0103000000010000000200000003
-	assert.Equal(t, "0173"+"01"+"03"+"00000001"+"00000002"+"00000003", result)
+	assert.Equal(t, "01730103000000010000000200000003", hex.EncodeToString([]byte(result)))
 }
 
 func TestHexCodec_RoundTrip_Optional_Slice(t *testing.T) {
@@ -1509,7 +1509,7 @@ func TestHexCodec_RoundTrip_Optional_Slice(t *testing.T) {
 	require.NoError(t, err)
 
 	var decoded TestOptionalSliceStruct
-	err = c.Unmarshal(encoded, &decoded)
+	err = c.Unmarshal(hex.EncodeToString([]byte(encoded)), &decoded)
 	require.NoError(t, err)
 
 	assert.Equal(t, original.Name, decoded.Name)
@@ -1542,7 +1542,7 @@ func TestHexCodec_RoundTrip_MixedOptional(t *testing.T) {
 	require.NoError(t, err)
 
 	var decoded TestMixedOptionalStruct
-	err = c.Unmarshal(encoded, &decoded)
+	err = c.Unmarshal(hex.EncodeToString([]byte(encoded)), &decoded)
 	require.NoError(t, err)
 
 	assert.Equal(t, original.Required1, decoded.Required1)
@@ -1569,7 +1569,7 @@ func TestHexCodec_RoundTrip_MixedOptional_SomeNil(t *testing.T) {
 	require.NoError(t, err)
 
 	var decoded TestMixedOptionalStruct
-	err = c.Unmarshal(encoded, &decoded)
+	err = c.Unmarshal(hex.EncodeToString([]byte(encoded)), &decoded)
 	require.NoError(t, err)
 
 	assert.Equal(t, original.Required1, decoded.Required1)
