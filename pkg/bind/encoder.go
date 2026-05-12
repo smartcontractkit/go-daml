@@ -11,7 +11,7 @@ type EncodedChoice struct {
 	TemplateID TemplateInformation
 	// Choice is the name of the choice to exercise
 	Choice string
-	// OperationData is the hex-encoded choice parameters
+	// OperationData is the choice parameters as raw MCMS wire bytes (stored in a Go string; use hex.EncodeToString for JSON / Canton additionalFields).
 	OperationData string
 }
 
