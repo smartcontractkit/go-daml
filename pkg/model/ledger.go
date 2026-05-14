@@ -71,18 +71,18 @@ type ExerciseByKeyCommand struct {
 
 func (ExerciseByKeyCommand) isCommandType() {}
 
-type damlMapper interface {
+type DamlMapper interface {
 	ToMap() map[string]any
 }
 
-type createCommander interface {
+type CreateCommander interface {
 	CreateCommand() *CreateCommand
 }
 
 // NestedToDAMLValue preserves compatibility with bindings generated before the
 // inline conversion template replaced this helper.
 func NestedToDAMLValue(v any) any {
-	if mapper, ok := v.(damlMapper); ok {
+	if mapper, ok := v.(DamlMapper); ok {
 		return mapper.ToMap()
 	}
 
@@ -94,7 +94,7 @@ func NestedToDAMLValue(v any) any {
 		return res
 	}
 
-	if creator, ok := v.(createCommander); ok {
+	if creator, ok := v.(CreateCommander); ok {
 		if cmd := creator.CreateCommand(); cmd != nil {
 			return cmd.Arguments
 		}
