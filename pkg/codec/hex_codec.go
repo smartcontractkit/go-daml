@@ -298,30 +298,9 @@ func (c *HexCodec) encodeStruct(rv reflect.Value) ([]byte, error) {
 				return nil, fmt.Errorf("hex:\"bytes\" tag only valid on string fields, got %v", field.Kind())
 			}
 		case "[]bytes":
-			// hex:"[]bytes" — DAML MCMS decodeBytesHexAt length-prefixes the *decoded byte payload*,
-			// then the ledger stores the logical BytesHex Text (e.g. hex.EncodeToString of those bytes).
-			// Each element must match hex:"bytes": decode hex text → raw bytes → encodeBytes (uint8 len + payload).
-			// Do NOT length-prefix the UTF-8 of the hex string (0x40 + 64 ASCII '0'-'f'): that is decoded
-			// as 64 payload bytes and persists as hex-of-ASCII ("3030…"), breaking message.onRampAddress `elem`.
-			if field.Kind() != reflect.Slice {
-				return nil, fmt.Errorf("hex:\"[]bytes\" tag only valid on slice fields, got %v", field.Kind())
-			}
-			length := field.Len()
-			if length > 255 {
-				return nil, fmt.Errorf("slice length %d exceeds max 255 for hex:\"[]bytes\"", length)
-			}
-			encoded = []byte{byte(length)}
-			for j := 0; j < length; j++ {
-				elem := field.Index(j)
-				if elem.Kind() != reflect.String {
-					return nil, fmt.Errorf("hex:\"[]bytes\" element %d: expected string-like, got %v", j, elem.Kind())
-				}
-				s := strings.TrimPrefix(strings.TrimPrefix(strings.TrimSpace(elem.String()), "0x"), "0X")
-				decoded, decErr := hex.DecodeString(s)
-				if decErr != nil {
-					return nil, fmt.Errorf("hex:\"[]bytes\" element %d: %w", j, decErr)
-				}
-				encoded = append(encoded, c.encodeBytes(decoded)...)
+			encoded, err = c.encodeBytesHexTextListSlice(field)
+			if err != nil {
+				return nil, fmt.Errorf("field %s: %w", fieldType.Name, err)
 			}
 		case "uint32":
 			// hex:"uint32" - encode INT64 or int64 as 4-byte uint32 (for Canton compatibility)
@@ -440,8 +419,18 @@ func (c *HexCodec) encodeStruct(rv reflect.Value) ([]byte, error) {
 				encoded = append([]byte{0x01}, valueEncoded...)
 			}
 		default:
-			// No tag or unknown tag - use default encoding
-			encoded, err = c.encode(field.Interface())
+			// Daml [BytesHex] becomes []types.TEXT in generated Go, but hex:"[]bytes" is only emitted
+			// when bindings are regenerated with FieldHints (LF erases BytesHex). Without the tag,
+			// default encoding treats each element as MCMS Text (0x40 + UTF-8 of 64 hex chars) — wrong.
+			// CCIP GlobalConfig uses field name onRampAddresses for this list; always use bytes-hex list
+			// encoding when the tag is missing so stale bindings still produce a valid ledger payload.
+			if hexTag == "" && field.Kind() == reflect.Slice &&
+				field.Type().Elem() == reflect.TypeOf(types.TEXT("")) &&
+				fieldType.Name == "OnRampAddresses" {
+				encoded, err = c.encodeBytesHexTextListSlice(field)
+			} else {
+				encoded, err = c.encode(field.Interface())
+			}
 			if err != nil {
 				return nil, fmt.Errorf("failed to encode field %s: %w", fieldType.Name, err)
 			}
@@ -449,6 +438,32 @@ func (c *HexCodec) encodeStruct(rv reflect.Value) ([]byte, error) {
 		result = append(result, encoded...)
 	}
 	return result, nil
+}
+
+// encodeBytesHexTextListSlice encodes []types.TEXT the same way as Daml MCMS encodeBytesHexList /
+// decodeBytesHexAt: per element, decode the hex text to bytes, then encodeBytes (uint8 len + payload).
+func (c *HexCodec) encodeBytesHexTextListSlice(field reflect.Value) ([]byte, error) {
+	if field.Kind() != reflect.Slice {
+		return nil, fmt.Errorf("expected slice, got %v", field.Kind())
+	}
+	length := field.Len()
+	if length > 255 {
+		return nil, fmt.Errorf("slice length %d exceeds max 255 for bytes-hex list", length)
+	}
+	out := []byte{byte(length)}
+	for j := 0; j < length; j++ {
+		elem := field.Index(j)
+		if elem.Kind() != reflect.String {
+			return nil, fmt.Errorf("bytes-hex list element %d: expected string-like, got %v", j, elem.Kind())
+		}
+		s := strings.TrimPrefix(strings.TrimPrefix(strings.TrimSpace(elem.String()), "0x"), "0X")
+		decoded, decErr := hex.DecodeString(s)
+		if decErr != nil {
+			return nil, fmt.Errorf("bytes-hex list element %d: %w", j, decErr)
+		}
+		out = append(out, c.encodeBytes(decoded)...)
+	}
+	return out, nil
 }
 
 func (c *HexCodec) encodeSlice(rv reflect.Value) ([]byte, error) {
@@ -894,29 +909,11 @@ func (c *HexCodec) decodeStruct(data []byte, offset int, target reflect.Value) (
 				return offset, fmt.Errorf("hex:\"bytes\" tag only valid on string fields, got %v", field.Kind())
 			}
 		case "[]bytes":
-			if field.Kind() != reflect.Slice {
-				return offset, fmt.Errorf("hex:\"[]bytes\" tag only valid on slice fields, got %v", field.Kind())
+			var decErr error
+			offset, decErr = c.decodeBytesHexTextListSlice(data, offset, field)
+			if decErr != nil {
+				return offset, fmt.Errorf("failed to decode field %s: %w", fieldType.Name, decErr)
 			}
-			if offset >= len(data) {
-				return offset, fmt.Errorf("not enough data for []bytes length at offset %d", offset)
-			}
-			n := int(data[offset])
-			offset++
-			slice := reflect.MakeSlice(field.Type(), n, n)
-			for j := 0; j < n; j++ {
-				if offset >= len(data) {
-					return offset, fmt.Errorf("not enough data for []bytes elem %d length at offset %d", j, offset)
-				}
-				blen := int(data[offset])
-				offset++
-				if offset+blen > len(data) {
-					return offset, fmt.Errorf("not enough data for []bytes elem %d (%d bytes) at offset %d", j, blen, offset)
-				}
-				raw := data[offset : offset+blen]
-				offset += blen
-				slice.Index(j).SetString(hex.EncodeToString(raw))
-			}
-			field.Set(slice)
 		case "uint32":
 			// hex:"uint32" - decode 4-byte uint32 into INT64/int64/int
 			if offset+4 > len(data) {
@@ -1042,12 +1039,45 @@ func (c *HexCodec) decodeStruct(data []byte, offset int, target reflect.Value) (
 			}
 			// flag == 0x00: leave field as nil (zero value)
 		default:
-			// No tag or unknown tag - use default decoding
-			offset, err = c.decodeValue(data, offset, field)
+			if hexTag == "" && field.Kind() == reflect.Slice &&
+				field.Type().Elem() == reflect.TypeOf(types.TEXT("")) &&
+				fieldType.Name == "OnRampAddresses" {
+				offset, err = c.decodeBytesHexTextListSlice(data, offset, field)
+			} else {
+				offset, err = c.decodeValue(data, offset, field)
+			}
 			if err != nil {
 				return offset, fmt.Errorf("failed to decode field %s: %w", fieldType.Name, err)
 			}
 		}
 	}
+	return offset, nil
+}
+
+// decodeBytesHexTextListSlice decodes MCMS encodeBytesHexList wire into []types.TEXT (hex text per element).
+func (c *HexCodec) decodeBytesHexTextListSlice(data []byte, offset int, field reflect.Value) (int, error) {
+	if field.Kind() != reflect.Slice {
+		return offset, fmt.Errorf("expected slice, got %v", field.Kind())
+	}
+	if offset >= len(data) {
+		return offset, fmt.Errorf("not enough data for bytes-hex list length at offset %d", offset)
+	}
+	n := int(data[offset])
+	offset++
+	slice := reflect.MakeSlice(field.Type(), n, n)
+	for j := 0; j < n; j++ {
+		if offset >= len(data) {
+			return offset, fmt.Errorf("not enough data for bytes-hex list elem %d length at offset %d", j, offset)
+		}
+		blen := int(data[offset])
+		offset++
+		if offset+blen > len(data) {
+			return offset, fmt.Errorf("not enough data for bytes-hex list elem %d (%d bytes) at offset %d", j, blen, offset)
+		}
+		raw := data[offset : offset+blen]
+		offset += blen
+		slice.Index(j).SetString(hex.EncodeToString(raw))
+	}
+	field.Set(slice)
 	return offset, nil
 }

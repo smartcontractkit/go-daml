@@ -139,6 +139,28 @@ func TestHexCodec_EncodeDAMLNumeric_ChainSelector_RoundTrip(t *testing.T) {
 	assert.Equal(t, sel, decoded)
 }
 
+func TestHexCodec_OnRampAddressesFallback_withoutStructTag(t *testing.T) {
+	// Regression: bindings without hex:"[]bytes" used to UTF-8-encode each hex string (0x40 + ASCII).
+	type sourceChainConfigArgsNoTag struct {
+		SourceChainSelector types.NUMERIC
+		IsEnabled           types.BOOL
+		OnRampAddresses     []types.TEXT // intentionally no hex:"[]bytes"
+	}
+	c := NewHexCodec()
+	args := sourceChainConfigArgsNoTag{
+		SourceChainSelector: types.NUMERIC("16015286601757825753"),
+		IsEnabled:           true,
+		OnRampAddresses: []types.TEXT{
+			"000000000000000000000000a94e45744553f4b2bea9dfb8979a02962b980732",
+		},
+	}
+	result, err := c.Marshal(args)
+	require.NoError(t, err)
+	opHex := hex.EncodeToString([]byte(result))
+	require.NotContains(t, opHex, "014030303030303030303030303030303030303030303030")
+	require.Contains(t, opHex, "010120")
+}
+
 func TestHexCodec_EncodeSlice(t *testing.T) {
 	c := NewHexCodec()
 	result, err := c.Marshal([]uint32{1, 2, 3})
