@@ -1087,7 +1087,7 @@ func convertToRecord(data any) *v2.Record {
 
 	// If it's already a map, keep existing behavior
 	if m, ok := data.(map[string]interface{}); ok {
-		return mapToRecord(m)
+		return MapToRecord(m)
 	}
 
 	// If it's a pointer, deref
@@ -1102,15 +1102,15 @@ func convertToRecord(data any) *v2.Record {
 
 	// If it's a struct, convert it to map using json tags (existing helper)
 	if rv.Kind() == reflect.Struct {
-		return mapToRecord(structToMap(data))
+		return MapToRecord(structToMap(data))
 	}
 
 	// If it's some other type but can still be mapped by structToMap fallback
 	// (structToMap already does json marshal/unmarshal for non-struct)
-	return mapToRecord(structToMap(data))
+	return MapToRecord(structToMap(data))
 }
 
-func mapToRecord(data map[string]interface{}) *v2.Record {
+func MapToRecord(data map[string]interface{}) *v2.Record {
 	if data == nil {
 		return nil
 	}
