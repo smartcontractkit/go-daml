@@ -161,6 +161,28 @@ func TestHexCodec_OnRampAddressesFallback_withoutStructTag(t *testing.T) {
 	require.Contains(t, opHex, "010120")
 }
 
+func TestHexCodec_OffRampAddressFallback_withoutStructTag(t *testing.T) {
+	type destChainConfigArgsNoTag struct {
+		DestChainSelector  types.NUMERIC
+		IsEnabled          types.BOOL
+		AddressBytesLength types.INT64
+		OffRampAddress     types.TEXT // intentionally no hex:"bytes"
+	}
+	c := NewHexCodec()
+	offRamp := "386577d8350d5814198974d16c3c756a638fbd62"
+	args := destChainConfigArgsNoTag{
+		DestChainSelector:  types.NUMERIC("16015286601757825753"),
+		IsEnabled:          true,
+		AddressBytesLength: types.INT64(20),
+		OffRampAddress:     types.TEXT(offRamp),
+	}
+	result, err := c.Marshal(args)
+	require.NoError(t, err)
+	opHex := hex.EncodeToString([]byte(result))
+	require.Contains(t, opHex, "14"+offRamp)
+	require.NotContains(t, opHex, "28"+offRamp)
+}
+
 func TestHexCodec_EncodeSlice(t *testing.T) {
 	c := NewHexCodec()
 	result, err := c.Marshal([]uint32{1, 2, 3})
@@ -1636,6 +1658,33 @@ func TestHexCodec_DecodeOptional_NonPointerField(t *testing.T) {
 	err := c.Unmarshal(hexStr, &s)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "hex:\"optional\" tag only valid on pointer fields")
+}
+
+func TestHexCodec_UsdPerUnitGas_DecimalEncoding(t *testing.T) {
+	c := NewHexCodec()
+
+	type GasPriceUpdate struct {
+		DestChainSelector types.NUMERIC `json:"destChainSelector"`
+		UsdPerUnitGas     types.NUMERIC `json:"usdPerUnitGas"`
+	}
+
+	original := GasPriceUpdate{
+		DestChainSelector: types.NUMERIC("16015286601757825753"),
+		UsdPerUnitGas:     types.NUMERIC("0.0000000038"),
+	}
+
+	encoded, err := c.Marshal(original)
+	require.NoError(t, err)
+
+	// MCMS encodeDecimal(0.0000000038) = 00 (sign) + encodeNumeric0(38) = 00 02 33 38
+	raw := []byte(encoded)
+	assert.Equal(t, []byte{0x00, 0x02, '3', '8'}, raw[len(raw)-4:])
+
+	var decoded GasPriceUpdate
+	err = c.Unmarshal(hex.EncodeToString(raw), &decoded)
+	require.NoError(t, err)
+	assert.Equal(t, original.DestChainSelector, decoded.DestChainSelector)
+	assert.Equal(t, original.UsdPerUnitGas, decoded.UsdPerUnitGas)
 }
 
 func toHex(s string) string {

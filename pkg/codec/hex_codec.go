@@ -229,6 +229,74 @@ func (c *HexCodec) encodeText(s string) ([]byte, error) {
 	return result, nil
 }
 
+// decimalShiftScale is 10^10 — MCMS encodeDecimal shifts Decimal into Numeric 0 (see MCMS.Codec.daml).
+var decimalShiftScale = big.NewInt(10_000_000_000)
+
+func isDecimalNumericField(name string) bool {
+	switch name {
+	case "UsdPerUnitGas", "UsdPerToken":
+		return true
+	default:
+		return false
+	}
+}
+
+// encodeDecimalString encodes a decimal string using MCMS encodeDecimal (sign byte + encodeNumeric0 of shifted magnitude).
+func (c *HexCodec) encodeDecimalString(s string) ([]byte, error) {
+	r, ok := new(big.Rat).SetString(s)
+	if !ok {
+		return nil, fmt.Errorf("invalid decimal %q", s)
+	}
+	sign := byte(0)
+	if r.Sign() < 0 {
+		sign = 1
+		r.Abs(r)
+	}
+	scaled := new(big.Rat).Mul(r, new(big.Rat).SetInt(decimalShiftScale))
+	magnitude := new(big.Int).Quo(scaled.Num(), scaled.Denom())
+	magEncoded, err := c.encodeText(magnitude.String())
+	if err != nil {
+		return nil, err
+	}
+	return append([]byte{sign}, magEncoded...), nil
+}
+
+// decodeDecimalAt decodes MCMS encodeDecimal wire into a decimal string.
+func (c *HexCodec) decodeDecimalAt(data []byte, offset int) (string, int, error) {
+	if offset >= len(data) {
+		return "", offset, fmt.Errorf("not enough data for decimal sign at offset %d", offset)
+	}
+	sign := data[offset]
+	offset++
+	magStr, offset, err := c.decodeText(data, offset)
+	if err != nil {
+		return "", offset, fmt.Errorf("decode decimal magnitude: %w", err)
+	}
+	magnitude := new(big.Int)
+	if _, ok := magnitude.SetString(magStr, 10); !ok {
+		return "", offset, fmt.Errorf("invalid decimal magnitude %q", magStr)
+	}
+	r := new(big.Rat).SetFrac(magnitude, decimalShiftScale)
+	if sign == 1 {
+		r.Neg(r)
+	} else if sign != 0 {
+		return "", offset, fmt.Errorf("invalid decimal sign byte 0x%02x", sign)
+	}
+	return formatDecimalRat(r), offset, nil
+}
+
+func formatDecimalRat(r *big.Rat) string {
+	s := r.FloatString(10)
+	if strings.Contains(s, ".") {
+		s = strings.TrimRight(s, "0")
+		s = strings.TrimRight(s, ".")
+	}
+	if s == "" || s == "-" {
+		return "0"
+	}
+	return s
+}
+
 // encodeTextBytes16 encodes a hex string with uint16 byte-count prefix.
 // The string is expected to be a hex-encoded byte sequence (e.g., "0102030405").
 // The length prefix is the BYTE count, and we write the actual bytes (not the string chars).
@@ -428,6 +496,19 @@ func (c *HexCodec) encodeStruct(rv reflect.Value) ([]byte, error) {
 				field.Type().Elem() == reflect.TypeOf(types.TEXT("")) &&
 				fieldType.Name == "OnRampAddresses" {
 				encoded, err = c.encodeBytesHexTextListSlice(field)
+			} else if hexTag == "" && field.Kind() == reflect.String &&
+				field.Type() == reflect.TypeOf(types.TEXT("")) &&
+				fieldType.Name == "OffRampAddress" {
+				s := strings.TrimPrefix(strings.TrimPrefix(strings.TrimSpace(field.String()), "0x"), "0X")
+				decoded, decErr := hex.DecodeString(s)
+				if decErr != nil {
+					return nil, fmt.Errorf("field %s: %w", fieldType.Name, decErr)
+				}
+				encoded = c.encodeBytes(decoded)
+			} else if hexTag == "" && field.Kind() == reflect.String &&
+				field.Type() == reflect.TypeOf(types.NUMERIC("")) &&
+				isDecimalNumericField(fieldType.Name) {
+				encoded, err = c.encodeDecimalString(string(field.String()))
 			} else {
 				encoded, err = c.encode(field.Interface())
 			}
@@ -1043,6 +1124,28 @@ func (c *HexCodec) decodeStruct(data []byte, offset int, target reflect.Value) (
 				field.Type().Elem() == reflect.TypeOf(types.TEXT("")) &&
 				fieldType.Name == "OnRampAddresses" {
 				offset, err = c.decodeBytesHexTextListSlice(data, offset, field)
+			} else if hexTag == "" && field.Kind() == reflect.String &&
+				field.Type() == reflect.TypeOf(types.TEXT("")) &&
+				fieldType.Name == "OffRampAddress" {
+				if offset >= len(data) {
+					return offset, fmt.Errorf("not enough data for offRampAddress length at offset %d", offset)
+				}
+				blen := int(data[offset])
+				offset++
+				if offset+blen > len(data) {
+					return offset, fmt.Errorf("not enough data for offRampAddress (%d bytes) at offset %d", blen, offset)
+				}
+				field.SetString(hex.EncodeToString(data[offset : offset+blen]))
+				offset += blen
+			} else if hexTag == "" && field.Kind() == reflect.String &&
+				field.Type() == reflect.TypeOf(types.NUMERIC("")) &&
+				isDecimalNumericField(fieldType.Name) {
+				decoded, newOffset, decErr := c.decodeDecimalAt(data, offset)
+				if decErr != nil {
+					return offset, fmt.Errorf("field %s: %w", fieldType.Name, decErr)
+				}
+				field.SetString(decoded)
+				offset = newOffset
 			} else {
 				offset, err = c.decodeValue(data, offset, field)
 			}

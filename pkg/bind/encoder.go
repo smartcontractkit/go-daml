@@ -1,6 +1,8 @@
 package bind
 
 import (
+	"encoding/hex"
+
 	"github.com/smartcontractkit/go-daml/pkg/codec"
 )
 
@@ -40,9 +42,10 @@ func NewBoundTemplate(packageID, moduleName, templateName string) *BoundTemplate
 	}
 }
 
-// EncodeChoiceArgs encodes choice parameters to hex and returns an EncodedChoice.
+// EncodeChoiceArgs encodes choice parameters and returns an EncodedChoice.
+// OperationData is hex-encoded MCMS wire bytes for JSON transport (Canton additionalFields).
 func (t *BoundTemplate) EncodeChoiceArgs(choice string, params any) (*EncodedChoice, error) {
-	encoded, err := t.hexCodec.Marshal(params)
+	wire, err := t.hexCodec.Marshal(params)
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +56,7 @@ func (t *BoundTemplate) EncodeChoiceArgs(choice string, params any) (*EncodedCho
 			TemplateName: t.templateName,
 		},
 		Choice:        choice,
-		OperationData: encoded,
+		OperationData: hex.EncodeToString([]byte(wire)),
 	}, nil
 }
 

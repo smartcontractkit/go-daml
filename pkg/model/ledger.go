@@ -75,9 +75,12 @@ type damlMapper interface {
 	ToMap() map[string]any
 }
 
-type createCommander interface {
+// CreateCommander is implemented by generated template bindings that expose CreateCommand().
+type CreateCommander interface {
 	CreateCommand() *CreateCommand
 }
+
+type createCommander = CreateCommander
 
 // NestedToDAMLValue preserves compatibility with bindings generated before the
 // inline conversion template replaced this helper.

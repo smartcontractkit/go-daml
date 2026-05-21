@@ -28,6 +28,11 @@ func ConvertToRecord(data any) *v2.Record {
 	return convertToRecord(data)
 }
 
+// MapToRecord converts a map to a ledger Record (exported for binding helpers).
+func MapToRecord(data map[string]interface{}) *v2.Record {
+	return mapToRecord(data)
+}
+
 // MapToValue exposes the internal any->Value conversion (useful for choice args later).
 func MapToValue(v interface{}) *v2.Value {
 	return mapToValue(v)
