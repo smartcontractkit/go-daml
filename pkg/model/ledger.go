@@ -75,6 +75,7 @@ type DamlMapper interface {
 	ToMap() map[string]any
 }
 
+// CreateCommander is implemented by generated template bindings that expose CreateCommand().
 type CreateCommander interface {
 	CreateCommand() *CreateCommand
 }

@@ -6,22 +6,26 @@ import (
 	"fmt"
 	"math/big"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/smartcontractkit/go-daml/pkg/types"
 )
 
-// HexCodec encodes/decodes values to/from hex strings using the Canton MCMS format.
+// HexCodec encodes/decodes values to/from raw bytes using the Canton MCMS format.
 // This format is used for encoding operation parameters in Canton smart contracts.
 //
 // Encoding format:
-//   - uint8: 1 byte, hex-encoded
-//   - uint32/int: 4 bytes, big-endian, hex-encoded
-//   - int64: 8 bytes, big-endian, hex-encoded
+//   - uint8: 1 byte
+//   - uint32/int: 4 bytes, big-endian
+//   - int64: 8 bytes, big-endian
 //   - bool: 1 byte (00 or 01)
-//   - text/string: uint8(len) + utf8 bytes
+//   - text/string: uint8(utf-8 byte length) + raw UTF-8 bytes (matches MCMS/Codec.daml encodeText)
 //   - list/slice: uint8(count) + items (encoded sequentially)
 //   - struct: concatenate fields in order
+//
+// Note: Marshal used to return a hex string, but now returns raw bytes (as a string)
+// to avoid double hex encoding when sent over wire by transport layers that also hex-encode.
 type HexCodec struct{}
 
 // NewHexCodec creates a new HexCodec instance
@@ -29,13 +33,15 @@ func NewHexCodec() *HexCodec {
 	return &HexCodec{}
 }
 
-// Marshal encodes value to hex string
+// Marshal encodes value to raw bytes (stored in a string)
 func (c *HexCodec) Marshal(value interface{}) (string, error) {
 	bytes, err := c.encode(value)
 	if err != nil {
 		return "", err
 	}
-	return hex.EncodeToString(bytes), nil
+	// Return raw bytes as string to avoid extra hex layer.
+	// Transport layers typically hex-encode this string.
+	return string(bytes), nil
 }
 
 // Unmarshal decodes hex string to value
@@ -211,24 +217,94 @@ func (c *HexCodec) encodeInt64(v int64) []byte {
 }
 
 func (c *HexCodec) encodeText(s string) ([]byte, error) {
-	b := []byte(s)
-	if len(b) > 255 {
-		return nil, fmt.Errorf("text length %d exceeds max 255 for uint8 prefix; use hex:\"bytes16\" tag for longer strings", len(b))
+	// MCMS/Codec.daml: encodeText t = encodeUint8 (byteCount (toHex t)) <> toHex t
+	// Here byteCount counts decoded bytes (UTF-8 length); the wire is [utf8Len][raw UTF-8...].
+	utf8 := []byte(s)
+	if len(utf8) > 255 {
+		return nil, fmt.Errorf("utf-8 byte length %d exceeds max 255 for uint8 prefix", len(utf8))
 	}
-	result := make([]byte, 1+len(b))
-	result[0] = byte(len(b))
-	copy(result[1:], b)
+	result := make([]byte, 1+len(utf8))
+	result[0] = byte(len(utf8))
+	copy(result[1:], utf8)
 	return result, nil
+}
+
+// decimalShiftScale is 10^10 — MCMS encodeDecimal shifts Decimal into Numeric 0 (see MCMS.Codec.daml).
+var decimalShiftScale = big.NewInt(10_000_000_000)
+
+func isDecimalNumericField(name string) bool {
+	switch name {
+	case "UsdPerUnitGas", "UsdPerToken":
+		return true
+	default:
+		return false
+	}
+}
+
+// encodeDecimalString encodes a decimal string using MCMS encodeDecimal (sign byte + encodeNumeric0 of shifted magnitude).
+func (c *HexCodec) encodeDecimalString(s string) ([]byte, error) {
+	r, ok := new(big.Rat).SetString(s)
+	if !ok {
+		return nil, fmt.Errorf("invalid decimal %q", s)
+	}
+	sign := byte(0)
+	if r.Sign() < 0 {
+		sign = 1
+		r.Abs(r)
+	}
+	scaled := new(big.Rat).Mul(r, new(big.Rat).SetInt(decimalShiftScale))
+	magnitude := new(big.Int).Quo(scaled.Num(), scaled.Denom())
+	magEncoded, err := c.encodeText(magnitude.String())
+	if err != nil {
+		return nil, err
+	}
+	return append([]byte{sign}, magEncoded...), nil
+}
+
+// decodeDecimalAt decodes MCMS encodeDecimal wire into a decimal string.
+func (c *HexCodec) decodeDecimalAt(data []byte, offset int) (string, int, error) {
+	if offset >= len(data) {
+		return "", offset, fmt.Errorf("not enough data for decimal sign at offset %d", offset)
+	}
+	sign := data[offset]
+	offset++
+	magStr, offset, err := c.decodeText(data, offset)
+	if err != nil {
+		return "", offset, fmt.Errorf("decode decimal magnitude: %w", err)
+	}
+	magnitude := new(big.Int)
+	if _, ok := magnitude.SetString(magStr, 10); !ok {
+		return "", offset, fmt.Errorf("invalid decimal magnitude %q", magStr)
+	}
+	r := new(big.Rat).SetFrac(magnitude, decimalShiftScale)
+	if sign == 1 {
+		r.Neg(r)
+	} else if sign != 0 {
+		return "", offset, fmt.Errorf("invalid decimal sign byte 0x%02x", sign)
+	}
+	return formatDecimalRat(r), offset, nil
+}
+
+func formatDecimalRat(r *big.Rat) string {
+	s := r.FloatString(10)
+	if strings.Contains(s, ".") {
+		s = strings.TrimRight(s, "0")
+		s = strings.TrimRight(s, ".")
+	}
+	if s == "" || s == "-" {
+		return "0"
+	}
+	return s
 }
 
 // encodeTextBytes16 encodes a hex string with uint16 byte-count prefix.
 // The string is expected to be a hex-encoded byte sequence (e.g., "0102030405").
 // The length prefix is the BYTE count, and we write the actual bytes (not the string chars).
-// After Marshal() hex-encoding, the output will contain the original hex string.
 // This matches the Daml MCMS codec which concatenates BytesHex directly.
+// Note: We return raw bytes because the transport layer will typically hex-encode the result.
 func (c *HexCodec) encodeTextBytes16(s string) ([]byte, error) {
 	// s is a hex string like "a1b2c3d4" representing bytes [0xa1, 0xb2, 0xc3, 0xd4]
-	// We need to write the raw bytes so that after Marshal's hex.EncodeToString,
+	// We need to write the raw bytes so that after the final hex encoding (e.g. by transport),
 	// the output contains the original hex string.
 	if len(s)%2 != 0 {
 		return nil, fmt.Errorf("hex string length %d is not even", len(s))
@@ -288,6 +364,11 @@ func (c *HexCodec) encodeStruct(rv reflect.Value) ([]byte, error) {
 				encoded = c.encodeBytes(decoded)
 			} else {
 				return nil, fmt.Errorf("hex:\"bytes\" tag only valid on string fields, got %v", field.Kind())
+			}
+		case "[]bytes":
+			encoded, err = c.encodeBytesHexTextListSlice(field)
+			if err != nil {
+				return nil, fmt.Errorf("field %s: %w", fieldType.Name, err)
 			}
 		case "uint32":
 			// hex:"uint32" - encode INT64 or int64 as 4-byte uint32 (for Canton compatibility)
@@ -406,8 +487,31 @@ func (c *HexCodec) encodeStruct(rv reflect.Value) ([]byte, error) {
 				encoded = append([]byte{0x01}, valueEncoded...)
 			}
 		default:
-			// No tag or unknown tag - use default encoding
-			encoded, err = c.encode(field.Interface())
+			// Daml [BytesHex] becomes []types.TEXT in generated Go, but hex:"[]bytes" is only emitted
+			// when bindings are regenerated with FieldHints (LF erases BytesHex). Without the tag,
+			// default encoding treats each element as MCMS Text (0x40 + UTF-8 of 64 hex chars) — wrong.
+			// CCIP GlobalConfig uses field name onRampAddresses for this list; always use bytes-hex list
+			// encoding when the tag is missing so stale bindings still produce a valid ledger payload.
+			if hexTag == "" && field.Kind() == reflect.Slice &&
+				field.Type().Elem() == reflect.TypeOf(types.TEXT("")) &&
+				fieldType.Name == "OnRampAddresses" {
+				encoded, err = c.encodeBytesHexTextListSlice(field)
+			} else if hexTag == "" && field.Kind() == reflect.String &&
+				field.Type() == reflect.TypeOf(types.TEXT("")) &&
+				fieldType.Name == "OffRampAddress" {
+				s := strings.TrimPrefix(strings.TrimPrefix(strings.TrimSpace(field.String()), "0x"), "0X")
+				decoded, decErr := hex.DecodeString(s)
+				if decErr != nil {
+					return nil, fmt.Errorf("field %s: %w", fieldType.Name, decErr)
+				}
+				encoded = c.encodeBytes(decoded)
+			} else if hexTag == "" && field.Kind() == reflect.String &&
+				field.Type() == reflect.TypeOf(types.NUMERIC("")) &&
+				isDecimalNumericField(fieldType.Name) {
+				encoded, err = c.encodeDecimalString(string(field.String()))
+			} else {
+				encoded, err = c.encode(field.Interface())
+			}
 			if err != nil {
 				return nil, fmt.Errorf("failed to encode field %s: %w", fieldType.Name, err)
 			}
@@ -415,6 +519,32 @@ func (c *HexCodec) encodeStruct(rv reflect.Value) ([]byte, error) {
 		result = append(result, encoded...)
 	}
 	return result, nil
+}
+
+// encodeBytesHexTextListSlice encodes []types.TEXT the same way as Daml MCMS encodeBytesHexList /
+// decodeBytesHexAt: per element, decode the hex text to bytes, then encodeBytes (uint8 len + payload).
+func (c *HexCodec) encodeBytesHexTextListSlice(field reflect.Value) ([]byte, error) {
+	if field.Kind() != reflect.Slice {
+		return nil, fmt.Errorf("expected slice, got %v", field.Kind())
+	}
+	length := field.Len()
+	if length > 255 {
+		return nil, fmt.Errorf("slice length %d exceeds max 255 for bytes-hex list", length)
+	}
+	out := []byte{byte(length)}
+	for j := 0; j < length; j++ {
+		elem := field.Index(j)
+		if elem.Kind() != reflect.String {
+			return nil, fmt.Errorf("bytes-hex list element %d: expected string-like, got %v", j, elem.Kind())
+		}
+		s := strings.TrimPrefix(strings.TrimPrefix(strings.TrimSpace(elem.String()), "0x"), "0X")
+		decoded, decErr := hex.DecodeString(s)
+		if decErr != nil {
+			return nil, fmt.Errorf("bytes-hex list element %d: %w", j, decErr)
+		}
+		out = append(out, c.encodeBytes(decoded)...)
+	}
+	return out, nil
 }
 
 func (c *HexCodec) encodeSlice(rv reflect.Value) ([]byte, error) {
@@ -765,14 +895,15 @@ func (c *HexCodec) decodeText(data []byte, offset int) (string, int, error) {
 	if offset >= len(data) {
 		return "", offset, fmt.Errorf("not enough data for text length at offset %d", offset)
 	}
-	length := int(data[offset])
+	n := int(data[offset])
 	offset++
-
-	if offset+length > len(data) {
-		return "", offset, fmt.Errorf("not enough data for text of length %d at offset %d", length, offset)
+	if n == 0 {
+		return "", offset, nil
 	}
-	s := string(data[offset : offset+length])
-	return s, offset + length, nil
+	if offset+n > len(data) {
+		return "", offset, fmt.Errorf("not enough data for UTF-8 text of length %d at offset %d", n, offset)
+	}
+	return string(data[offset : offset+n]), offset + n, nil
 }
 
 func (c *HexCodec) decodeSlice(data []byte, offset int, target reflect.Value) (int, error) {
@@ -857,6 +988,12 @@ func (c *HexCodec) decodeStruct(data []byte, offset int, target reflect.Value) (
 				offset += length
 			} else {
 				return offset, fmt.Errorf("hex:\"bytes\" tag only valid on string fields, got %v", field.Kind())
+			}
+		case "[]bytes":
+			var decErr error
+			offset, decErr = c.decodeBytesHexTextListSlice(data, offset, field)
+			if decErr != nil {
+				return offset, fmt.Errorf("failed to decode field %s: %w", fieldType.Name, decErr)
 			}
 		case "uint32":
 			// hex:"uint32" - decode 4-byte uint32 into INT64/int64/int
@@ -945,8 +1082,7 @@ func (c *HexCodec) decodeStruct(data []byte, offset int, target reflect.Value) (
 			field.Set(slice)
 		case "bytes16":
 			// hex:"bytes16" - decode uint16 byte-count prefix + raw bytes -> hex string
-			// The data has been hex-decoded by Unmarshal, so we read raw bytes
-			// and encode them back to a hex string.
+			// We read raw bytes and encode them back to a hex string for the struct field.
 			if field.Kind() != reflect.String {
 				return offset, fmt.Errorf("hex:\"bytes16\" tag only valid on string fields, got %v", field.Kind())
 			}
@@ -984,12 +1120,67 @@ func (c *HexCodec) decodeStruct(data []byte, offset int, target reflect.Value) (
 			}
 			// flag == 0x00: leave field as nil (zero value)
 		default:
-			// No tag or unknown tag - use default decoding
-			offset, err = c.decodeValue(data, offset, field)
+			if hexTag == "" && field.Kind() == reflect.Slice &&
+				field.Type().Elem() == reflect.TypeOf(types.TEXT("")) &&
+				fieldType.Name == "OnRampAddresses" {
+				offset, err = c.decodeBytesHexTextListSlice(data, offset, field)
+			} else if hexTag == "" && field.Kind() == reflect.String &&
+				field.Type() == reflect.TypeOf(types.TEXT("")) &&
+				fieldType.Name == "OffRampAddress" {
+				if offset >= len(data) {
+					return offset, fmt.Errorf("not enough data for offRampAddress length at offset %d", offset)
+				}
+				blen := int(data[offset])
+				offset++
+				if offset+blen > len(data) {
+					return offset, fmt.Errorf("not enough data for offRampAddress (%d bytes) at offset %d", blen, offset)
+				}
+				field.SetString(hex.EncodeToString(data[offset : offset+blen]))
+				offset += blen
+			} else if hexTag == "" && field.Kind() == reflect.String &&
+				field.Type() == reflect.TypeOf(types.NUMERIC("")) &&
+				isDecimalNumericField(fieldType.Name) {
+				decoded, newOffset, decErr := c.decodeDecimalAt(data, offset)
+				if decErr != nil {
+					return offset, fmt.Errorf("field %s: %w", fieldType.Name, decErr)
+				}
+				field.SetString(decoded)
+				offset = newOffset
+			} else {
+				offset, err = c.decodeValue(data, offset, field)
+			}
 			if err != nil {
 				return offset, fmt.Errorf("failed to decode field %s: %w", fieldType.Name, err)
 			}
 		}
 	}
+	return offset, nil
+}
+
+// decodeBytesHexTextListSlice decodes MCMS encodeBytesHexList wire into []types.TEXT (hex text per element).
+func (c *HexCodec) decodeBytesHexTextListSlice(data []byte, offset int, field reflect.Value) (int, error) {
+	if field.Kind() != reflect.Slice {
+		return offset, fmt.Errorf("expected slice, got %v", field.Kind())
+	}
+	if offset >= len(data) {
+		return offset, fmt.Errorf("not enough data for bytes-hex list length at offset %d", offset)
+	}
+	n := int(data[offset])
+	offset++
+	slice := reflect.MakeSlice(field.Type(), n, n)
+	for j := 0; j < n; j++ {
+		if offset >= len(data) {
+			return offset, fmt.Errorf("not enough data for bytes-hex list elem %d length at offset %d", j, offset)
+		}
+		blen := int(data[offset])
+		offset++
+		if offset+blen > len(data) {
+			return offset, fmt.Errorf("not enough data for bytes-hex list elem %d (%d bytes) at offset %d", j, blen, offset)
+		}
+		raw := data[offset : offset+blen]
+		offset += blen
+		slice.Index(j).SetString(hex.EncodeToString(raw))
+	}
+	field.Set(slice)
 	return offset, nil
 }
