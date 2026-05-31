@@ -3,8 +3,10 @@ package codec
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"math/big"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -1079,6 +1081,12 @@ func (codec *JsonCodec) assignStructValue(jsonValue interface{}, target reflect.
 	if m, ok := jsonValue.(map[string]interface{}); ok {
 		targetType := target.Type()
 
+		// Create a map of all JSON keys, in order to track if any unknown fields remain
+		jsonKeys := make(map[string]bool, len(m))
+		for k := range m {
+			jsonKeys[k] = true
+		}
+
 		for i := 0; i < target.NumField(); i++ {
 			field := target.Field(i)
 			fieldType := targetType.Field(i)
@@ -1102,7 +1110,14 @@ func (codec *JsonCodec) assignStructValue(jsonValue interface{}, target reflect.
 				if err := codec.assignValue(jsonVal, field); err != nil {
 					return fmt.Errorf("failed to assign field %s: %w", fieldName, err)
 				}
+				delete(jsonKeys, fieldName)
 			}
+		}
+
+		// If any fields remain, the target struct doesn't have corresponding fields for them.
+		if len(jsonKeys) > 0 {
+			unknownFields := slices.Collect(maps.Keys(jsonKeys))
+			return fmt.Errorf("unknown fields in target struct: %s", strings.Join(unknownFields, ", "))
 		}
 
 		return nil
