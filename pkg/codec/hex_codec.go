@@ -337,6 +337,16 @@ func (c *HexCodec) encodeBool(v bool) []byte {
 	return []byte{0}
 }
 
+// isBytesHexTextListField reports Daml [BytesHex] fields generated as []types.TEXT without hex:"[]bytes".
+func isBytesHexTextListField(name string) bool {
+	switch name {
+	case "OnRampAddresses", "SignerKeys":
+		return true
+	default:
+		return false
+	}
+}
+
 func (c *HexCodec) encodeStruct(rv reflect.Value) ([]byte, error) {
 	var result []byte
 	rt := rv.Type()
@@ -490,11 +500,10 @@ func (c *HexCodec) encodeStruct(rv reflect.Value) ([]byte, error) {
 			// Daml [BytesHex] becomes []types.TEXT in generated Go, but hex:"[]bytes" is only emitted
 			// when bindings are regenerated with FieldHints (LF erases BytesHex). Without the tag,
 			// default encoding treats each element as MCMS Text (0x40 + UTF-8 of 64 hex chars) — wrong.
-			// CCIP GlobalConfig uses field name onRampAddresses for this list; always use bytes-hex list
-			// encoding when the tag is missing so stale bindings still produce a valid ledger payload.
+			// Use bytes-hex list encoding when the tag is missing so stale bindings still produce a valid ledger payload.
 			if hexTag == "" && field.Kind() == reflect.Slice &&
 				field.Type().Elem() == reflect.TypeOf(types.TEXT("")) &&
-				fieldType.Name == "OnRampAddresses" {
+				isBytesHexTextListField(fieldType.Name) {
 				encoded, err = c.encodeBytesHexTextListSlice(field)
 			} else if hexTag == "" && field.Kind() == reflect.String &&
 				field.Type() == reflect.TypeOf(types.TEXT("")) &&
@@ -1122,7 +1131,7 @@ func (c *HexCodec) decodeStruct(data []byte, offset int, target reflect.Value) (
 		default:
 			if hexTag == "" && field.Kind() == reflect.Slice &&
 				field.Type().Elem() == reflect.TypeOf(types.TEXT("")) &&
-				fieldType.Name == "OnRampAddresses" {
+				isBytesHexTextListField(fieldType.Name) {
 				offset, err = c.decodeBytesHexTextListSlice(data, offset, field)
 			} else if hexTag == "" && field.Kind() == reflect.String &&
 				field.Type() == reflect.TypeOf(types.TEXT("")) &&
