@@ -337,16 +337,6 @@ func (c *HexCodec) encodeBool(v bool) []byte {
 	return []byte{0}
 }
 
-// isBytesHexTextListField reports Daml [BytesHex] fields generated as []types.TEXT without hex:"[]bytes".
-func isBytesHexTextListField(name string) bool {
-	switch name {
-	case "OnRampAddresses", "SignerKeys":
-		return true
-	default:
-		return false
-	}
-}
-
 func (c *HexCodec) encodeStruct(rv reflect.Value) ([]byte, error) {
 	var result []byte
 	rt := rv.Type()
@@ -497,24 +487,7 @@ func (c *HexCodec) encodeStruct(rv reflect.Value) ([]byte, error) {
 				encoded = append([]byte{0x01}, valueEncoded...)
 			}
 		default:
-			// Daml [BytesHex] becomes []types.TEXT in generated Go, but hex:"[]bytes" is only emitted
-			// when bindings are regenerated with FieldHints (LF erases BytesHex). Without the tag,
-			// default encoding treats each element as MCMS Text (0x40 + UTF-8 of 64 hex chars) — wrong.
-			// Use bytes-hex list encoding when the tag is missing so stale bindings still produce a valid ledger payload.
-			if hexTag == "" && field.Kind() == reflect.Slice &&
-				field.Type().Elem() == reflect.TypeOf(types.TEXT("")) &&
-				isBytesHexTextListField(fieldType.Name) {
-				encoded, err = c.encodeBytesHexTextListSlice(field)
-			} else if hexTag == "" && field.Kind() == reflect.String &&
-				field.Type() == reflect.TypeOf(types.TEXT("")) &&
-				fieldType.Name == "OffRampAddress" {
-				s := strings.TrimPrefix(strings.TrimPrefix(strings.TrimSpace(field.String()), "0x"), "0X")
-				decoded, decErr := hex.DecodeString(s)
-				if decErr != nil {
-					return nil, fmt.Errorf("field %s: %w", fieldType.Name, decErr)
-				}
-				encoded = c.encodeBytes(decoded)
-			} else if hexTag == "" && field.Kind() == reflect.String &&
+			if hexTag == "" && field.Kind() == reflect.String &&
 				field.Type() == reflect.TypeOf(types.NUMERIC("")) &&
 				isDecimalNumericField(fieldType.Name) {
 				encoded, err = c.encodeDecimalString(string(field.String()))
@@ -1129,24 +1102,7 @@ func (c *HexCodec) decodeStruct(data []byte, offset int, target reflect.Value) (
 			}
 			// flag == 0x00: leave field as nil (zero value)
 		default:
-			if hexTag == "" && field.Kind() == reflect.Slice &&
-				field.Type().Elem() == reflect.TypeOf(types.TEXT("")) &&
-				isBytesHexTextListField(fieldType.Name) {
-				offset, err = c.decodeBytesHexTextListSlice(data, offset, field)
-			} else if hexTag == "" && field.Kind() == reflect.String &&
-				field.Type() == reflect.TypeOf(types.TEXT("")) &&
-				fieldType.Name == "OffRampAddress" {
-				if offset >= len(data) {
-					return offset, fmt.Errorf("not enough data for offRampAddress length at offset %d", offset)
-				}
-				blen := int(data[offset])
-				offset++
-				if offset+blen > len(data) {
-					return offset, fmt.Errorf("not enough data for offRampAddress (%d bytes) at offset %d", blen, offset)
-				}
-				field.SetString(hex.EncodeToString(data[offset : offset+blen]))
-				offset += blen
-			} else if hexTag == "" && field.Kind() == reflect.String &&
+			if hexTag == "" && field.Kind() == reflect.String &&
 				field.Type() == reflect.TypeOf(types.NUMERIC("")) &&
 				isDecimalNumericField(fieldType.Name) {
 				decoded, newOffset, decErr := c.decodeDecimalAt(data, offset)
