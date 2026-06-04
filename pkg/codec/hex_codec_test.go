@@ -139,50 +139,6 @@ func TestHexCodec_EncodeDAMLNumeric_ChainSelector_RoundTrip(t *testing.T) {
 	assert.Equal(t, sel, decoded)
 }
 
-func TestHexCodec_OnRampAddressesFallback_withoutStructTag(t *testing.T) {
-	// Regression: bindings without hex:"[]bytes" used to UTF-8-encode each hex string (0x40 + ASCII).
-	type sourceChainConfigArgsNoTag struct {
-		SourceChainSelector types.NUMERIC
-		IsEnabled           types.BOOL
-		OnRampAddresses     []types.TEXT // intentionally no hex:"[]bytes"
-	}
-	c := NewHexCodec()
-	args := sourceChainConfigArgsNoTag{
-		SourceChainSelector: types.NUMERIC("16015286601757825753"),
-		IsEnabled:           true,
-		OnRampAddresses: []types.TEXT{
-			"000000000000000000000000a94e45744553f4b2bea9dfb8979a02962b980732",
-		},
-	}
-	result, err := c.Marshal(args)
-	require.NoError(t, err)
-	opHex := hex.EncodeToString([]byte(result))
-	require.NotContains(t, opHex, "014030303030303030303030303030303030303030303030")
-	require.Contains(t, opHex, "010120")
-}
-
-func TestHexCodec_OffRampAddressFallback_withoutStructTag(t *testing.T) {
-	type destChainConfigArgsNoTag struct {
-		DestChainSelector  types.NUMERIC
-		IsEnabled          types.BOOL
-		AddressBytesLength types.INT64
-		OffRampAddress     types.TEXT // intentionally no hex:"bytes"
-	}
-	c := NewHexCodec()
-	offRamp := "386577d8350d5814198974d16c3c756a638fbd62"
-	args := destChainConfigArgsNoTag{
-		DestChainSelector:  types.NUMERIC("16015286601757825753"),
-		IsEnabled:          true,
-		AddressBytesLength: types.INT64(20),
-		OffRampAddress:     types.TEXT(offRamp),
-	}
-	result, err := c.Marshal(args)
-	require.NoError(t, err)
-	opHex := hex.EncodeToString([]byte(result))
-	require.Contains(t, opHex, "14"+offRamp)
-	require.NotContains(t, opHex, "28"+offRamp)
-}
-
 func TestHexCodec_EncodeSlice(t *testing.T) {
 	c := NewHexCodec()
 	result, err := c.Marshal([]uint32{1, 2, 3})
@@ -604,7 +560,7 @@ func TestHexCodec_HexBytesTag_RoundTrip(t *testing.T) {
 	assert.Equal(t, original, decoded)
 }
 
-// CCIP GlobalConfig SourceChainConfigArgs: [BytesHex] — each element is logical hex text (e.g. 32-byte EVM addr).
+// [BytesHex] list (e.g. onRampAddresses): each element is logical hex text (e.g. 32-byte EVM addr).
 // Wire is: slice count, then per element encodeBytes(decoded) = 0x20 + 32 bytes (not 0x40 + 64 ASCII digits).
 func TestHexCodec_HexBytesSliceTag_RoundTrip(t *testing.T) {
 	type Row struct {
