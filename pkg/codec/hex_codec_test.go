@@ -1646,3 +1646,171 @@ func TestHexCodec_UsdPerUnitGas_DecimalEncoding(t *testing.T) {
 func toHex(s string) string {
 	return hex.EncodeToString([]byte(s))
 }
+
+// testFinality mirrors a generated tag-byte variant (e.g. FinalityConfig):
+// pointer constructor fields + GetVariantTag/GetVariantValue/GetVariantTagByte.
+type testFinality struct {
+	WaitForFinality *types.UNIT  `json:"WaitForFinality,omitempty"`
+	WaitForSafe     *types.UNIT  `json:"WaitForSafe,omitempty"`
+	BlockDepth      *types.INT64 `json:"BlockDepth,omitempty"`
+}
+
+func (v testFinality) GetVariantTag() string {
+	switch {
+	case v.WaitForFinality != nil:
+		return "WaitForFinality"
+	case v.WaitForSafe != nil:
+		return "WaitForSafe"
+	case v.BlockDepth != nil:
+		return "BlockDepth"
+	}
+	return ""
+}
+
+func (v testFinality) GetVariantValue() interface{} {
+	switch {
+	case v.WaitForFinality != nil:
+		return v.WaitForFinality
+	case v.WaitForSafe != nil:
+		return v.WaitForSafe
+	case v.BlockDepth != nil:
+		return v.BlockDepth
+	}
+	return nil
+}
+
+func (v testFinality) GetVariantTagByte() byte {
+	switch {
+	case v.WaitForFinality != nil:
+		return 0
+	case v.WaitForSafe != nil:
+		return 1
+	case v.BlockDepth != nil:
+		return 2
+	}
+	return 0xFF
+}
+
+// testShape mirrors a generated text-tag variant (no GetVariantTagByte).
+type testShape struct {
+	Circle *types.INT64 `json:"Circle,omitempty"`
+	Point  *types.UNIT  `json:"Point,omitempty"`
+}
+
+func (v testShape) GetVariantTag() string {
+	switch {
+	case v.Circle != nil:
+		return "Circle"
+	case v.Point != nil:
+		return "Point"
+	}
+	return ""
+}
+
+func (v testShape) GetVariantValue() interface{} {
+	switch {
+	case v.Circle != nil:
+		return v.Circle
+	case v.Point != nil:
+		return v.Point
+	}
+	return nil
+}
+
+func TestHexCodec_DecodeVariantTagByte_UnitPayload(t *testing.T) {
+	c := NewHexCodec()
+
+	var decoded testFinality
+	err := c.Unmarshal("00", &decoded)
+	require.NoError(t, err)
+	require.NotNil(t, decoded.WaitForFinality)
+	assert.Nil(t, decoded.WaitForSafe)
+	assert.Nil(t, decoded.BlockDepth)
+
+	err = c.Unmarshal("01", &decoded)
+	require.NoError(t, err)
+	require.NotNil(t, decoded.WaitForSafe)
+}
+
+func TestHexCodec_DecodeVariantTagByte_Int64Payload(t *testing.T) {
+	c := NewHexCodec()
+
+	var decoded testFinality
+	err := c.Unmarshal("020000000000000005", &decoded)
+	require.NoError(t, err)
+	require.NotNil(t, decoded.BlockDepth)
+	assert.Equal(t, types.INT64(5), *decoded.BlockDepth)
+}
+
+func TestHexCodec_DecodeVariantTagByte_UnknownTag(t *testing.T) {
+	c := NewHexCodec()
+
+	var decoded testFinality
+	err := c.Unmarshal("07", &decoded)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unknown variant tag byte 0x07")
+}
+
+func TestHexCodec_VariantTagByte_RoundTrip(t *testing.T) {
+	c := NewHexCodec()
+
+	depth := types.INT64(12)
+	for _, original := range []testFinality{
+		{WaitForFinality: &types.UNIT{}},
+		{WaitForSafe: &types.UNIT{}},
+		{BlockDepth: &depth},
+	} {
+		encoded, err := c.Marshal(original)
+		require.NoError(t, err)
+
+		var decoded testFinality
+		err = c.Unmarshal(hex.EncodeToString([]byte(encoded)), &decoded)
+		require.NoError(t, err)
+		assert.Equal(t, original, decoded)
+
+		reEncoded, err := c.Marshal(decoded)
+		require.NoError(t, err)
+		assert.Equal(t, encoded, reEncoded)
+	}
+}
+
+func TestHexCodec_VariantTextTag_RoundTrip(t *testing.T) {
+	c := NewHexCodec()
+
+	radius := types.INT64(3)
+	for _, original := range []testShape{
+		{Circle: &radius},
+		{Point: &types.UNIT{}},
+	} {
+		encoded, err := c.Marshal(original)
+		require.NoError(t, err)
+
+		var decoded testShape
+		err = c.Unmarshal(hex.EncodeToString([]byte(encoded)), &decoded)
+		require.NoError(t, err)
+		assert.Equal(t, original, decoded)
+	}
+}
+
+func TestHexCodec_DecodeVariantNestedInStruct(t *testing.T) {
+	c := NewHexCodec()
+
+	type deployParams struct {
+		InstanceId types.TEXT   `json:"instanceId"`
+		Finality   testFinality `json:"finality"`
+		Enabled    types.BOOL   `json:"enabled"`
+	}
+
+	original := deployParams{
+		InstanceId: "executor-1",
+		Finality:   testFinality{WaitForFinality: &types.UNIT{}},
+		Enabled:    false,
+	}
+	encoded, err := c.Marshal(original)
+	require.NoError(t, err)
+
+	var decoded deployParams
+	err = c.Unmarshal(hex.EncodeToString([]byte(encoded)), &decoded)
+	require.NoError(t, err)
+	assert.Equal(t, original, decoded)
+}

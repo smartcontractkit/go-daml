@@ -770,6 +770,11 @@ func (c *HexCodec) decodeValue(data []byte, offset int, target reflect.Value) (i
 		return newOffset, nil
 	}
 
+	// Handle VARIANT types before generic struct decoding (mirrors encodeVariant)
+	if target.Kind() == reflect.Struct && targetType.Implements(variantInterfaceType) {
+		return c.decodeVariant(data, offset, target)
+	}
+
 	// Handle Go types based on kind
 	switch target.Kind() {
 	case reflect.String:
@@ -886,6 +891,86 @@ func (c *HexCodec) decodeText(data []byte, offset int) (string, int, error) {
 		return "", offset, fmt.Errorf("not enough data for UTF-8 text of length %d at offset %d", n, offset)
 	}
 	return string(data[offset : offset+n]), offset + n, nil
+}
+
+var (
+	variantInterfaceType        = reflect.TypeOf((*types.VARIANT)(nil)).Elem()
+	variantTagByteInterfaceType = reflect.TypeOf((*types.VariantWithTagByte)(nil)).Elem()
+)
+
+// decodeVariant is the inverse of encodeVariant: a tag byte (VariantWithTagByte) or a
+// length-prefixed text tag (plain VARIANT) selects the constructor, then its payload is
+// decoded into the matching pointer field of the generated variant struct.
+func (c *HexCodec) decodeVariant(data []byte, offset int, target reflect.Value) (int, error) {
+	targetType := target.Type()
+
+	if targetType.Implements(variantTagByteInterfaceType) {
+		if offset >= len(data) {
+			return offset, fmt.Errorf("not enough data for variant tag byte at offset %d", offset)
+		}
+		tag := data[offset]
+		fieldIndex, err := variantFieldForTagByte(targetType, tag)
+		if err != nil {
+			return offset, err
+		}
+		return c.decodeVariantField(data, offset+1, target, fieldIndex)
+	}
+
+	tag, newOffset, err := c.decodeText(data, offset)
+	if err != nil {
+		return offset, fmt.Errorf("failed to decode variant tag: %w", err)
+	}
+	for i := 0; i < targetType.NumField(); i++ {
+		field := targetType.Field(i)
+		if field.PkgPath != "" || field.Type.Kind() != reflect.Ptr {
+			continue
+		}
+		if variantConstructorName(field) == tag {
+			return c.decodeVariantField(data, newOffset, target, i)
+		}
+	}
+	return offset, fmt.Errorf("unknown variant tag %q for type %v", tag, targetType)
+}
+
+// variantFieldForTagByte finds the constructor field whose tag byte matches: for each
+// candidate it probes a value with only that field set and asks GetVariantTagByte, so the
+// (possibly non-sequential) generated mapping stays the single source of truth.
+func variantFieldForTagByte(t reflect.Type, tag byte) (int, error) {
+	for i := 0; i < t.NumField(); i++ {
+		field := t.Field(i)
+		if field.PkgPath != "" || field.Type.Kind() != reflect.Ptr {
+			continue
+		}
+		probe := reflect.New(t).Elem()
+		probe.Field(i).Set(reflect.New(field.Type.Elem()))
+		if probe.Interface().(types.VariantWithTagByte).GetVariantTagByte() == tag {
+			return i, nil
+		}
+	}
+	return -1, fmt.Errorf("unknown variant tag byte 0x%02x for type %v", tag, t)
+}
+
+func (c *HexCodec) decodeVariantField(data []byte, offset int, target reflect.Value, fieldIndex int) (int, error) {
+	fieldType := target.Type().Field(fieldIndex)
+	value := reflect.New(fieldType.Type.Elem())
+	newOffset, err := c.decodeValue(data, offset, value.Elem())
+	if err != nil {
+		return offset, fmt.Errorf("failed to decode variant constructor %s: %w", fieldType.Name, err)
+	}
+	target.Field(fieldIndex).Set(value)
+	return newOffset, nil
+}
+
+// variantConstructorName returns the Daml constructor name for a variant struct field,
+// matching what GetVariantTag returns (the json tag, falling back to the Go field name).
+func variantConstructorName(field reflect.StructField) string {
+	if tag := field.Tag.Get("json"); tag != "" {
+		if comma := strings.Index(tag, ","); comma >= 0 {
+			return tag[:comma]
+		}
+		return tag
+	}
+	return field.Name
 }
 
 func (c *HexCodec) decodeSlice(data []byte, offset int, target reflect.Value) (int, error) {
