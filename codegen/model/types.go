@@ -103,6 +103,11 @@ type FieldHints struct {
 	// a map of constructor names to their numeric tag bytes for MCMS encoding.
 	// Example: {"MyModule.TransferTimeout": {"Indefinite": 0x00, "RelativeHours": 0x01}}
 	VariantTagByteMap map[string]map[string]byte
+	// EnumTagByteMap: maps fully-qualified enum type name (e.g. "CCIP.RateLimiter.RateLimitDirection") to
+	// a map of constructor names to their uint8 ordinal bytes for MCMS encoding.
+	// The ordinals must match the Daml MCMS codec's decodeXxxAt single-byte case statement.
+	// Example: {"CCIP.RateLimiter.RateLimitDirection": {"RateLimitDirection_Outbound": 0, "RateLimitDirection_Inbound": 1}}
+	EnumTagByteMap map[string]map[string]byte
 	// ChoiceParamEncoderNames: function/choice names whose corresponding <Name>Params record
 	// should get a typed encoder even when <Name> is not a Daml template choice.
 	// This is useful for dispatcher-style operationData payloads.

@@ -1814,3 +1814,107 @@ func TestHexCodec_DecodeVariantNestedInStruct(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, original, decoded)
 }
+
+// testDirection implements types.EnumWithTagByte, mirroring a generated CCIP enum
+// (e.g. RateLimitDirection: Outbound=0, Inbound=1).
+type testDirection string
+
+const (
+	testDirectionOutbound testDirection = "Outbound"
+	testDirectionInbound  testDirection = "Inbound"
+)
+
+func (e testDirection) GetEnumConstructor() string { return string(e) }
+func (e testDirection) GetEnumTypeID() string      { return "#test:Test:testDirection" }
+
+func (e testDirection) GetEnumTagByte() byte {
+	switch e {
+	case testDirectionOutbound:
+		return 0
+	case testDirectionInbound:
+		return 1
+	}
+	return 0xFF
+}
+
+func (e testDirection) EnumConstructorForTagByte(tag byte) (string, bool) {
+	switch tag {
+	case 0:
+		return string(testDirectionOutbound), true
+	case 1:
+		return string(testDirectionInbound), true
+	}
+	return "", false
+}
+
+func TestHexCodec_EncodeEnumTagByte(t *testing.T) {
+	c := NewHexCodec()
+
+	encoded, err := c.Marshal(testDirectionOutbound)
+	require.NoError(t, err)
+	assert.Equal(t, []byte{0x00}, []byte(encoded))
+
+	encoded, err = c.Marshal(testDirectionInbound)
+	require.NoError(t, err)
+	assert.Equal(t, []byte{0x01}, []byte(encoded))
+}
+
+func TestHexCodec_DecodeEnumTagByte(t *testing.T) {
+	c := NewHexCodec()
+
+	var d testDirection
+	require.NoError(t, c.Unmarshal("00", &d))
+	assert.Equal(t, testDirectionOutbound, d)
+
+	require.NoError(t, c.Unmarshal("01", &d))
+	assert.Equal(t, testDirectionInbound, d)
+}
+
+func TestHexCodec_DecodeEnumTagByte_UnknownTag(t *testing.T) {
+	c := NewHexCodec()
+
+	var d testDirection
+	err := c.Unmarshal("07", &d)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unknown enum tag byte 0x07")
+}
+
+func TestHexCodec_EnumTagByte_RoundTrip(t *testing.T) {
+	c := NewHexCodec()
+
+	for _, original := range []testDirection{testDirectionOutbound, testDirectionInbound} {
+		encoded, err := c.Marshal(original)
+		require.NoError(t, err)
+
+		var decoded testDirection
+		require.NoError(t, c.Unmarshal(hex.EncodeToString([]byte(encoded)), &decoded))
+		assert.Equal(t, original, decoded)
+	}
+}
+
+func TestHexCodec_EnumTagByte_NestedInStruct(t *testing.T) {
+	c := NewHexCodec()
+
+	type rateLimitParams struct {
+		InstanceId types.TEXT    `json:"instanceId"`
+		Direction  testDirection `json:"direction"`
+		Enabled    types.BOOL    `json:"enabled"`
+	}
+
+	original := rateLimitParams{
+		InstanceId: "rl-1",
+		Direction:  testDirectionInbound,
+		Enabled:    true,
+	}
+	encoded, err := c.Marshal(original)
+	require.NoError(t, err)
+
+	// Direction must be a single byte (0x01), not a string
+	raw := []byte(encoded)
+	// InstanceId: 0x04 "rl-1" = 5 bytes; then direction byte
+	assert.Equal(t, byte(0x01), raw[5])
+
+	var decoded rateLimitParams
+	require.NoError(t, c.Unmarshal(hex.EncodeToString(raw), &decoded))
+	assert.Equal(t, original, decoded)
+}

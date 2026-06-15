@@ -316,6 +316,30 @@ func (e *{{capitalise .Name}}) UnmarshalHex(data string) error {
 
 var _ types.ENUM = {{capitalise .Name}}("")
 
+{{if .EnumTagMapping}}
+// GetEnumTagByte implements types.EnumWithTagByte interface for MCMS single-byte ordinal encoding.
+func (e {{capitalise .Name}}) GetEnumTagByte() byte {
+	{{$tagMap := .EnumTagMapping}}{{range $field := .Fields}}{{if hasKey $tagMap $field.Name}}
+	if string(e) == "{{$field.Name}}" {
+		return {{index $tagMap $field.Name}}
+	}
+	{{end}}{{end}}
+	return 0xFF // Invalid/unknown constructor
+}
+
+// EnumConstructorForTagByte implements types.EnumWithTagByte: reverse maps a tag byte to constructor name.
+func (e {{capitalise .Name}}) EnumConstructorForTagByte(tag byte) (string, bool) {
+	{{$tagMap := .EnumTagMapping}}{{range $field := .Fields}}{{if hasKey $tagMap $field.Name}}
+	if tag == {{index $tagMap $field.Name}} {
+		return "{{$field.Name}}", true
+	}
+	{{end}}{{end}}
+	return "", false
+}
+
+var _ types.EnumWithTagByte = {{capitalise .Name}}("")
+{{end}}
+
 {{else}}
 // {{capitalise .Name}} is a {{.RawType}} type
 type {{capitalise .Name}} struct {

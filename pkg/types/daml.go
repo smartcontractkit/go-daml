@@ -58,6 +58,15 @@ type ENUM interface {
 	GetEnumTypeID() string
 }
 
+// EnumWithTagByte extends ENUM with single-byte ordinal encoding for MCMS compatibility.
+// Enums implementing this interface encode/decode as a single uint8 tag byte rather than
+// a length-prefixed constructor-name string, matching the Daml MCMS codec wire format.
+type EnumWithTagByte interface {
+	ENUM
+	GetEnumTagByte() byte
+	EnumConstructorForTagByte(byte) (string, bool)
+}
+
 func (p PARTY) ToMap() map[string]interface{} {
 	return map[string]interface{}{
 		"_type": "party",

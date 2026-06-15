@@ -29,6 +29,9 @@ type TmplStruct struct {
 	// VariantTagMapping maps variant field names to their numeric tag bytes for MCMS encoding.
 	// When set, codegen generates GetVariantTagByte() method implementing VariantWithTagByte interface.
 	VariantTagMapping map[string]byte
+	// EnumTagMapping maps enum constructor names to their uint8 ordinal bytes for MCMS encoding.
+	// When set, codegen generates GetEnumTagByte/EnumConstructorForTagByte implementing EnumWithTagByte.
+	EnumTagMapping map[string]byte
 }
 
 type TmplField struct {

@@ -111,8 +111,10 @@ func (c *HexCodec) encode(value interface{}) ([]byte, error) {
 		return c.encodeTuple2(v)
 	}
 
-	// Handle DAML enum/variant types (types with GetEnumConstructor method)
-	// These are string-based enums that should be encoded as their constructor name
+	// Handle DAML enum types: tag-byte path first (MCMS wire format), then constructor-name string.
+	if e, ok := value.(types.EnumWithTagByte); ok {
+		return []byte{e.GetEnumTagByte()}, nil
+	}
 	type enumConstructorGetter interface {
 		GetEnumConstructor() string
 	}
@@ -775,6 +777,21 @@ func (c *HexCodec) decodeValue(data []byte, offset int, target reflect.Value) (i
 		return c.decodeVariant(data, offset, target)
 	}
 
+	// Handle tag-byte enums before generic string decoding (mirrors EnumWithTagByte encode path)
+	if target.Kind() == reflect.String && reflect.PointerTo(targetType).Implements(enumTagByteInterfaceType) {
+		if offset >= len(data) {
+			return offset, fmt.Errorf("not enough data for enum tag byte at offset %d", offset)
+		}
+		tag := data[offset]
+		zero := reflect.Zero(targetType).Interface()
+		name, ok := zero.(types.EnumWithTagByte).EnumConstructorForTagByte(tag)
+		if !ok {
+			return offset, fmt.Errorf("unknown enum tag byte 0x%02x for type %v", tag, targetType)
+		}
+		target.SetString(name)
+		return offset + 1, nil
+	}
+
 	// Handle Go types based on kind
 	switch target.Kind() {
 	case reflect.String:
@@ -896,6 +913,7 @@ func (c *HexCodec) decodeText(data []byte, offset int) (string, int, error) {
 var (
 	variantInterfaceType        = reflect.TypeOf((*types.VARIANT)(nil)).Elem()
 	variantTagByteInterfaceType = reflect.TypeOf((*types.VariantWithTagByte)(nil)).Elem()
+	enumTagByteInterfaceType    = reflect.TypeOf((*types.EnumWithTagByte)(nil)).Elem()
 )
 
 // decodeVariant is the inverse of encodeVariant: a tag byte (VariantWithTagByte) or a
