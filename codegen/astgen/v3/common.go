@@ -657,6 +657,10 @@ func (c *codeGenAst) getDataTypes(pkg *daml.Package, module *daml.Module, module
 			}
 		case *daml.DefDataType_Enum:
 			tmplStruct.RawType = RawTypeEnum
+			enumKey := moduleName + "." + name
+			if tagMap, exists := c.fieldHints.EnumTagByteMap[enumKey]; exists {
+				tmplStruct.EnumTagMapping = tagMap
+			}
 			for _, constructorIdx := range v.Enum.ConstructorsInternedStr {
 				if int(constructorIdx) < len(pkg.InternedStrings) {
 					constructorName := pkg.InternedStrings[constructorIdx]
