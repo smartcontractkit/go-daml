@@ -633,3 +633,133 @@ func TestBindChoiceEncoderFallsBackForDuplicateChoiceNames(t *testing.T) {
 		t.Error("Generated code should still encode the original duplicate Daml choice name")
 	}
 }
+
+func TestBindChoiceOperationDataParamsMapping(t *testing.T) {
+	structs := map[string]*model.TmplStruct{
+		"TokenAdminRegistry": {
+			Name:       "TokenAdminRegistry",
+			DAMLName:   "TokenAdminRegistry",
+			RawType:    "Template",
+			IsTemplate: true,
+			Choices: []*model.TmplChoice{
+				{Name: "ProposeAdministrator", ArgType: model.Unknown{String: "ProposeAdministrator"}},
+				{Name: "SetPool", ArgType: model.Unknown{String: "SetPool"}},
+			},
+		},
+		"ProposeAdministrator": {
+			Name:     "ProposeAdministrator",
+			DAMLName: "ProposeAdministrator",
+			RawType:  "Record",
+			Fields: []*model.TmplField{
+				{Name: "tokenConfigCid", Type: model.ContractId{}, IsOptional: true},
+				{Name: "instrumentId", Type: model.Text{}},
+				{Name: "newAdmin", Type: model.Party{}},
+				{Name: "caller", Type: model.Party{}},
+			},
+		},
+		"ProposeAdminParams": {
+			Name:     "ProposeAdminParams",
+			DAMLName: "ProposeAdminParams",
+			RawType:  "Record",
+			Fields: []*model.TmplField{
+				{Name: "instrumentId", Type: model.Text{}},
+				{Name: "newAdmin", Type: model.Party{}},
+			},
+		},
+		"SetPool": {
+			Name:     "SetPool",
+			DAMLName: "SetPool",
+			RawType:  "Record",
+			Fields: []*model.TmplField{
+				{Name: "tokenConfigCid", Type: model.ContractId{}},
+				{Name: "instrumentId", Type: model.Text{}},
+				{Name: "caller", Type: model.Party{}},
+			},
+		},
+		"SetPoolParams": {
+			Name:     "SetPoolParams",
+			DAMLName: "SetPoolParams",
+			RawType:  "Record",
+			Fields: []*model.TmplField{
+				{Name: "instrumentId", Type: model.Text{}},
+			},
+		},
+	}
+
+	pkg := &model.Package{
+		Name:    "test-tar",
+		Structs: structs,
+	}
+
+	result, err := Bind("tar", pkg, "3.4.10", true, true, model.FieldHints{
+		ChoiceOperationDataParams: map[string]string{
+			"ProposeAdministrator": "ProposeAdminParams",
+		},
+	})
+	if err != nil {
+		t.Fatalf("Bind failed: %v", err)
+	}
+
+	if !strings.Contains(result, `func (e *encoder) ProposeAdministrator(args ProposeAdminParams) (*bind.EncodedChoice, error)`) {
+		t.Error("Generated code should map ProposeAdministrator choice to ProposeAdminParams encoder")
+	}
+	if !strings.Contains(result, `return e.EncodeChoiceArgs("ProposeAdministrator", args)`) {
+		t.Error("Generated code should encode the mapped MCMS choice name")
+	}
+	if strings.Contains(result, `ProposeAdministratorMCMSParams`) {
+		t.Error("Generated code should not emit MCMSParams when ChoiceOperationDataParams mapping exists")
+	}
+	if strings.Contains(result, `func (e *encoder) ProposeAdministrator(args ProposeAdministrator)`) {
+		t.Error("Generated code should not keep the full choice-arg encoder when mapped Params exist")
+	}
+	if !strings.Contains(result, `func (e *encoder) SetPoolParams(args SetPoolParams)`) {
+		t.Error("Generated code should keep conventional SetPoolParams encoder")
+	}
+}
+
+func TestBindMCMSParamsOmitsContractIdFields(t *testing.T) {
+	structs := map[string]*model.TmplStruct{
+		"TokenAdminRegistry": {
+			Name:       "TokenAdminRegistry",
+			DAMLName:   "TokenAdminRegistry",
+			RawType:    "Template",
+			IsTemplate: true,
+			Choices: []*model.TmplChoice{
+				{Name: "SetPool", ArgType: model.Unknown{String: "SetPool"}},
+			},
+		},
+		"SetPool": {
+			Name:     "SetPool",
+			DAMLName: "SetPool",
+			RawType:  "Record",
+			Fields: []*model.TmplField{
+				{Name: "tokenConfigCid", Type: model.ContractId{}},
+				{Name: "instrumentId", Type: model.Text{}},
+				{Name: "caller", Type: model.Party{}},
+			},
+		},
+	}
+
+	pkg := &model.Package{
+		Name:    "test-tar-setpool",
+		Structs: structs,
+	}
+
+	result, err := Bind("tar", pkg, "3.4.10", true, true)
+	if err != nil {
+		t.Fatalf("Bind failed: %v", err)
+	}
+
+	if !strings.Contains(result, `type SetPoolMCMSParams struct`) {
+		t.Fatal("expected SetPoolMCMSParams struct")
+	}
+	start := strings.Index(result, `type SetPoolMCMSParams struct`)
+	end := strings.Index(result[start:], `func (t SetPoolMCMSParams) MarshalHex`)
+	if end < 0 {
+		t.Fatal("expected SetPoolMCMSParams MarshalHex method")
+	}
+	mcmsStruct := result[start : start+end]
+	if strings.Contains(mcmsStruct, `TokenConfigCid`) || strings.Contains(mcmsStruct, `tokenConfigCid`) {
+		t.Errorf("SetPoolMCMSParams should omit ContractId fields, got:\n%s", mcmsStruct)
+	}
+}

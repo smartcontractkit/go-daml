@@ -13,19 +13,22 @@ import (
 )
 
 type tmplData struct {
-	Package            string
-	PackageID          string
-	PackageName        string
-	SdkVersion         string
-	Structs            map[string]*model.TmplStruct
-	Consts             []*model.TmplConst
-	IsMainDalf         bool
-	GenerateHexCodec   bool
-	ChoiceArgTypes     map[string]bool // Types used as choice arguments (for Encode functions)
-	ChoiceArgChoices   map[string]string
-	ParamEncoderNames  map[string]bool
-	EncoderMethodNames map[string]string
-	ImportedPackages   []model.ExternalPackage
+	Package                     string
+	PackageID                   string
+	PackageName                 string
+	SdkVersion                  string
+	Structs                     map[string]*model.TmplStruct
+	Consts                      []*model.TmplConst
+	IsMainDalf                  bool
+	GenerateHexCodec            bool
+	ChoiceArgTypes              map[string]bool // Types used as choice arguments (for Encode functions)
+	ChoiceArgChoices            map[string]string
+	ParamEncoderNames           map[string]bool
+	EncoderMethodNames          map[string]string
+	EncoderChoiceNames          map[string]string
+	OperationDataParamsByStruct map[string]string
+	OperationDataParamsByChoice map[string]string
+	ImportedPackages            []model.ExternalPackage
 }
 
 //go:embed source.go.tmpl
@@ -65,22 +68,43 @@ func Bind(genPkg string, pkg *model.Package, sdkVersion string, isMainDalf bool,
 			paramEncoderNames[name] = true
 		}
 	}
-	encoderMethodNames := buildEncoderMethodNames(pkg.Structs, choiceArgTypes, choiceArgChoices, paramEncoderNames, choiceNameCounts)
+	operationDataParamsByStruct := make(map[string]string)
+	operationDataParamsByChoice := make(map[string]string)
+	for choiceName, paramsStructName := range hints.ChoiceOperationDataParams {
+		if choiceName == "" || paramsStructName == "" {
+			continue
+		}
+		operationDataParamsByStruct[paramsStructName] = choiceName
+		operationDataParamsByChoice[choiceName] = paramsStructName
+		paramEncoderNames[choiceName] = true
+	}
+	encoderMethodNames, encoderChoiceNames := buildEncoderMethodNames(
+		pkg.Structs,
+		choiceArgTypes,
+		choiceArgChoices,
+		paramEncoderNames,
+		choiceNameCounts,
+		operationDataParamsByStruct,
+		operationDataParamsByChoice,
+	)
 
 	data := &tmplData{
-		Package:            genPkg,
-		PackageID:          pkg.PackageID,
-		PackageName:        pkg.Name,
-		SdkVersion:         sdkVersion,
-		Structs:            pkg.Structs,
-		Consts:             pkg.Consts,
-		IsMainDalf:         isMainDalf,
-		GenerateHexCodec:   generateHexCodec,
-		ChoiceArgTypes:     choiceArgTypes,
-		ChoiceArgChoices:   choiceArgChoices,
-		ParamEncoderNames:  paramEncoderNames,
-		EncoderMethodNames: encoderMethodNames,
-		ImportedPackages:   pkg.ImportedPackages,
+		Package:                     genPkg,
+		PackageID:                   pkg.PackageID,
+		PackageName:                 pkg.Name,
+		SdkVersion:                  sdkVersion,
+		Structs:                     pkg.Structs,
+		Consts:                      pkg.Consts,
+		IsMainDalf:                  isMainDalf,
+		GenerateHexCodec:            generateHexCodec,
+		ChoiceArgTypes:              choiceArgTypes,
+		ChoiceArgChoices:            choiceArgChoices,
+		ParamEncoderNames:           paramEncoderNames,
+		EncoderMethodNames:          encoderMethodNames,
+		EncoderChoiceNames:          encoderChoiceNames,
+		OperationDataParamsByStruct: operationDataParamsByStruct,
+		OperationDataParamsByChoice: operationDataParamsByChoice,
+		ImportedPackages:            pkg.ImportedPackages,
 	}
 	buffer := new(bytes.Buffer)
 
@@ -109,6 +133,19 @@ func Bind(genPkg string, pkg *model.Package, sdkVersion string, isMainDalf bool,
 		},
 		"isCallerField": func(fieldName string) bool {
 			return strings.EqualFold(fieldName, "caller")
+		},
+		"isContractIdField": func(f *model.TmplField) bool {
+			if f == nil {
+				return false
+			}
+			if _, ok := f.Type.(model.ContractId); ok {
+				return true
+			}
+			if f.Type.GoType() == "types.CONTRACT_ID" {
+				return true
+			}
+			name := strings.ToLower(f.Name)
+			return strings.HasSuffix(name, "cid") || strings.HasSuffix(name, "contractid")
 		},
 		"damlName": func(s *model.TmplStruct) string {
 			if s.DAMLName != "" {
@@ -140,8 +177,11 @@ func buildEncoderMethodNames(
 	choiceArgChoices map[string]string,
 	paramEncoderNames map[string]bool,
 	choiceNameCounts map[string]int,
-) map[string]string {
+	operationDataParamsByStruct map[string]string,
+	operationDataParamsByChoice map[string]string,
+) (map[string]string, map[string]string) {
 	names := make(map[string]string)
+	choiceNames := make(map[string]string)
 	used := make(map[string]bool)
 	structNames := sortedStructNames(structs)
 
@@ -157,11 +197,20 @@ func buildEncoderMethodNames(
 		}
 
 		choiceName := choiceArgChoices[goName]
+		if choiceName != "" {
+			if _, mapped := operationDataParamsByChoice[choiceName]; mapped {
+				continue
+			}
+		}
+
 		methodName := goName
 		if choiceName != "" && choiceNameCounts[choiceName] == 1 {
 			methodName = capitalize(choiceName)
 		}
 		names[goName] = reserveMethodName(methodName, goName, used)
+		if choiceName != "" {
+			choiceNames[goName] = choiceName
+		}
 	}
 
 	for _, structName := range structNames {
@@ -183,6 +232,12 @@ func buildEncoderMethodNames(
 			continue
 		}
 
+		if mappedChoice, ok := operationDataParamsByStruct[damlName]; ok {
+			names[goName] = reserveMethodName(capitalize(mappedChoice), goName, used)
+			choiceNames[goName] = mappedChoice
+			continue
+		}
+
 		baseName := strings.TrimSuffix(damlName, "Params")
 		if !paramEncoderNames[baseName] {
 			continue
@@ -191,9 +246,10 @@ func buildEncoderMethodNames(
 		preferred := capitalize(baseName)
 		fallback := preferred + "Params"
 		names[goName] = reserveMethodName(preferred, fallback, used)
+		choiceNames[goName] = baseName
 	}
 
-	return names
+	return names, choiceNames
 }
 
 func sortedStructNames(structs map[string]*model.TmplStruct) []string {

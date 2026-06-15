@@ -107,6 +107,10 @@ type FieldHints struct {
 	// should get a typed encoder even when <Name> is not a Daml template choice.
 	// This is useful for dispatcher-style operationData payloads.
 	ChoiceParamEncoderNames map[string]bool
+	// ChoiceOperationDataParams maps an MCMS choice/function name to the Params record name
+	// used in operationData when they don't follow the {Choice}Params naming convention.
+	// Example: "ProposeAdministrator" -> "ProposeAdminParams"
+	ChoiceOperationDataParams map[string]string
 }
 
 type Int64 struct {

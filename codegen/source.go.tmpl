@@ -373,12 +373,14 @@ func (t *{{capitalise .Name}}) UnmarshalHex(data string) error {
 
 {{/* Generate MCMSParams struct for choice arg types with caller field */}}
 {{- $isChoiceArgType := index $.ChoiceArgTypes (capitalise .Name)}}
-{{- if and $isChoiceArgType (hasCallerField .)}}
+{{- $choiceNameForMCMS := index $.ChoiceArgChoices (capitalise .Name)}}
+{{- $hasOperationDataMapping := and $choiceNameForMCMS (index $.OperationDataParamsByChoice $choiceNameForMCMS)}}
+{{- if and $isChoiceArgType (hasCallerField .) (not $hasOperationDataMapping)}}
 // {{capitalise .Name}}MCMSParams is {{capitalise .Name}} without the Caller field for MCMS operationData encoding.
-// Use this when encoding choice arguments for MCMS timelock operations.
+// ContractId fields are omitted; pass them via the MCMS targetCids map at execution time.
 type {{capitalise .Name}}MCMSParams struct {
 {{- range .Fields}}
-{{- if not (isCallerField .Name)}}
+{{- if and (not (isCallerField .Name)) (not (isContractIdField .))}}
 	{{capitalise .Name}} {{.Type.GoType}} `json:"{{.Name}}"{{if .IsOptional}} hex:"optional"{{else if and .IsBytes (stringsHasPrefix .Type.GoType "[]")}} hex:"[]bytes"{{else if .IsBytes}} hex:"bytes"{{else if .IsBytesHex}} hex:"bytes16"{{else if .IsUint32}} hex:"uint32"{{else if .IsUint32List}} hex:"[]uint32"{{end}}`
 {{- end}}
 {{- end}}
@@ -608,6 +610,9 @@ func {{capitalise $interfaceName}}InterfaceIDWithPackageID(packageID string) str
 {{$choiceArgChoices := .ChoiceArgChoices}}
 {{$paramEncoderNames := .ParamEncoderNames}}
 {{$encoderMethodNames := .EncoderMethodNames}}
+{{$encoderChoiceNames := .EncoderChoiceNames}}
+{{$operationDataParamsByStruct := .OperationDataParamsByStruct}}
+{{$operationDataParamsByChoice := .OperationDataParamsByChoice}}
 // MCMSEncoder interface for typed encoding methods.
 // Implemented by Encoder for method-based encoding.
 type MCMSEncoder interface {
@@ -617,13 +622,18 @@ type MCMSEncoder interface {
 {{- $isChoiceArgType := index $choiceArgTypes $goName}}
 {{- $isParamsType := stringsHasSuffix $damlName "Params"}}
 {{- $baseNameForParams := stringsTrimSuffix $damlName "Params"}}
-{{- $hasParamEncoder := and $isParamsType (index $paramEncoderNames $baseNameForParams)}}
-{{- if and (not .IsInterface) (not .IsTemplate) (eq .RawType "Record") (or $isChoiceArgType $hasParamEncoder)}}
+{{- $hasOperationDataParamsEncoder := index $operationDataParamsByStruct $damlName}}
+{{- $hasParamEncoder := or $hasOperationDataParamsEncoder (and $isParamsType (index $paramEncoderNames $baseNameForParams))}}
+{{- $choiceNameForArg := index $choiceArgChoices $goName}}
+{{- $skipChoiceArgEncoder := and $isChoiceArgType $choiceNameForArg (index $operationDataParamsByChoice $choiceNameForArg)}}
+{{- if and (not .IsInterface) (not .IsTemplate) (eq .RawType "Record") (or (and $isChoiceArgType (not $skipChoiceArgEncoder)) $hasParamEncoder)}}
 {{- /* Generate encoder for all choice types and *Params types */}}
 {{- $methodName := index $encoderMethodNames $goName}}
 {{- if eq $methodName ""}}{{$methodName = $goName}}{{end}}
 	{{$methodName}}(args {{$goName}}) (*bind.EncodedChoice, error)
-{{- if and $isChoiceArgType (hasCallerField .)}}
+{{- $choiceNameForMCMS := index $choiceArgChoices $goName}}
+{{- $skipMCMSParams := and $choiceNameForMCMS (index $operationDataParamsByChoice $choiceNameForMCMS)}}
+{{- if and $isChoiceArgType (hasCallerField .) (not $skipMCMSParams)}}
 	{{$methodName}}MCMSParams(args {{$goName}}MCMSParams) (*bind.EncodedChoice, error)
 {{- end}}
 {{- end}}
@@ -664,19 +674,28 @@ func (c *Contract) Encoder() MCMSEncoder {
 {{- $isChoiceArgType := index $choiceArgTypes $goName}}
 {{- $isParamsType := stringsHasSuffix $damlName "Params"}}
 {{- $baseNameForParams := stringsTrimSuffix $damlName "Params"}}
-{{- $hasParamEncoder := and $isParamsType (index $paramEncoderNames $baseNameForParams)}}
-{{- if and (not .IsInterface) (not .IsTemplate) (eq .RawType "Record") (or $isChoiceArgType $hasParamEncoder)}}
+{{- $hasOperationDataParamsEncoder := index $operationDataParamsByStruct $damlName}}
+{{- $hasParamEncoder := or $hasOperationDataParamsEncoder (and $isParamsType (index $paramEncoderNames $baseNameForParams))}}
+{{- $choiceNameForArg := index $choiceArgChoices $goName}}
+{{- $skipChoiceArgEncoder := and $isChoiceArgType $choiceNameForArg (index $operationDataParamsByChoice $choiceNameForArg)}}
+{{- if and (not .IsInterface) (not .IsTemplate) (eq .RawType "Record") (or (and $isChoiceArgType (not $skipChoiceArgEncoder)) $hasParamEncoder)}}
 {{- /* Generate encoder for all choice types and *Params types */}}
 {{- $methodName := index $encoderMethodNames $goName}}
 {{- if eq $methodName ""}}{{$methodName = $goName}}{{end}}
 {{- $choiceName := index $choiceArgChoices $goName}}
-{{- if and $isParamsType (not $isChoiceArgType)}}{{$choiceName = $baseNameForParams}}{{end}}
+{{- if index $encoderChoiceNames $goName}}
+{{- $choiceName = index $encoderChoiceNames $goName}}
+{{- else if and $isParamsType (not $isChoiceArgType)}}
+{{- $choiceName = $baseNameForParams}}
+{{- end}}
 
 // {{$methodName}} encodes parameters for the {{$choiceName}} choice.
 func (e *encoder) {{$methodName}}(args {{$goName}}) (*bind.EncodedChoice, error) {
 	return e.EncodeChoiceArgs("{{$choiceName}}", args)
 }
-{{- if and $isChoiceArgType (hasCallerField .)}}
+{{- $choiceNameForMCMS := index $choiceArgChoices $goName}}
+{{- $skipMCMSParams := and $choiceNameForMCMS (index $operationDataParamsByChoice $choiceNameForMCMS)}}
+{{- if and $isChoiceArgType (hasCallerField .) (not $skipMCMSParams)}}
 
 // {{$methodName}}MCMSParams encodes MCMS parameters (without Caller) for the {{$choiceName}} choice.
 func (e *encoder) {{$methodName}}MCMSParams(args {{$goName}}MCMSParams) (*bind.EncodedChoice, error) {
