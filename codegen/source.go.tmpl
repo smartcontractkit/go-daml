@@ -344,7 +344,7 @@ var _ types.EnumWithTagByte = {{capitalise .Name}}("")
 // {{capitalise .Name}} is a {{.RawType}} type
 type {{capitalise .Name}} struct {
 	{{- range $field := .Fields}}
-	{{capitalise $field.Name}} {{$field.Type.GoType}} `json:"{{$field.Name}}"{{if $field.IsOptional}} hex:"optional"{{else if and $field.IsBytes (stringsHasPrefix $field.Type.GoType "[]")}} hex:"[]bytes"{{else if $field.IsBytes}} hex:"bytes"{{else if $field.IsBytesHex}} hex:"bytes16"{{else if $field.IsUint32}} hex:"uint32"{{else if $field.IsUint32List}} hex:"[]uint32"{{end}}`
+	{{capitalise $field.Name}} {{$field.Type.GoType}} `json:"{{$field.Name}}"{{if $field.IsOptional}} hex:"optional"{{else if and $field.IsBytes (stringsHasPrefix $field.Type.GoType "[]")}} hex:"[]bytes"{{else if $field.IsBytes}} hex:"bytes"{{else if $field.IsBytesHex}} hex:"bytes16"{{else if $field.IsUint32}} hex:"uint32"{{else if $field.IsUint32List}} hex:"[]uint32"{{else if $field.IsDecimal}} hex:"decimal"{{end}}`
 	{{- end}}
 }
 

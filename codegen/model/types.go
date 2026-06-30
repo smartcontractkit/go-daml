@@ -99,6 +99,11 @@ type FieldHints struct {
 	Uint32Fields map[string]bool
 	// Uint32ListFields: field names where []INT64 should be encoded as []uint32 (hex:"[]uint32" tag).
 	Uint32ListFields map[string]bool
+	// DecimalFields: field names whose Daml Decimal value should use the MCMS encodeDecimal
+	// wire format (sign byte + magnitude shifted ×10^10 as length-prefixed text; hex:"decimal" tag).
+	// Daml's Decimal (= Numeric 10) is indistinguishable from a plain Numeric in the compiled
+	// .dalf, so the field name is hinted here rather than inferred.
+	DecimalFields map[string]bool
 	// VariantTagByteMap: maps fully-qualified variant type name (e.g. "Module.TypeName") to
 	// a map of constructor names to their numeric tag bytes for MCMS encoding.
 	// Example: {"MyModule.TransferTimeout": {"Indefinite": 0x00, "RelativeHours": 0x01}}

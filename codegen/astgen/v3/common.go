@@ -377,6 +377,9 @@ func (c *codeGenAst) getTemplates(
 					IsBytesHex:   c.fieldHints.BytesHexFields[fieldExtracted],
 					IsUint32:     c.fieldHints.Uint32Fields[fieldExtracted],
 					IsUint32List: c.fieldHints.Uint32ListFields[fieldExtracted],
+					// Only scalar NUMERIC fields get hex:"decimal"; a same-named map/list (e.g. FeeQuoter's
+					// usdPerToken GENMAP) must not, matching the runtime types.NUMERIC check in the codec.
+					IsDecimal: c.fieldHints.DecimalFields[fieldExtracted] && typeExtracted.GoType() == "types.NUMERIC",
 				})
 			}
 		default:
@@ -630,6 +633,9 @@ func (c *codeGenAst) getDataTypes(pkg *daml.Package, module *daml.Module, module
 					IsBytesHex:   c.fieldHints.BytesHexFields[fieldExtracted],
 					IsUint32:     c.fieldHints.Uint32Fields[fieldExtracted],
 					IsUint32List: c.fieldHints.Uint32ListFields[fieldExtracted],
+					// Only scalar NUMERIC fields get hex:"decimal"; a same-named map/list (e.g. FeeQuoter's
+					// usdPerToken GENMAP) must not, matching the runtime types.NUMERIC check in the codec.
+					IsDecimal: c.fieldHints.DecimalFields[fieldExtracted] && typeExtracted.GoType() == "types.NUMERIC",
 				})
 			}
 		case *daml.DefDataType_Variant:
@@ -653,6 +659,9 @@ func (c *codeGenAst) getDataTypes(pkg *daml.Package, module *daml.Module, module
 					IsBytesHex:   c.fieldHints.BytesHexFields[fieldExtracted],
 					IsUint32:     c.fieldHints.Uint32Fields[fieldExtracted],
 					IsUint32List: c.fieldHints.Uint32ListFields[fieldExtracted],
+					// Only scalar NUMERIC fields get hex:"decimal"; a same-named map/list (e.g. FeeQuoter's
+					// usdPerToken GENMAP) must not, matching the runtime types.NUMERIC check in the codec.
+					IsDecimal: c.fieldHints.DecimalFields[fieldExtracted] && typeExtracted.GoType() == "types.NUMERIC",
 				})
 			}
 		case *daml.DefDataType_Enum:
