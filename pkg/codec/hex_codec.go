@@ -234,15 +234,6 @@ func (c *HexCodec) encodeText(s string) ([]byte, error) {
 // decimalShiftScale is 10^10 — MCMS encodeDecimal shifts Decimal into Numeric 0 (see MCMS.Codec.daml).
 var decimalShiftScale = big.NewInt(10_000_000_000)
 
-func isDecimalNumericField(name string) bool {
-	switch name {
-	case "UsdPerUnitGas", "UsdPerToken":
-		return true
-	default:
-		return false
-	}
-}
-
 // encodeDecimalString encodes a decimal string using MCMS encodeDecimal (sign byte + encodeNumeric0 of shifted magnitude).
 func (c *HexCodec) encodeDecimalString(s string) ([]byte, error) {
 	r, ok := new(big.Rat).SetString(s)
@@ -488,14 +479,17 @@ func (c *HexCodec) encodeStruct(rv reflect.Value) ([]byte, error) {
 				}
 				encoded = append([]byte{0x01}, valueEncoded...)
 			}
-		default:
-			if hexTag == "" && field.Kind() == reflect.String &&
-				field.Type() == reflect.TypeOf(types.NUMERIC("")) &&
-				isDecimalNumericField(fieldType.Name) {
-				encoded, err = c.encodeDecimalString(string(field.String()))
-			} else {
-				encoded, err = c.encode(field.Interface())
+		case "decimal":
+			// hex:"decimal" - Daml Decimal via MCMS encodeDecimal (sign byte + 10^10-shifted magnitude as text)
+			if field.Kind() != reflect.String || field.Type() != reflect.TypeOf(types.NUMERIC("")) {
+				return nil, fmt.Errorf("hex:\"decimal\" tag only valid on types.NUMERIC fields, got %v", field.Type())
 			}
+			encoded, err = c.encodeDecimalString(field.String())
+			if err != nil {
+				return nil, fmt.Errorf("failed to encode decimal field %s: %w", fieldType.Name, err)
+			}
+		default:
+			encoded, err = c.encode(field.Interface())
 			if err != nil {
 				return nil, fmt.Errorf("failed to encode field %s: %w", fieldType.Name, err)
 			}
@@ -1204,19 +1198,19 @@ func (c *HexCodec) decodeStruct(data []byte, offset int, target reflect.Value) (
 				return offset, fmt.Errorf("invalid optional flag 0x%02x for field %s", flag, fieldType.Name)
 			}
 			// flag == 0x00: leave field as nil (zero value)
-		default:
-			if hexTag == "" && field.Kind() == reflect.String &&
-				field.Type() == reflect.TypeOf(types.NUMERIC("")) &&
-				isDecimalNumericField(fieldType.Name) {
-				decoded, newOffset, decErr := c.decodeDecimalAt(data, offset)
-				if decErr != nil {
-					return offset, fmt.Errorf("field %s: %w", fieldType.Name, decErr)
-				}
-				field.SetString(decoded)
-				offset = newOffset
-			} else {
-				offset, err = c.decodeValue(data, offset, field)
+		case "decimal":
+			// hex:"decimal" - inverse of encodeDecimalString (MCMS decodeDecimalAt)
+			if field.Kind() != reflect.String || field.Type() != reflect.TypeOf(types.NUMERIC("")) {
+				return offset, fmt.Errorf("hex:\"decimal\" tag only valid on types.NUMERIC fields, got %v", field.Type())
 			}
+			decoded, newOffset, decErr := c.decodeDecimalAt(data, offset)
+			if decErr != nil {
+				return offset, fmt.Errorf("field %s: %w", fieldType.Name, decErr)
+			}
+			field.SetString(decoded)
+			offset = newOffset
+		default:
+			offset, err = c.decodeValue(data, offset, field)
 			if err != nil {
 				return offset, fmt.Errorf("failed to decode field %s: %w", fieldType.Name, err)
 			}

@@ -44,6 +44,7 @@ type TmplField struct {
 	IsBytesHex   bool // True if field should use uint16 length prefix (hex:"bytes16" tag)
 	IsUint32     bool // True if INT64 field should encode as 4-byte uint32 (hex:"uint32" tag)
 	IsUint32List bool // True if []INT64 field should encode with 4-byte uint32 elements (hex:"[]uint32" tag)
+	IsDecimal    bool // True if NUMERIC field should use MCMS encodeDecimal (sign byte + 10^10 shift; hex:"decimal" tag)
 }
 
 type TmplChoice struct {

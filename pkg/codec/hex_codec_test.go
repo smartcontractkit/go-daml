@@ -1621,7 +1621,7 @@ func TestHexCodec_UsdPerUnitGas_DecimalEncoding(t *testing.T) {
 
 	type GasPriceUpdate struct {
 		DestChainSelector types.NUMERIC `json:"destChainSelector"`
-		UsdPerUnitGas     types.NUMERIC `json:"usdPerUnitGas"`
+		UsdPerUnitGas     types.NUMERIC `json:"usdPerUnitGas" hex:"decimal"`
 	}
 
 	original := GasPriceUpdate{
