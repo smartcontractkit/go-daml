@@ -360,11 +360,6 @@ func renameTypeRefs(t model2.DamlType, renamedStructs map[string]*model2.TmplStr
 			v.Value = renameTypeRefs(v.Value, renamedStructs)
 		}
 		return v
-	case model2.Imported:
-		if v.Underlying != nil {
-			v.Underlying = renameTypeRefs(v.Underlying, renamedStructs)
-		}
-		return v
 	case model2.Unknown:
 		if renamed, exists := renamedStructs[v.String]; exists {
 			return model2.Unknown{String: renamed.Name}
