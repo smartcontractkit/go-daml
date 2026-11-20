@@ -2,6 +2,7 @@ package admin
 
 import (
 	"context"
+	"fmt"
 
 	"google.golang.org/grpc"
 
@@ -31,9 +32,13 @@ func NewUserManagementClient(conn *grpc.ClientConn) *userManagement {
 }
 
 func (c *userManagement) CreateUser(ctx context.Context, user *model.User, rights []*model.Right) (*model.User, error) {
+	protoRights, err := rightsToProto(rights)
+	if err != nil {
+		return nil, err
+	}
 	request := &adminv2.CreateUserRequest{
 		User:   userToProto(user),
-		Rights: rightsToProto(rights),
+		Rights: protoRights,
 	}
 
 	resp, err := c.client.CreateUser(ctx, request)
@@ -82,10 +87,14 @@ func (c *userManagement) DeleteUser(ctx context.Context, userID string) error {
 }
 
 func (c *userManagement) GrantUserRights(ctx context.Context, userID, identityProviderID string, rights []*model.Right) ([]*model.Right, error) {
+	protoRights, err := rightsToProto(rights)
+	if err != nil {
+		return nil, err
+	}
 	req := &adminv2.GrantUserRightsRequest{
 		UserId:             userID,
 		IdentityProviderId: identityProviderID,
-		Rights:             rightsToProto(rights),
+		Rights:             protoRights,
 	}
 
 	resp, err := c.client.GrantUserRights(ctx, req)
@@ -93,13 +102,17 @@ func (c *userManagement) GrantUserRights(ctx context.Context, userID, identityPr
 		return nil, err
 	}
 
-	return rightsFromProto(resp.NewlyGrantedRights), nil
+	return rightsFromProto(resp.NewlyGrantedRights)
 }
 
 func (c *userManagement) RevokeUserRights(ctx context.Context, userID string, rights []*model.Right) ([]*model.Right, error) {
+	protoRights, err := rightsToProto(rights)
+	if err != nil {
+		return nil, err
+	}
 	req := &adminv2.RevokeUserRightsRequest{
 		UserId: userID,
-		Rights: rightsToProto(rights),
+		Rights: protoRights,
 	}
 
 	resp, err := c.client.RevokeUserRights(ctx, req)
@@ -107,7 +120,7 @@ func (c *userManagement) RevokeUserRights(ctx context.Context, userID string, ri
 		return nil, err
 	}
 
-	return rightsFromProto(resp.NewlyRevokedRights), nil
+	return rightsFromProto(resp.NewlyRevokedRights)
 }
 
 func (c *userManagement) ListUserRights(ctx context.Context, userID string) ([]*model.Right, error) {
@@ -120,7 +133,7 @@ func (c *userManagement) ListUserRights(ctx context.Context, userID string) ([]*
 		return nil, err
 	}
 
-	return rightsFromProto(resp.Rights), nil
+	return rightsFromProto(resp.Rights)
 }
 
 func userFromProto(pb *adminv2.User) *model.User {
@@ -159,27 +172,35 @@ func userToProto(u *model.User) *adminv2.User {
 	}
 }
 
-func rightFromProto(pb *adminv2.Right) *model.Right {
+func rightFromProto(pb *adminv2.Right) (*model.Right, error) {
 	if pb == nil {
-		return nil
+		return nil, nil
 	}
 	r := &model.Right{}
 	switch rt := pb.Kind.(type) {
 	case *adminv2.Right_CanActAs_:
-		r.Type = model.CanActAs{Party: rt.CanActAs.Party}
+		r.Type = model.CanActAs{Party: rt.CanActAs.GetParty()}
 	case *adminv2.Right_CanReadAs_:
-		r.Type = model.CanReadAs{Party: rt.CanReadAs.Party}
+		r.Type = model.CanReadAs{Party: rt.CanReadAs.GetParty()}
 	case *adminv2.Right_ParticipantAdmin_:
 		r.Type = model.ParticipantAdmin{}
 	case *adminv2.Right_IdentityProviderAdmin_:
 		r.Type = model.IdentityProviderAdmin{}
+	case *adminv2.Right_CanReadAsAnyParty_:
+		r.Type = model.CanReadAsAnyParty{}
+	case *adminv2.Right_CanExecuteAs_:
+		r.Type = model.CanExecuteAs{Party: rt.CanExecuteAs.GetParty()}
+	case *adminv2.Right_CanExecuteAsAnyParty_:
+		r.Type = model.CanExecuteAsAnyParty{}
+	default:
+		return nil, fmt.Errorf("unsupported user right kind %T", pb.Kind)
 	}
-	return r
+	return r, nil
 }
 
-func rightToProto(r *model.Right) *adminv2.Right {
+func rightToProto(r *model.Right) (*adminv2.Right, error) {
 	if r == nil {
-		return nil
+		return nil, nil
 	}
 	pb := &adminv2.Right{}
 	switch rt := r.Type.(type) {
@@ -199,24 +220,46 @@ func rightToProto(r *model.Right) *adminv2.Right {
 		pb.Kind = &adminv2.Right_IdentityProviderAdmin_{
 			IdentityProviderAdmin: &adminv2.Right_IdentityProviderAdmin{},
 		}
+	case model.CanReadAsAnyParty:
+		pb.Kind = &adminv2.Right_CanReadAsAnyParty_{
+			CanReadAsAnyParty: &adminv2.Right_CanReadAsAnyParty{},
+		}
+	case model.CanExecuteAs:
+		pb.Kind = &adminv2.Right_CanExecuteAs_{
+			CanExecuteAs: &adminv2.Right_CanExecuteAs{Party: rt.Party},
+		}
+	case model.CanExecuteAsAnyParty:
+		pb.Kind = &adminv2.Right_CanExecuteAsAnyParty_{
+			CanExecuteAsAnyParty: &adminv2.Right_CanExecuteAsAnyParty{},
+		}
+	default:
+		return nil, fmt.Errorf("unsupported user right type %T", r.Type)
 	}
-	return pb
+	return pb, nil
 }
 
-func rightsFromProto(pbs []*adminv2.Right) []*model.Right {
+func rightsFromProto(pbs []*adminv2.Right) ([]*model.Right, error) {
 	rights := make([]*model.Right, len(pbs))
 	for i, pb := range pbs {
-		rights[i] = rightFromProto(pb)
+		right, err := rightFromProto(pb)
+		if err != nil {
+			return nil, fmt.Errorf("convert user right at index %d: %w", i, err)
+		}
+		rights[i] = right
 	}
-	return rights
+	return rights, nil
 }
 
-func rightsToProto(rights []*model.Right) []*adminv2.Right {
+func rightsToProto(rights []*model.Right) ([]*adminv2.Right, error) {
 	pbs := make([]*adminv2.Right, len(rights))
 	for i, r := range rights {
-		pbs[i] = rightToProto(r)
+		pb, err := rightToProto(r)
+		if err != nil {
+			return nil, fmt.Errorf("convert user right at index %d: %w", i, err)
+		}
+		pbs[i] = pb
 	}
-	return pbs
+	return pbs, nil
 }
 
 func usersFromProto(pbs []*adminv2.User) []*model.User {

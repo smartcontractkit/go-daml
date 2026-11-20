@@ -38,6 +38,20 @@ type IdentityProviderAdmin struct{}
 
 func (IdentityProviderAdmin) isRightType() {}
 
+type CanReadAsAnyParty struct{}
+
+func (CanReadAsAnyParty) isRightType() {}
+
+type CanExecuteAs struct {
+	Party string
+}
+
+func (CanExecuteAs) isRightType() {}
+
+type CanExecuteAsAnyParty struct{}
+
+func (CanExecuteAsAnyParty) isRightType() {}
+
 type PartyDetails struct {
 	Party              string
 	IsLocal            bool
